@@ -15,10 +15,13 @@ class BATTLEFRAME_API UBFSubjectiveAgentComponent : public USubjectiveActorCompo
 public:
     UBFSubjectiveAgentComponent();
 
-    UFUNCTION(BlueprintCallable)
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | SubjectiveAgent", meta = (DisplayName = "Initialize With Data Asset"))
     void InitializeTraits(AActor* OwnerActor);
 
-    UFUNCTION(BlueprintCallable)
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | SubjectiveAgent", meta = (DisplayName = "Activate Agent"))
+    void ActivateAgent(FSubjectHandle Agent);
+
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | SubjectiveAgent", meta = (DisplayName = "Sync Transform Subject To Actor"))
     void SyncTransformSubjectToActor(AActor* OwnerActor);
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)

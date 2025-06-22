@@ -39,10 +39,9 @@ public:
 
 	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::M;
 
-	UFUNCTION(BlueprintCallable, Category = "BattleFrame | AgentSpawner", meta = (DisplayName = "Spawn Agents By Config Index"))
+	UFUNCTION(BlueprintCallable, Category = "BattleFrame | AgentSpawner", meta = (DisplayName = "Spawn Agents By Config Index(Legacy)"))
 	TArray<FSubjectHandle> SpawnAgentsRectangular
 	(
-		bool bAutoActivate = true,
 		int32 ConfigIndex = 0,
 		int32 Quantity = 1,
 		int32 Team = 0,
@@ -56,7 +55,6 @@ public:
 
 	TArray<FSubjectHandle> SpawnAgentsByConfigRectangular
 	(
-		const bool bAutoActivate = true,
 		const TSoftObjectPtr<UAgentConfigDataAsset> DataAsset = nullptr,
 		const int32 Quantity = 1,
 		const int32 Team = 0,
@@ -68,13 +66,13 @@ public:
 		const FSpawnerMult& Multipliers = FSpawnerMult()
 	);
 
-	UFUNCTION(BlueprintCallable, Category = "BattleFrame | AgentSpawner", meta = (DisplayName = "Initialize Agent"))
+	UFUNCTION(BlueprintCallable, Category = "BattleFrame | AgentSpawner", meta = (DisplayName = "Activate Agent"))
 	void ActivateAgent(FSubjectHandle Agent);
 
-	UFUNCTION(BlueprintCallable, Category = "BattleFrame | AgentSpawner", meta = (DisplayName = "KillAllAgents"))
+	UFUNCTION(BlueprintCallable, Category = "BattleFrame | AgentSpawner", meta = (DisplayName = "Kill All Agents"))
 	void KillAllAgents();
 
-	UFUNCTION(BlueprintCallable, Category = "BattleFrame | AgentSpawner", meta = (DisplayName = "KillAgentsBySubtype"))
+	UFUNCTION(BlueprintCallable, Category = "BattleFrame | AgentSpawner", meta = (DisplayName = "Kill Agents By Subtype"))
 	void KillAgentsBySubtype(int32 Index);
 
 };

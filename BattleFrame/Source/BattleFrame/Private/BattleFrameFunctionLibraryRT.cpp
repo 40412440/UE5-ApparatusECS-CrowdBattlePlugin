@@ -16,7 +16,6 @@
 TArray<FSubjectHandle> UBattleFrameFunctionLibraryRT::SpawnAgentsByConfigRectangular
 (
 	AAgentSpawner* AgentSpawner,
-	bool bAutoActivate,
 	TSoftObjectPtr<UAgentConfigDataAsset> DataAsset,
 	int32 Quantity,
 	int32 Team,
@@ -46,7 +45,7 @@ TArray<FSubjectHandle> UBattleFrameFunctionLibraryRT::SpawnAgentsByConfigRectang
 		return EmptyResult;
 	}
 
-	return AgentSpawner->SpawnAgentsByConfigRectangular(bAutoActivate, DataAsset, Quantity, Team, Origin, Region, LaunchVelocity, InitialDirection, CustomDirection, Multipliers);
+	return AgentSpawner->SpawnAgentsByConfigRectangular(DataAsset, Quantity, Team, Origin, Region, LaunchVelocity, InitialDirection, CustomDirection, Multipliers);
 }
 
 void UBattleFrameFunctionLibraryRT::SphereTraceForSubjects
@@ -1130,6 +1129,345 @@ void UBattleFrameFunctionLibraryRT::SetRecordSubTypeTraitByEnum(EESubType SubTyp
 
 	case EESubType::SubType81:
 		SubjectRecord.SetTrait(FSubType81());
+		break;
+	}
+}
+
+void UBattleFrameFunctionLibraryRT::RemoveSubjectSubTypeTraitByIndex(int32 Index, FSubjectHandle SubjectHandle)
+{
+	//TRACE_CPUPROFILER_EVENT_SCOPE_STR("SetRecordSubTypeTraitByIndex");
+	switch (Index)
+	{
+	default:
+		SubjectHandle.RemoveTrait<FSubType0>();
+		break;
+
+	case 0:
+		SubjectHandle.RemoveTrait<FSubType0>();
+		break;
+
+	case 1:
+		SubjectHandle.RemoveTrait<FSubType1>();
+		break;
+
+	case 2:
+		SubjectHandle.RemoveTrait<FSubType2>();
+		break;
+
+	case 3:
+		SubjectHandle.RemoveTrait<FSubType3>();
+		break;
+
+	case 4:
+		SubjectHandle.RemoveTrait<FSubType4>();
+		break;
+
+	case 5:
+		SubjectHandle.RemoveTrait<FSubType5>();
+		break;
+
+	case 6:
+		SubjectHandle.RemoveTrait<FSubType6>();
+		break;
+
+	case 7:
+		SubjectHandle.RemoveTrait<FSubType7>();
+		break;
+
+	case 8:
+		SubjectHandle.RemoveTrait<FSubType8>();
+		break;
+
+	case 9:
+		SubjectHandle.RemoveTrait<FSubType9>();
+		break;
+
+	case 10:
+		SubjectHandle.RemoveTrait<FSubType10>();
+		break;
+
+	case 11:
+		SubjectHandle.RemoveTrait<FSubType11>();
+		break;
+
+	case 12:
+		SubjectHandle.RemoveTrait<FSubType12>();
+		break;
+
+	case 13:
+		SubjectHandle.RemoveTrait<FSubType13>();
+		break;
+
+	case 14:
+		SubjectHandle.RemoveTrait<FSubType14>();
+		break;
+
+	case 15:
+		SubjectHandle.RemoveTrait<FSubType15>();
+		break;
+
+	case 16:
+		SubjectHandle.RemoveTrait<FSubType16>();
+		break;
+
+	case 17:
+		SubjectHandle.RemoveTrait<FSubType17>();
+		break;
+
+	case 18:
+		SubjectHandle.RemoveTrait<FSubType18>();
+		break;
+
+	case 19:
+		SubjectHandle.RemoveTrait<FSubType19>();
+		break;
+
+	case 20:
+		SubjectHandle.RemoveTrait<FSubType20>();
+		break;
+
+	case 21:
+		SubjectHandle.RemoveTrait<FSubType21>();
+		break;
+
+	case 22:
+		SubjectHandle.RemoveTrait<FSubType22>();
+		break;
+
+	case 23:
+		SubjectHandle.RemoveTrait<FSubType23>();
+		break;
+
+	case 24:
+		SubjectHandle.RemoveTrait<FSubType24>();
+		break;
+
+	case 25:
+		SubjectHandle.RemoveTrait<FSubType25>();
+		break;
+
+	case 26:
+		SubjectHandle.RemoveTrait<FSubType26>();
+		break;
+
+	case 27:
+		SubjectHandle.RemoveTrait<FSubType27>();
+		break;
+
+	case 28:
+		SubjectHandle.RemoveTrait<FSubType28>();
+		break;
+
+	case 29:
+		SubjectHandle.RemoveTrait<FSubType29>();
+		break;
+
+	case 30:
+		SubjectHandle.RemoveTrait<FSubType30>();
+		break;
+
+	case 31:
+		SubjectHandle.RemoveTrait<FSubType31>();
+		break;
+
+	case 32:
+		SubjectHandle.RemoveTrait<FSubType32>();
+		break;
+
+	case 33:
+		SubjectHandle.RemoveTrait<FSubType33>();
+		break;
+
+	case 34:
+		SubjectHandle.RemoveTrait<FSubType34>();
+		break;
+
+	case 35:
+		SubjectHandle.RemoveTrait<FSubType35>();
+		break;
+
+	case 36:
+		SubjectHandle.RemoveTrait<FSubType36>();
+		break;
+
+	case 37:
+		SubjectHandle.RemoveTrait<FSubType37>();
+		break;
+
+	case 38:
+		SubjectHandle.RemoveTrait<FSubType38>();
+		break;
+
+	case 39:
+		SubjectHandle.RemoveTrait<FSubType39>();
+		break;
+
+	case 40:
+		SubjectHandle.RemoveTrait<FSubType40>();
+		break;
+
+	case 41:
+		SubjectHandle.RemoveTrait<FSubType41>();
+		break;
+
+	case 42:
+		SubjectHandle.RemoveTrait<FSubType42>();
+		break;
+
+	case 43:
+		SubjectHandle.RemoveTrait<FSubType43>();
+		break;
+
+	case 44:
+		SubjectHandle.RemoveTrait<FSubType44>();
+		break;
+
+	case 45:
+		SubjectHandle.RemoveTrait<FSubType45>();
+		break;
+
+	case 46:
+		SubjectHandle.RemoveTrait<FSubType46>();
+		break;
+
+	case 47:
+		SubjectHandle.RemoveTrait<FSubType47>();
+		break;
+
+	case 48:
+		SubjectHandle.RemoveTrait<FSubType48>();
+		break;
+
+	case 49:
+		SubjectHandle.RemoveTrait<FSubType49>();
+		break;
+
+	case 50:
+		SubjectHandle.RemoveTrait<FSubType50>();
+		break;
+
+	case 51:
+		SubjectHandle.RemoveTrait<FSubType51>();
+		break;
+
+	case 52:
+		SubjectHandle.RemoveTrait<FSubType52>();
+		break;
+
+	case 53:
+		SubjectHandle.RemoveTrait<FSubType53>();
+		break;
+
+	case 54:
+		SubjectHandle.RemoveTrait<FSubType54>();
+		break;
+
+	case 55:
+		SubjectHandle.RemoveTrait<FSubType55>();
+		break;
+
+	case 56:
+		SubjectHandle.RemoveTrait<FSubType56>();
+		break;
+
+	case 57:
+		SubjectHandle.RemoveTrait<FSubType57>();
+		break;
+
+	case 58:
+		SubjectHandle.RemoveTrait<FSubType58>();
+		break;
+
+	case 59:
+		SubjectHandle.RemoveTrait<FSubType59>();
+		break;
+
+	case 60:
+		SubjectHandle.RemoveTrait<FSubType60>();
+		break;
+
+	case 61:
+		SubjectHandle.RemoveTrait<FSubType61>();
+		break;
+
+	case 62:
+		SubjectHandle.RemoveTrait<FSubType62>();
+		break;
+
+	case 63:
+		SubjectHandle.RemoveTrait<FSubType63>();
+		break;
+
+	case 64:
+		SubjectHandle.RemoveTrait<FSubType64>();
+		break;
+
+	case 65:
+		SubjectHandle.RemoveTrait<FSubType65>();
+		break;
+
+	case 66:
+		SubjectHandle.RemoveTrait<FSubType66>();
+		break;
+
+	case 67:
+		SubjectHandle.RemoveTrait<FSubType67>();
+		break;
+
+	case 68:
+		SubjectHandle.RemoveTrait<FSubType68>();
+		break;
+
+	case 69:
+		SubjectHandle.RemoveTrait<FSubType69>();
+		break;
+
+	case 70:
+		SubjectHandle.RemoveTrait<FSubType70>();
+		break;
+
+	case 71:
+		SubjectHandle.RemoveTrait<FSubType71>();
+		break;
+
+	case 72:
+		SubjectHandle.RemoveTrait<FSubType72>();
+		break;
+
+	case 73:
+		SubjectHandle.RemoveTrait<FSubType73>();
+		break;
+
+	case 74:
+		SubjectHandle.RemoveTrait<FSubType74>();
+		break;
+
+	case 75:
+		SubjectHandle.RemoveTrait<FSubType75>();
+		break;
+
+	case 76:
+		SubjectHandle.RemoveTrait<FSubType76>();
+		break;
+
+	case 77:
+		SubjectHandle.RemoveTrait<FSubType77>();
+		break;
+
+	case 78:
+		SubjectHandle.RemoveTrait<FSubType78>();
+		break;
+
+	case 79:
+		SubjectHandle.RemoveTrait<FSubType79>();
+		break;
+
+	case 80:
+		SubjectHandle.RemoveTrait<FSubType80>();
+		break;
+
+	case 81:
+		SubjectHandle.RemoveTrait<FSubType81>();
 		break;
 	}
 }

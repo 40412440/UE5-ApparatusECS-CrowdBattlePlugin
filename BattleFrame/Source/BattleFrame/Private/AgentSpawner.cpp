@@ -52,7 +52,6 @@ void AAgentSpawner::BeginPlay()
 
 TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsRectangular
 (
-    bool bAutoActivate,
     int32 ConfigIndex,
     int32 Quantity,
     int32 Team,
@@ -239,10 +238,7 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsRectangular
         // Spawn using the modified record
         const auto Agent = Mechanism->SpawnSubject(Config);
 
-        if (bAutoActivate)
-        {
-            ActivateAgent(Agent);
-        }
+        ActivateAgent(Agent);
 
         SpawnedAgents.Add(Agent);
     }
@@ -252,7 +248,6 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsRectangular
 
 TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsByConfigRectangular
 (
-    const bool bAutoActivate,
     const TSoftObjectPtr<UAgentConfigDataAsset> DataAsset,
     const int32 Quantity,
     const int32 Team,
@@ -434,10 +429,7 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsByConfigRectangular
         // Spawn using the modified record
         const auto Agent = Mechanism->SpawnSubject(Config);
 
-        if (bAutoActivate)
-        {
-            ActivateAgent(Agent);
-        }
+        ActivateAgent(Agent);
 
         SpawnedAgents.Add(Agent);
     }
@@ -464,6 +456,8 @@ void AAgentSpawner::ActivateAgent( FSubjectHandle Agent )// strange apparatus bu
 
     if (IsValid(Animation.AnimToTextureData))
     {
+        Animation.AnimLengthArray.Empty();
+
         for (FAnimToTextureAnimInfo CurrentAnim : Animation.AnimToTextureData->Animations)
         {
             Animation.AnimLengthArray.Add((CurrentAnim.EndFrame - CurrentAnim.StartFrame) / Animation.AnimToTextureData->SampleRate);
@@ -475,6 +469,10 @@ void AAgentSpawner::ActivateAgent( FSubjectHandle Agent )// strange apparatus bu
         Animation.Dissolve = 1;
         Agent.SetTrait(FAppearing());
     }
+    else
+    {
+        Agent.RemoveTrait<FAppearing>();
+    }
 
     Animation.AnimOffsetTime0 = FMath::RandRange(Animation.IdleRandomTimeOffset.X, Animation.IdleRandomTimeOffset.Y);
     Animation.AnimOffsetTime1 = FMath::RandRange(Animation.IdleRandomTimeOffset.X, Animation.IdleRandomTimeOffset.Y);
@@ -485,10 +483,18 @@ void AAgentSpawner::ActivateAgent( FSubjectHandle Agent )// strange apparatus bu
     {
         Agent.SetTrait(FSleeping());
     }
+    else
+    {
+        Agent.RemoveTrait<FSleeping>();
+    }
 
     if (Patrol.bEnable)
     {
         Agent.SetTrait(FPatrolling());
+    }
+    else
+    {
+        Agent.RemoveTrait<FPatrolling>();
     }
 
     if (Collider.bHightQuality)
@@ -496,12 +502,29 @@ void AAgentSpawner::ActivateAgent( FSubjectHandle Agent )// strange apparatus bu
         //Agent.SetTrait(FRegisterMultiple());
         Agent.SetFlag(RegisterMultipleFlag, true);
     }
+    else
+    {
+        Agent.SetFlag(RegisterMultipleFlag, false);
+    }
 
-    Agent.SetTrait(FGridData{ Agent.CalcHash(), FVector3f(Located.Location), Collider.Radius * Scaled.Scale, Agent });
+    UBattleFrameFunctionLibraryRT::RemoveSubjectSubTypeTraitByIndex(SubType.PreviousIndex, Agent);
+    UBattleFrameFunctionLibraryRT::RemoveSubjectTeamTraitByIndex(FMath::Clamp(Team.PreviousIndex, 0, 9), Agent);
+    UBattleFrameFunctionLibraryRT::RemoveSubjectAvoGroupTraitByIndex(FMath::Clamp(Avoidance.PreviousGroup, 0, 9), Agent);
 
     UBattleFrameFunctionLibraryRT::SetSubjectSubTypeTraitByIndex(SubType.Index, Agent);
     UBattleFrameFunctionLibraryRT::SetSubjectTeamTraitByIndex(FMath::Clamp(Team.index, 0, 9), Agent);
     UBattleFrameFunctionLibraryRT::SetSubjectAvoGroupTraitByIndex(FMath::Clamp(Avoidance.Group, 0, 9), Agent);
+    
+    Team.PreviousIndex = Team.index;
+    SubType.PreviousIndex = SubType.Index;
+    Avoidance.PreviousGroup = Avoidance.Group;
+
+    Agent.SetTrait(Team);
+    Agent.SetTrait(SubType);
+    Agent.SetTrait(Avoidance);
+
+    Agent.SetTrait(FGridData{ Agent.CalcHash(), FVector3f(Located.Location), Collider.Radius * Scaled.Scale, Agent });
+    Agent.SetTrait(FActivated());
 
     // 如果场上没有，生成该怪物的渲染器
     if (CurrentWorld && BattleControl && !BattleControl->ExistingRenderers.Contains(SubType.Index))
@@ -522,7 +545,6 @@ void AAgentSpawner::ActivateAgent( FSubjectHandle Agent )// strange apparatus bu
         }
     }
 
-    Agent.SetTrait(FActivated());
 }
 
 void AAgentSpawner::KillAllAgents()

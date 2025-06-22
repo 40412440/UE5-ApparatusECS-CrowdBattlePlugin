@@ -116,7 +116,6 @@ void UBFSubjectiveAgentComponent::InitializeTraits(AActor* OwnerActor)
     AgentConfig.SetTrait(FSlowing());
     AgentConfig.SetTrait(DataAsset->Statistics);
     AgentConfig.SetTrait(FIsSubjective());
-    AgentConfig.SetTrait(FActivated());
 
     // Apply Multipliers
     auto& Health = AgentConfig.GetTraitRef<FHealth>();
@@ -166,17 +165,33 @@ void UBFSubjectiveAgentComponent::InitializeTraits(AActor* OwnerActor)
         Moving.bLaunching = true;
     }
 
-    auto& Appear = AgentConfig.GetTraitRef<FAppear>();
-    auto& Sleep = AgentConfig.GetTraitRef<FSleep>();
-    auto& Animation = AgentConfig.GetTraitRef<FAnimation>();
-    auto& Team = AgentConfig.GetTraitRef<FTeam>();
-    auto& SubType = AgentConfig.GetTraitRef<FSubType>();
-    auto& Avoidance = AgentConfig.GetTraitRef<FAvoidance>();
+    this->GetHandle()->RemoveAllTraits();
+    this->GetHandle()->SetTraits(AgentConfig);
+
+    ActivateAgent(this->GetHandle());
+}
+
+void UBFSubjectiveAgentComponent::ActivateAgent(FSubjectHandle Agent)// strange apparatus bug : don't use get ref or the value may expire later when use
+{
+    TRACE_CPUPROFILER_EVENT_SCOPE_STR("ActivateAgent");
+
+    auto Located = Agent.GetTrait<FLocated>();
+    auto Scaled = Agent.GetTrait<FScaled>();
+    auto Collider = Agent.GetTrait<FCollider>();
+    auto Appear = Agent.GetTrait<FAppear>();
+    auto Sleep = Agent.GetTrait<FSleep>();
+    auto Patrol = Agent.GetTrait<FPatrol>();
+    auto Animation = Agent.GetTrait<FAnimation>();
+    auto Team = Agent.GetTrait<FTeam>();
+    auto SubType = Agent.GetTrait<FSubType>();
+    auto Avoidance = Agent.GetTrait<FAvoidance>();
 
     Animation.AnimToTextureData = Animation.AnimToTextureDataAsset.LoadSynchronous(); // DataAsset Solid Pointer
 
     if (IsValid(Animation.AnimToTextureData))
     {
+        Animation.AnimLengthArray.Empty();
+
         for (FAnimToTextureAnimInfo CurrentAnim : Animation.AnimToTextureData->Animations)
         {
             Animation.AnimLengthArray.Add((CurrentAnim.EndFrame - CurrentAnim.StartFrame) / Animation.AnimToTextureData->SampleRate);
@@ -186,35 +201,64 @@ void UBFSubjectiveAgentComponent::InitializeTraits(AActor* OwnerActor)
     if (Appear.bEnable)
     {
         Animation.Dissolve = 1;
-        AgentConfig.SetTrait(FAppearing());
+        Agent.SetTrait(FAppearing());
+    }
+    else
+    {
+        Agent.RemoveTrait<FAppearing>();
     }
 
     Animation.AnimOffsetTime0 = FMath::RandRange(Animation.IdleRandomTimeOffset.X, Animation.IdleRandomTimeOffset.Y);
     Animation.AnimOffsetTime1 = FMath::RandRange(Animation.IdleRandomTimeOffset.X, Animation.IdleRandomTimeOffset.Y);
 
+    Agent.SetTrait(Animation);
+
     if (Sleep.bEnable)
     {
-        AgentConfig.SetTrait(FSleeping());
+        Agent.SetTrait(FSleeping());
+    }
+    else
+    {
+        Agent.RemoveTrait<FSleeping>();
     }
 
     if (Patrol.bEnable)
     {
-        AgentConfig.SetTrait(FPatrolling());
+        Agent.SetTrait(FPatrolling());
+    }
+    else
+    {
+        Agent.RemoveTrait<FPatrolling>();
     }
 
     if (Collider.bHightQuality)
     {
         //Agent.SetTrait(FRegisterMultiple());
-        AgentConfig.SetFlag(RegisterMultipleFlag, true);
+        Agent.SetFlag(RegisterMultipleFlag, true);
+    }
+    else
+    {
+        Agent.SetFlag(RegisterMultipleFlag, false);
     }
 
-    UBattleFrameFunctionLibraryRT::SetRecordSubTypeTraitByIndex(SubType.Index, AgentConfig);
-    UBattleFrameFunctionLibraryRT::SetRecordTeamTraitByIndex(FMath::Clamp(Team.index, 0, 9), AgentConfig);
-    UBattleFrameFunctionLibraryRT::SetRecordAvoGroupTraitByIndex(FMath::Clamp(Avoidance.Group, 0, 9), AgentConfig);
+    UBattleFrameFunctionLibraryRT::RemoveSubjectSubTypeTraitByIndex(SubType.PreviousIndex, Agent);
+    UBattleFrameFunctionLibraryRT::RemoveSubjectTeamTraitByIndex(FMath::Clamp(Team.PreviousIndex, 0, 9), Agent);
+    UBattleFrameFunctionLibraryRT::RemoveSubjectAvoGroupTraitByIndex(FMath::Clamp(Avoidance.PreviousGroup, 0, 9), Agent);
 
-    AgentConfig.SetTrait(FGridData{ this->GetHandle().CalcHash(), FVector3f(Located.Location), Collider.Radius * Scaled.Scale, this->GetHandle() });
+    UBattleFrameFunctionLibraryRT::SetSubjectSubTypeTraitByIndex(SubType.Index, Agent);
+    UBattleFrameFunctionLibraryRT::SetSubjectTeamTraitByIndex(FMath::Clamp(Team.index, 0, 9), Agent);
+    UBattleFrameFunctionLibraryRT::SetSubjectAvoGroupTraitByIndex(FMath::Clamp(Avoidance.Group, 0, 9), Agent);
 
-    this->GetHandle()->SetTraits(AgentConfig);
+    Team.PreviousIndex = Team.index;
+    SubType.PreviousIndex = SubType.Index;
+    Avoidance.PreviousGroup = Avoidance.Group;
+
+    Agent.SetTrait(Team);
+    Agent.SetTrait(SubType);
+    Agent.SetTrait(Avoidance);
+
+    Agent.SetTrait(FGridData{ Agent.CalcHash(), FVector3f(Located.Location), Collider.Radius * Scaled.Scale, Agent });
+    Agent.SetTrait(FActivated());
 
     // 如果场上没有，生成该怪物的渲染器
     if (CurrentWorld && BattleControl && !BattleControl->ExistingRenderers.Contains(SubType.Index))
@@ -235,6 +279,7 @@ void UBFSubjectiveAgentComponent::InitializeTraits(AActor* OwnerActor)
         }
     }
 }
+
 
 void UBFSubjectiveAgentComponent::SyncTransformSubjectToActor(AActor* OwnerActor)
 {

@@ -23,11 +23,15 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "合批特效的子类型,不支持Attach", DisplayName = "SubType_Batched"))
 	EESubType SubType = EESubType::None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Niagara资产", DisplayName = "NiagaraAsset_UnBatched"))
 	UNiagaraSystem* NiagaraAsset = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Cascade资产", DisplayName = "CascadeAsset_UnBatched"))
 	UParticleSystem* CascadeAsset = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Niagara资产", DisplayName = "NiagaraAsset_UnBatched"))
+	TSoftObjectPtr<UNiagaraSystem> SoftNiagaraAsset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Cascade资产", DisplayName = "CascadeAsset_UnBatched"))
+	TSoftObjectPtr<UParticleSystem> SoftCascadeAsset;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "偏移量"))
 	FTransform Transform = FTransform::Identity;
@@ -63,11 +67,15 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "合批特效的子类型,不支持Attach", DisplayName = "SubType_Batched"))
 	EESubType SubType = EESubType::None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Niagara资产", DisplayName = "NiagaraAsset_UnBatched"))
 	UNiagaraSystem* NiagaraAsset = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Cascade资产", DisplayName = "CascadeAsset_UnBatched"))
 	UParticleSystem* CascadeAsset = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Niagara资产", DisplayName = "NiagaraAsset_UnBatched"))
+	TSoftObjectPtr<UNiagaraSystem> SoftNiagaraAsset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Cascade资产", DisplayName = "CascadeAsset_UnBatched"))
+	TSoftObjectPtr<UParticleSystem> SoftCascadeAsset;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "偏移量"))
 	FTransform Transform = FTransform::Identity;
@@ -108,6 +116,8 @@ public:
 		SubType = Config.SubType;
 		NiagaraAsset = Config.NiagaraAsset;
 		CascadeAsset = Config.CascadeAsset;
+		SoftNiagaraAsset = Config.SoftNiagaraAsset;
+		SoftCascadeAsset = Config.SoftCascadeAsset;
 		Transform = Config.Transform;
 		Quantity = Config.Quantity;
 		Delay = Config.Delay;
@@ -122,6 +132,8 @@ public:
 		SubType = Config.SubType;
 		NiagaraAsset = Config.NiagaraAsset;
 		CascadeAsset = Config.CascadeAsset;
+		SoftNiagaraAsset = Config.SoftNiagaraAsset;
+		SoftCascadeAsset = Config.SoftCascadeAsset;
 		Transform = Config.Transform;
 		Quantity = Config.Quantity;
 		Delay = Config.Delay;
@@ -136,11 +148,15 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "合批特效的子类型", DisplayName = "SubType_Batched"))
 	EESubType SubType = EESubType::None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Niagara资产", DisplayName = "NiagaraAsset_UnBatched"))
 	UNiagaraSystem* NiagaraAsset = nullptr;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Cascade资产", DisplayName = "CascadeAsset_UnBatched"))
 	UParticleSystem* CascadeAsset = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Niagara资产", DisplayName = "NiagaraAsset_UnBatched"))
+	TSoftObjectPtr<UNiagaraSystem> SoftNiagaraAsset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "非合批特效Cascade资产", DisplayName = "CascadeAsset_UnBatched"))
+	TSoftObjectPtr<UParticleSystem> SoftCascadeAsset;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "偏移量"))
 	FTransform Transform = FTransform::Identity;

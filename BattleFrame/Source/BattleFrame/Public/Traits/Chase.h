@@ -22,6 +22,6 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "移动速度乘数"))
 	float MoveSpeedMult = 1;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "距离超过该值丢失仇恨"))
-	float MaxDistance = 10000;
+	//UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "距离超过该值丢失仇恨"))
+	//float MaxDistance = 10000;
 };

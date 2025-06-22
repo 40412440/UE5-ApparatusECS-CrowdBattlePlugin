@@ -37,22 +37,22 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FxRenderer")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	EFxMode Mode = EFxMode::InPlace;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FxRenderer")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	UScriptStruct* TraitType = nullptr;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FxRenderer")
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	UScriptStruct* SubType = nullptr;
 
-	// Niagara component that will handle the effects
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FxRenderer", meta = (AllowPrivateAccess = "true"))
-	UNiagaraComponent* NiagaraComponent;
-
 	// Variable to hold the Niagara System Asset
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FxRenderer")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	UNiagaraSystem* NiagaraAsset;
+
+	// Niagara component that will handle the effects
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly)
+	UNiagaraComponent* NiagaraComponent;
 
 	TArray<FTransform> Transforms;
 	FBitMask ValidTransforms;

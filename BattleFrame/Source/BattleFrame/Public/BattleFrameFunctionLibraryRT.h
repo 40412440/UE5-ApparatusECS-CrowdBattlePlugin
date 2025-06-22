@@ -34,7 +34,6 @@ public:
     static TArray<FSubjectHandle> SpawnAgentsByConfigRectangular
     (
         AAgentSpawner* AgentSpawner = nullptr,
-        bool bAutoActivate = true, 
         TSoftObjectPtr<UAgentConfigDataAsset> DataAsset = nullptr,
         int32 Quantity = 1, 
         int32 Team = 0, 
@@ -172,8 +171,49 @@ public:
     static void CalculateThreadsCountAndBatchSize(int32 IterableNum, int32 MaxThreadsAllowed, int32 MinBatchSizeAllowed, int32& ThreadsCount, int32& BatchSize);
     static void SetRecordSubTypeTraitByIndex(int32 Index, FSubjectRecord& SubjectRecord);
     static void SetRecordSubTypeTraitByEnum(EESubType SubType, FSubjectRecord& SubjectRecord);
+    static void RemoveSubjectSubTypeTraitByIndex(int32 Index, FSubjectHandle SubjectHandle);
     static void SetSubjectSubTypeTraitByIndex(int32 Index, FSubjectHandle SubjectHandle);
     static void IncludeSubTypeTraitByIndex(int32 Index, FFilter& Filter);
+
+    FORCEINLINE static void RemoveSubjectAvoGroupTraitByIndex(int32 Index, FSubjectHandle SubjectHandle)
+    {
+        switch (Index)
+        {
+        default:
+            SubjectHandle.RemoveTrait<FAvoGroup0>();
+            break;
+        case 0:
+            SubjectHandle.RemoveTrait<FAvoGroup0>();
+            break;
+        case 1:
+            SubjectHandle.RemoveTrait<FAvoGroup1>();
+            break;
+        case 2:
+            SubjectHandle.RemoveTrait<FAvoGroup2>();
+            break;
+        case 3:
+            SubjectHandle.RemoveTrait<FAvoGroup3>();
+            break;
+        case 4:
+            SubjectHandle.RemoveTrait<FAvoGroup4>();
+            break;
+        case 5:
+            SubjectHandle.RemoveTrait<FAvoGroup5>();
+            break;
+        case 6:
+            SubjectHandle.RemoveTrait<FAvoGroup6>();
+            break;
+        case 7:
+            SubjectHandle.RemoveTrait<FAvoGroup7>();
+            break;
+        case 8:
+            SubjectHandle.RemoveTrait<FAvoGroup8>();
+            break;
+        case 9:
+            SubjectHandle.RemoveTrait<FAvoGroup9>();
+            break;
+        }
+    }
 
     FORCEINLINE static void SetSubjectAvoGroupTraitByIndex(int32 Index, FSubjectHandle SubjectHandle)
     {
@@ -214,6 +254,46 @@ public:
                 break;
         }
     };
+
+    FORCEINLINE static void RemoveSubjectTeamTraitByIndex(int32 Index, FSubjectHandle SubjectHandle)
+    {
+        switch (Index)
+        {
+        default:
+            SubjectHandle.RemoveTrait<FTeam0>();
+            break;
+        case 0:
+            SubjectHandle.RemoveTrait<FTeam0>();
+            break;
+        case 1:
+            SubjectHandle.RemoveTrait<FTeam1>();
+            break;
+        case 2:
+            SubjectHandle.RemoveTrait<FTeam2>();
+            break;
+        case 3:
+            SubjectHandle.RemoveTrait<FTeam3>();
+            break;
+        case 4:
+            SubjectHandle.RemoveTrait<FTeam4>();
+            break;
+        case 5:
+            SubjectHandle.RemoveTrait<FTeam5>();
+            break;
+        case 6:
+            SubjectHandle.RemoveTrait<FTeam6>();
+            break;
+        case 7:
+            SubjectHandle.RemoveTrait<FTeam7>();
+            break;
+        case 8:
+            SubjectHandle.RemoveTrait<FTeam8>();
+            break;
+        case 9:
+            SubjectHandle.RemoveTrait<FTeam9>();
+            break;
+        }
+    }
 
     FORCEINLINE static void SetSubjectTeamTraitByIndex(int32 Index, FSubjectHandle SubjectHandle) 
     {

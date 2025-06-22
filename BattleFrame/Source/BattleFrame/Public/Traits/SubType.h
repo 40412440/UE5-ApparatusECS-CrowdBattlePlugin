@@ -9,6 +9,8 @@ struct BATTLEFRAME_API FSubType
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 Index = 0;
+
+    int32 PreviousIndex = 0;
 };
 
 USTRUCT(BlueprintType)

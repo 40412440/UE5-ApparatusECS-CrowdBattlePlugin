@@ -16,8 +16,10 @@ public:
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "启用"))
     bool bEnable = true;
 
-    UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "Actor类"))
     TSubclassOf<AActor> ActorClass = nullptr;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "软Actor类", DisplayName = "ActorClass"))
+    TSoftClassPtr<AActor> SoftActorClass;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "偏移量"))
     FTransform Transform = FTransform::Identity;
@@ -50,8 +52,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "启用"))
 	bool bEnable = true;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "Actor类"))
-	TSubclassOf<AActor> ActorClass = nullptr;
+    TSubclassOf<AActor> ActorClass = nullptr;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "软Actor类", DisplayName = "ActorClass"))
+    TSoftClassPtr<AActor> SoftActorClass;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "偏移量"))
 	FTransform Transform = FTransform::Identity;
@@ -90,6 +94,7 @@ public:
     {
         bEnable = Config.bEnable;
         ActorClass = Config.ActorClass;
+        SoftActorClass = Config.SoftActorClass;
         Transform = Config.Transform;
         Quantity = Config.Quantity;
         Delay = Config.Delay;
@@ -102,6 +107,7 @@ public:
     {
         bEnable = Config.bEnable;
         ActorClass = Config.ActorClass;
+        SoftActorClass = Config.SoftActorClass;
         Transform = Config.Transform;
         Quantity = Config.Quantity;
         Delay = Config.Delay;
@@ -113,8 +119,10 @@ public:
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "启用"))
     bool bEnable = true;
 
-    UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "Actor类"))
     TSubclassOf<AActor> ActorClass = nullptr;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "软Actor类", DisplayName = "ActorClass"))
+    TSoftClassPtr<AActor> SoftActorClass;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "偏移量"))
     FTransform Transform = FTransform::Identity;

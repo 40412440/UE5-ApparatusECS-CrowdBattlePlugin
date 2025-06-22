@@ -6,7 +6,9 @@ USTRUCT(BlueprintType)
 struct BATTLEFRAME_API FTeam
 {
     GENERATED_BODY()
+
     int32 index = 0;
+    int32 PreviousIndex = 0;
 };
 
 USTRUCT(BlueprintType)

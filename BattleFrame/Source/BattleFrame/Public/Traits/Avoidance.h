@@ -27,6 +27,8 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ToolTip = "碰撞组", ClampMin = "0", ClampMax = "9"))
     int32 Group = 0;
 
+    int32 PreviousGroup = 0;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ToolTip = "不与这些组产生碰撞", ClampMin = "0", ClampMax = "9"))
     TArray<int32> IgnoreGroups;
 
