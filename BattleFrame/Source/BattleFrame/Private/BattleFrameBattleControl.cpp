@@ -1025,6 +1025,53 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 				FVector DesiredMoveDirection = FVector::ZeroVector;
 
+				auto AStarTest = [&]()
+					{
+						// 调用A*算法
+						FVector2D StartGridCoord;
+						Navigation.FlowField->WorldToGrid(AgentLocation, StartGridCoord);
+						FVector2D GoalGridCoord;
+						Navigation.FlowField->WorldToGrid(Moving.Goal, GoalGridCoord);
+
+						TArray<FVector> PathPoints;
+
+						if (Navigation.FlowField->FindPathAStar(StartGridCoord, GoalGridCoord, PathPoints))
+						{
+							if (PathPoints.Num() > 1)
+							{
+								// 获取行驶方向
+								FVector SteeringDir = Navigation.FlowField->GetSteeringDirection(AgentLocation, PathPoints, Moving.CurrentVelocity.Size2D(), 500.0f, 200.0f);
+
+								// 应用移动
+								if (!SteeringDir.IsNearlyZero())
+								{
+									DesiredMoveDirection = SteeringDir;
+								}
+
+								FVector PreviousPoint = PathPoints[0];
+
+								for (const auto& Point : PathPoints)
+								{
+									FDebugSphereConfig SphereConfig;
+									SphereConfig.Location = Point;
+									SphereConfig.Radius = 10;
+									SphereConfig.Color = FColor::Red;
+									SphereConfig.LineThickness = 0.f;
+									DebugSphereQueue.Enqueue(SphereConfig);
+
+									FDebugLineConfig LineConfig;
+									LineConfig.StartLocation = PreviousPoint;
+									LineConfig.EndLocation = Point;
+									LineConfig.Color = FColor::Red;
+									LineConfig.LineThickness = 0.f;
+									DebugLineQueue.Enqueue(LineConfig);
+
+									PreviousPoint = Point;
+								}
+							}
+						}
+					};
+
 				if (Move.bEnable && !bIsAppearing)// Appearing不寻路
 				{
 					if (bIsPatrolling)// Patrolling直接向目标点移动，之后要做个体寻路
@@ -1093,6 +1140,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								}
 								else
 								{
+									//AStarTest();
 									ApproachTraceResultDirectly();
 								}
 							}
