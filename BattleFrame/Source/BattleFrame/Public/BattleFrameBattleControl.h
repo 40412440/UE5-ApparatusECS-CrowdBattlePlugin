@@ -42,6 +42,7 @@
 #include "Traits/Move.h"
 #include "Traits/Moving.h"
 #include "Traits/Navigation.h"
+#include "Traits/Navigating.h"
 #include "Traits/Death.h"
 #include "Traits/Dying.h"
 #include "Traits/DeathAnim.h"
@@ -304,6 +305,12 @@ public:
 	static FVector FindNewPatrolGoalLocation(const FPatrol Patrol, const FCollider Collider, const FTrace Trace, const FTracing Tracing, const FLocated Located, const FScaled Scaled, int32 MaxAttempts);
 
 	void DrawDebugSector(UWorld* World, const FVector& Center, const FVector& Direction, float Radius, float AngleDegrees, float Height, const FColor& Color, bool bPersistentLines, float LifeTime, uint8 DepthPriority, float Thickness);
+
+	bool FindPathAStar(AFlowField* FlowField, const FVector& StartLocation, const FVector& GoalLocation, TArray<FVector>& OutPath);
+
+	bool GetSteeringDirection(const FVector& CurrentLocation, const FVector& GoalLocation, const TArray<FVector>& PathPoints, float MoveSpeed, float LookAheadDistance, float PathRadius, FVector& SteeringDirection);
+
+	FVector FindClosestPointOnSegment(const FVector& Point, const FVector& SegmentStart, const FVector& SegmentEnd);
 
 
 	//---------------------------------------------RVO2------------------------------------------------------------------

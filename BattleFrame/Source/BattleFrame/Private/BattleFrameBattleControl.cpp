@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "DrawDebugHelpers.h"
+#include <queue>
 
 // Niagara 插件
 #include "NiagaraDataInterfaceArrayFunctionLibrary.h"
@@ -937,6 +938,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FMove& Move,
 				FMoving& Moving,
 				FNavigation& Navigation,
+				FNavigating& Navigating,
 				FTrace& Trace,
 				FTracing& Tracing,
 				FDefence& Defence,
@@ -959,13 +961,13 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					return;
 				}
 
-				if (Navigation.bIsDirtyData)
+				if (Navigation.bReloadFlowField)
 				{
-					Navigation.FlowField = Navigation.FlowFieldToUse.LoadSynchronous();
-					Navigation.bIsDirtyData = false;
+					Navigating.FlowField = Navigation.FlowFieldToUse.LoadSynchronous();
+					Navigation.bReloadFlowField = false;
 				}
 
-				const bool bIsValidFF = IsValid(Navigation.FlowField);
+				const bool bIsValidFF = IsValid(Navigating.FlowField);
 
 				// 必须要有一个流场
 				if (UNLIKELY(!bIsValidFF))
@@ -974,12 +976,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					return;
 				}
 
-				FVector AgentLocation = Located.Location;
+				FVector SelfLocation = Located.Location;
 				float SelfRadius = Collider.Radius * Scaled.Scale;
 
 				// 必须获取因为之后要用到地面高度
 				bool bInside_BaseFF;
-				FCellStruct& Cell_BaseFF = Navigation.FlowField->GetCellAtLocation(AgentLocation, bInside_BaseFF);
+				FCellStruct& Cell_BaseFF = Navigating.FlowField->GetCellAtLocation(SelfLocation, bInside_BaseFF);
 
 				const bool bIsAppearing = Subject.HasTrait<FAppearing>();
 				const bool bIsAttacking = Subject.HasTrait<FAttacking>();
@@ -1025,58 +1027,66 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 				FVector DesiredMoveDirection = FVector::ZeroVector;
 
-				auto AStarTest = [&]()
-					{
-						// 调用A*算法
-						FVector2D StartGridCoord;
-						Navigation.FlowField->WorldToGrid(AgentLocation, StartGridCoord);
-						FVector2D GoalGridCoord;
-						Navigation.FlowField->WorldToGrid(Moving.Goal, GoalGridCoord);
-
-						TArray<FVector> PathPoints;
-
-						if (Navigation.FlowField->FindPathAStar(StartGridCoord, GoalGridCoord, PathPoints))
-						{
-							if (PathPoints.Num() > 1)
-							{
-								// 获取行驶方向
-								FVector SteeringDir = Navigation.FlowField->GetSteeringDirection(AgentLocation, PathPoints, Moving.CurrentVelocity.Size2D(), 500.0f, 200.0f);
-
-								// 应用移动
-								if (!SteeringDir.IsNearlyZero())
-								{
-									DesiredMoveDirection = SteeringDir;
-								}
-
-								FVector PreviousPoint = PathPoints[0];
-
-								for (const auto& Point : PathPoints)
-								{
-									FDebugSphereConfig SphereConfig;
-									SphereConfig.Location = Point;
-									SphereConfig.Radius = 10;
-									SphereConfig.Color = FColor::Red;
-									SphereConfig.LineThickness = 0.f;
-									DebugSphereQueue.Enqueue(SphereConfig);
-
-									FDebugLineConfig LineConfig;
-									LineConfig.StartLocation = PreviousPoint;
-									LineConfig.EndLocation = Point;
-									LineConfig.Color = FColor::Red;
-									LineConfig.LineThickness = 0.f;
-									DebugLineQueue.Enqueue(LineConfig);
-
-									PreviousPoint = Point;
-								}
-							}
-						}
-					};
-
 				if (Move.bEnable && !bIsAppearing)// Appearing不寻路
 				{
-					if (bIsPatrolling)// Patrolling直接向目标点移动，之后要做个体寻路
+					auto PathfindToGoal = [&]()
+						{
+							if (Navigation.bUseAStar)
+							{
+								const bool bIsOnPath = GetSteeringDirection(SelfLocation, Moving.Goal, Navigating.PathPoints, Moving.CurrentVelocity.Size2D(), SelfRadius * 2, SelfRadius * 2, DesiredMoveDirection);
+
+								if (Navigating.TimeLeft <= 0 && !bIsOnPath)
+								{
+									Navigating.TimeLeft = Navigation.AStarCoolDown;
+
+									// 调用A*算法
+									FindPathAStar(Navigating.FlowField, SelfLocation, Moving.Goal, Navigating.PathPoints);
+								}
+
+								Navigating.TimeLeft = FMath::Clamp(Navigating.TimeLeft - SafeDeltaTime, 0, FLT_MAX);
+
+								// Draw Path
+								if (Navigation.bDrawDebugShape && Navigating.PathPoints.Num() > 0)
+								{
+									FVector PreviousPoint = Navigating.PathPoints[0];
+
+									for (const auto& Point : Navigating.PathPoints)
+									{
+										FDebugSphereConfig SphereConfig;
+										SphereConfig.Location = Point;
+										SphereConfig.Radius = 10;
+										SphereConfig.Color = FColor::Red;
+										SphereConfig.LineThickness = 0.f;
+										DebugSphereQueue.Enqueue(SphereConfig);
+
+										FDebugLineConfig LineConfig;
+										LineConfig.StartLocation = PreviousPoint;
+										LineConfig.EndLocation = Point;
+										LineConfig.Color = FColor::Red;
+										LineConfig.LineThickness = 0.f;
+										DebugLineQueue.Enqueue(LineConfig);
+
+										PreviousPoint = Point;
+									}
+								}
+							}
+							else
+							{
+								if (bIsTraceResultHasLocated)
+								{
+									Moving.Goal = Tracing.TraceResult.GetTrait<FLocated>().Location;
+									DesiredMoveDirection = (Moving.Goal - SelfLocation).GetSafeNormal2D();
+								}
+								else
+								{
+									Moving.MoveSpeedMult = 0;
+								}
+							}
+						};
+
+					if (bIsPatrolling)
 					{
-						DesiredMoveDirection = (Moving.Goal - AgentLocation).GetSafeNormal2D();
+						PathfindToGoal();
 					}
 					else
 					{
@@ -1084,7 +1094,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						{
 							if (bInside_BaseFF)
 							{
-								Moving.Goal = Navigation.FlowField->goalLocation;
+								Moving.Goal = Navigating.FlowField->goalLocation;
 								DesiredMoveDirection = Cell_BaseFF.dir.GetSafeNormal2D();
 							}
 							else
@@ -1094,39 +1104,25 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						}
 						else
 						{
-							// 直接向攻击目标移动，之后要做个体寻路
-							auto ApproachTraceResultDirectly = [&]()
-								{
-									if (bIsTraceResultHasLocated)
-									{
-										Moving.Goal = Tracing.TraceResult.GetTraitRef<FLocated,EParadigm::Unsafe>().Location;
-										DesiredMoveDirection = (Moving.Goal - AgentLocation).GetSafeNormal2D();
-									}
-									else
-									{
-										Moving.MoveSpeedMult = 0;
-									}
-								};
-
 							if (bIsTraceResultHasLocated)
 							{
-								Moving.Goal = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
+								Moving.Goal = Tracing.TraceResult.GetTrait<FLocated>().Location;
 							}
 
 							if (bIsTraceResultHasBindFlowField)
 							{
-								FBindFlowField BindFlowField = Tracing.TraceResult.GetTraitRef<FBindFlowField, EParadigm::Unsafe>();
+								FBindFlowField BindFlowField = Tracing.TraceResult.GetTrait<FBindFlowField>();
 
-								if (BindFlowField.bIsDirtyData)
+								if (BindFlowField.bReloadFlowField)
 								{
 									BindFlowField.FlowField = BindFlowField.FlowFieldToBind.LoadSynchronous();
-									BindFlowField.bIsDirtyData = false;
+									BindFlowField.bReloadFlowField = false;
 								}
 
 								if (IsValid(BindFlowField.FlowField)) // 从目标获取指向目标的流场
 								{
 									bool bInside_TargetFF;
-									FCellStruct& Cell_TargetFF = BindFlowField.FlowField->GetCellAtLocation(AgentLocation, bInside_TargetFF);
+									FCellStruct& Cell_TargetFF = BindFlowField.FlowField->GetCellAtLocation(SelfLocation, bInside_TargetFF);
 
 									if (bInside_TargetFF)
 									{
@@ -1135,18 +1131,17 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 									}
 									else
 									{
-										ApproachTraceResultDirectly();
+										PathfindToGoal();
 									}
 								}
 								else
 								{
-									//AStarTest();
-									ApproachTraceResultDirectly();
+									PathfindToGoal();
 								}
 							}
 							else
 							{
-								ApproachTraceResultDirectly();
+								PathfindToGoal();
 							}
 						}
 					}
@@ -1157,7 +1152,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				Moving.MoveSpeedMult = 0;
 
 				// Stop when attacking and not cooling
-				const bool bIsAttackingNotColling = bIsAttacking ? Subject.GetTraitRef<FAttacking, EParadigm::Unsafe>().State != EAttackState::Cooling : false;
+				const bool bIsAttackingNotColling = bIsAttacking ? Subject.GetTrait<FAttacking>().State != EAttackState::Cooling : false;
 
 				// Decide current move state
 				float DistanceToGoal = 0;;
@@ -1187,7 +1182,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// 巡逻状态
 				else if (bIsPatrolling) 
 				{
-					DistanceToGoal = FVector::Dist2D(AgentLocation, Moving.Goal);
+					DistanceToGoal = FVector::Dist2D(SelfLocation, Moving.Goal);
 					bIsInAcceptanceRadius = DistanceToGoal <= Patrol.AcceptanceRadius;
 					FinalAcceptenceRadius = Patrol.AcceptanceRadius;
 
@@ -1215,7 +1210,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				{
 					bIsChasing = true;
 					float OtherRadius = Tracing.TraceResult.HasTrait<FGridData>() ? Tracing.TraceResult.GetTraitRef<FGridData, EParadigm::Unsafe>().Radius : 0;
-					DistanceToGoal = FMath::Clamp(FVector::Dist2D(AgentLocation, Moving.Goal) - SelfRadius - OtherRadius, 0, FLT_MAX);
+					DistanceToGoal = FMath::Clamp(FVector::Dist2D(SelfLocation, Moving.Goal) - SelfRadius - OtherRadius, 0, FLT_MAX);
 					bIsInAcceptanceRadius = DistanceToGoal <= Chase.AcceptanceRadius;
 					FinalAcceptenceRadius = Chase.AcceptanceRadius + OtherRadius;
 
@@ -1244,7 +1239,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// 移动到位置
 				else 
 				{
-					DistanceToGoal = FVector::Dist2D(AgentLocation, Moving.Goal);
+					DistanceToGoal = FVector::Dist2D(SelfLocation, Moving.Goal);
 					bIsInAcceptanceRadius = DistanceToGoal <= Move.XY.AcceptanceRadius;
 					FinalAcceptenceRadius = Move.XY.AcceptanceRadius;
 
@@ -1391,7 +1386,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						if (Tracing.TraceResult.IsValid())
 						{
 							FVector TargetLocation = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
-							Directed.DesiredDirection = (TargetLocation - AgentLocation).GetSafeNormal2D();
+							Directed.DesiredDirection = (TargetLocation - SelfLocation).GetSafeNormal2D();
 						}
 					}
 					else
@@ -1522,7 +1517,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						FVector BoundSamplePoint = Located.Location + VectorToRotate.RotateAngleAxis(i * 45.f, FVector::UpVector);
 
 						bool bInside;
-						FCellStruct& Cell = Navigation.FlowField->GetCellAtLocation(BoundSamplePoint, bInside);
+						FCellStruct& Cell = Navigating.FlowField->GetCellAtLocation(BoundSamplePoint, bInside);
 
 						if (bInside)
 						{
@@ -1541,11 +1536,11 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					{
 						// 计算投影高度
 						const float PlaneD = -FVector::DotProduct(HighestGroundNormal, HighestGroundLocation);
-						const float GroundHeight = (-PlaneD - HighestGroundNormal.X * AgentLocation.X - HighestGroundNormal.Y * AgentLocation.Y) / HighestGroundNormal.Z;
+						const float GroundHeight = (-PlaneD - HighestGroundNormal.X * SelfLocation.X - HighestGroundNormal.Y * SelfLocation.Y) / HighestGroundNormal.Z;
 
 						if (UNLIKELY(Move.Z.bCanFly))
 						{
-							Moving.CurrentVelocity.Z += FMath::Clamp(Moving.FlyingHeight + GroundHeight - AgentLocation.Z, -100, 100);//fly at a certain height above ground
+							Moving.CurrentVelocity.Z += FMath::Clamp(Moving.FlyingHeight + GroundHeight - SelfLocation.Z, -100, 100);//fly at a certain height above ground
 							Moving.CurrentVelocity.Z *= 0.9f;
 						}
 						else
@@ -1553,7 +1548,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							const float CollisionThreshold = GroundHeight + Collider.Radius * Scaled.Scale;
 
 							// 高度状态判断
-							if (UNLIKELY(AgentLocation.Z - CollisionThreshold > Collider.Radius * Scaled.Scale * 0.1f))// need a bit of tolerance or it will be hard to decide is it is on ground or in the air
+							if (UNLIKELY(SelfLocation.Z - CollisionThreshold > Collider.Radius * Scaled.Scale * 0.1f))// need a bit of tolerance or it will be hard to decide is it is on ground or in the air
 							{
 								// 应用重力
 								Moving.CurrentVelocity.Z += Move.Z.Gravity * SafeDeltaTime;
@@ -1578,7 +1573,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								}
 
 								// 平滑移动到地面
-								Located.Location.Z = FMath::FInterpTo(AgentLocation.Z, CollisionThreshold, SafeDeltaTime, 25.0f);
+								Located.Location.Z = FMath::FInterpTo(SelfLocation.Z, CollisionThreshold, SafeDeltaTime, 25.0f);
 							}
 						}
 					}
@@ -2160,7 +2155,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 										if (Distance <= Attack.RangeToleranceHit && Angle <= Attack.AngleToleranceHit)
 										{
 											ApplyDamageToSubjectsDeferred(FSubjectArray{ TArray<FSubjectHandle>{Tracing.TraceResult} }, FSubjectArray(), FSubjectHandle{ Subject }, Located.Location, Damage, Debuff, DmgResults);
-											UE_LOG(LogTemp, Warning, TEXT("TryApplyDmg"));
+											//UE_LOG(LogTemp, Warning, TEXT("TryApplyDmg"));
 										}
 									}
 								}
@@ -4056,7 +4051,7 @@ void ABattleFrameBattleControl::DefineFilters()
 	AgentDeathAnimFilter = FFilter::Make<FAgent, FRendering, FDeathAnim, FAnimation, FDying, FActivated>();
 	AgentSleepFilter = FFilter::Make<FAgent, FLocated, FDirected, FScaled, FCollider, FSleep, FSleeping, FTrace, FTracing, FMove, FMoving, FRendering, FActivated>().Exclude<FAppearing, FAttacking, FDying>();
 	AgentPatrolFilter = FFilter::Make<FAgent, FLocated, FDirected, FScaled, FCollider, FPatrol, FPatrolling, FTrace, FTracing, FMove, FMoving, FRendering, FActivated>().Exclude<FAppearing, FSleeping, FAttacking, FDying>();
-	AgentMoveFilter = FFilter::Make<FAgent, FRendering, FAnimation, FMove, FMoving, FChase, FLocated, FDirected, FScaled, FCollider, FAttack, FTrace, FTracing, FNavigation, FAvoidance, FAvoiding, FDefence, FPatrol, FGridData, FSlowing, FActivated>();
+	AgentMoveFilter = FFilter::Make<FAgent, FRendering, FAnimation, FMove, FMoving, FChase, FLocated, FDirected, FScaled, FCollider, FAttack, FTrace, FTracing, FNavigation, FNavigating, FAvoidance, FAvoiding, FDefence, FPatrol, FGridData, FSlowing, FActivated>();
 	AgentStateMachineFilter = FFilter::Make<FAgent, FAnimation, FRendering, FAppear, FAttack, FDeath, FMoving, FSlowing, FActivated>();
 	AgentRenderFilter = FFilter::Make<FAgent, FRendering, FLocated, FDirected, FScaled, FCollider, FAnimation, FHealth, FHealthBar, FPoppingText, FActivated>();
 
@@ -5655,6 +5650,290 @@ void ABattleFrameBattleControl::DrawDebugSector(UWorld* World, const FVector& Ce
 	}
 }
 
+
+//-------------------------------RVO2D Copyright 2023, EastFoxStudio. All Rights Reserved-------------------------------
+
+bool ABattleFrameBattleControl::FindPathAStar(AFlowField* FlowField, const FVector& StartLocation, const FVector& GoalLocation, TArray<FVector>& OutPath)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE_STR("FindPathAStar");
+	OutPath.Empty();
+
+	// 验证坐标有效性
+	auto IsValidCoord = [&](FVector2D Coord) -> bool
+		{
+			return Coord.X >= 0 && Coord.X < FlowField->xNum && Coord.Y >= 0 && Coord.Y < FlowField->yNum;
+		};
+
+	FVector2D StartCoord;
+	FlowField->WorldToGrid(StartLocation, StartCoord);
+	FVector2D GoalCoord;
+	FlowField->WorldToGrid(GoalLocation, GoalCoord);
+
+	if (!IsValidCoord(StartCoord) || !IsValidCoord(GoalCoord))
+	{
+		return false;
+	}
+
+	// 获取起点终点索引
+	const int32 StartIndex = FlowField->CoordToIndex(StartCoord);
+	const int32 GoalIndex = FlowField->CoordToIndex(GoalCoord);
+
+	// 检查起点终点是否为障碍
+	//if (FlowField->CurrentCellsArray[StartIndex].cost == 255 || FlowField->CurrentCellsArray[GoalIndex].cost == 255)
+	//{
+	//    return false;
+	//}
+
+	// 初始化数据结构
+	TArray<float> gScore;
+	TArray<FVector2D> CameFrom;
+	gScore.Init(FLT_MAX, FlowField->CurrentCellsArray.Num());
+	CameFrom.Init(FVector2D(-1, -1), FlowField->CurrentCellsArray.Num());
+
+	// 自定义优先队列比较器
+	struct FPriorityNode
+	{
+		float Priority;
+		FVector2D Coord;
+	};
+	struct FPriorityCompare
+	{
+		bool operator()(const FPriorityNode& A, const FPriorityNode& B) const
+		{
+			return A.Priority > B.Priority;
+		}
+	};
+	std::priority_queue<FPriorityNode, std::vector<FPriorityNode>, FPriorityCompare> OpenSet;
+
+	// 初始化起点
+	gScore[StartIndex] = 0;
+	const float StartH = FVector2D::Distance(StartCoord, GoalCoord);
+	OpenSet.push({ StartH, StartCoord });
+
+	// A*主循环
+	while (!OpenSet.empty())
+	{
+		const FVector2D CurrentCoord = OpenSet.top().Coord;
+		OpenSet.pop();
+		const int32 CurrentIndex = FlowField->CoordToIndex(CurrentCoord);
+
+		// 到达终点
+		if (CurrentCoord == GoalCoord)
+		{
+			// 重建路径
+			TArray<FVector2D> PathCoords;
+			FVector2D TraceCoord = GoalCoord;
+			while (TraceCoord != StartCoord)
+			{
+				PathCoords.Add(TraceCoord);
+				TraceCoord = CameFrom[FlowField->CoordToIndex(TraceCoord)];
+			}
+			PathCoords.Add(StartCoord);
+			Algo::Reverse(PathCoords);
+
+			// 转换为世界坐标
+			TArray<FVector> MidPoints;
+			
+			for (const FVector2D& Coord : PathCoords)
+			{
+				MidPoints.Add(FlowField->CurrentCellsArray[FlowField->CoordToIndex(Coord)].worldLoc);
+			}
+
+			if (MidPoints.Num() > 1)
+			{
+				OutPath.Append(MidPoints);
+				OutPath.Add(GoalLocation);
+				int32 Num = OutPath.Num();
+				OutPath[Num - 1].Z = OutPath[Num - 2].Z;
+			}
+
+			return MidPoints.Num() > 1;
+		}
+
+		// 生成邻居坐标 (8方向或4方向)
+		TArray<FVector2D> NeighborCoords;
+		if (FlowField->Style == EStyle::AdjacentFirst)
+		{
+			NeighborCoords = {
+				CurrentCoord + FVector2D(1, -1),  // 右上
+				CurrentCoord + FVector2D(1, 1),   // 右下
+				CurrentCoord + FVector2D(-1, 1),  // 左下
+				CurrentCoord + FVector2D(-1, -1), // 左上
+				CurrentCoord + FVector2D(0, -1),  // 上
+				CurrentCoord + FVector2D(1, 0),   // 右
+				CurrentCoord + FVector2D(0, 1),   // 下
+				CurrentCoord + FVector2D(-1, 0)   // 左
+			};
+		}
+		else
+		{
+			NeighborCoords = {
+				CurrentCoord + FVector2D(0, -1),  // 上
+				CurrentCoord + FVector2D(1, 0),   // 右
+				CurrentCoord + FVector2D(0, 1),   // 下
+				CurrentCoord + FVector2D(-1, 0)   // 左
+			};
+		}
+
+		// 处理邻居
+		for (int32 i = 0; i < NeighborCoords.Num(); ++i)
+		{
+			const FVector2D& NeighborCoord = NeighborCoords[i];
+
+			// 跳过无效坐标
+			if (!IsValidCoord(NeighborCoord)) continue;
+
+			const int32 NeighborIndex = FlowField->CoordToIndex(NeighborCoord);
+			FCellStruct& NeighborCell = FlowField->CurrentCellsArray[NeighborIndex];
+			FCellStruct& CurrentCell = FlowField->CurrentCellsArray[CurrentIndex];
+
+			// 跳过障碍
+			//if (FlowField->bIgnoreInternalObstacleCells && NeighborCell.cost == 255) continue;
+
+			auto IsValidDiagonal = [&](TArray<FVector2D> neighborCoords, int32 indexA, int32 indexB) -> bool
+				{
+					bool result = true;
+
+					if (IsValidCoord(neighborCoords[indexA]))
+					{
+						if (FlowField->CurrentCellsArray[FlowField->CoordToIndex(neighborCoords[indexA])].cost == 255)
+						{
+							result = false;
+						}
+					}
+					if (IsValidCoord(neighborCoords[indexB]))
+					{
+						if (FlowField->CurrentCellsArray[FlowField->CoordToIndex(neighborCoords[indexB])].cost == 255)
+						{
+							result = false;
+						}
+					}
+					return result;
+				};
+
+			// 对角线移动检查
+			if (FlowField->Style == EStyle::AdjacentFirst && i < 4) // 前4个是斜角
+			{
+				bool bSkipDiagonal = false;
+				switch (i)
+				{
+				case 0: bSkipDiagonal = !IsValidDiagonal(NeighborCoords, 4, 5); break; // 右上：检查上、右
+				case 1: bSkipDiagonal = !IsValidDiagonal(NeighborCoords, 5, 6); break; // 右下：检查右、下
+				case 2: bSkipDiagonal = !IsValidDiagonal(NeighborCoords, 6, 7); break; // 左下：检查下、左
+				case 3: bSkipDiagonal = !IsValidDiagonal(NeighborCoords, 7, 4); break; // 左上：检查左、上
+				}
+				if (bSkipDiagonal) continue;
+			}
+
+			// 坡度检查
+			const float HeightDiff = FMath::Abs(CurrentCell.worldLoc.Z - NeighborCell.worldLoc.Z);
+			const float HorizontalDist = FVector2D::Distance(FVector2D(CurrentCell.worldLoc.X, CurrentCell.worldLoc.Y),FVector2D(NeighborCell.worldLoc.X, NeighborCell.worldLoc.Y));
+
+			if (HorizontalDist > SMALL_NUMBER)
+			{
+				const float SlopeAngle = FMath::RadiansToDegrees(FMath::Atan(HeightDiff / HorizontalDist));
+				if (SlopeAngle > FlowField->maxWalkableAngle && CurrentCell.cost != 255) continue;
+			}
+
+			// 计算移动成本
+			const float MoveCost = NeighborCell.cost/*(NeighborCell.cost == 255) ? FLT_MAX : static_cast<float>(NeighborCell.cost)*/;
+			const float TentativeG = gScore[CurrentIndex] + MoveCost;
+
+			// 发现更优路径
+			if (TentativeG < gScore[NeighborIndex])
+			{
+				CameFrom[NeighborIndex] = CurrentCoord;
+				gScore[NeighborIndex] = TentativeG;
+				const float H = FVector2D::Distance(NeighborCoord, GoalCoord);
+				OpenSet.push({ TentativeG + H, NeighborCoord });
+			}
+		}
+	}
+
+	return false; // 未找到路径
+}
+
+bool ABattleFrameBattleControl::GetSteeringDirection(const FVector& CurrentLocation, const FVector& GoalLocation, const TArray<FVector>& PathPoints, float MoveSpeed, float LookAheadDistance, float PathRadius, FVector& SteeringDirection)
+{
+	// 1. 验证路径有效性
+	if (PathPoints.Num() < 2)
+	{
+		SteeringDirection = FVector::ZeroVector;
+		return false; // 无效路径
+	}
+
+	// 2. 找到当前位置在路径上的最近点
+	int32 ClosestSegmentIndex = 0;
+	float MinDistanceSq = FLT_MAX;
+	FVector ClosestPointOnPath = FVector::ZeroVector;
+
+	for (int32 i = 0; i < PathPoints.Num() - 1; i++)
+	{
+		const FVector& StartPoint = PathPoints[i];
+		const FVector& EndPoint = PathPoints[i + 1];
+
+		FVector ClosestPoint = FindClosestPointOnSegment(CurrentLocation, StartPoint, EndPoint);
+		float DistanceSq = FVector::DistSquared(CurrentLocation, ClosestPoint);
+
+		if (DistanceSq < MinDistanceSq)
+		{
+			MinDistanceSq = DistanceSq;
+			ClosestPointOnPath = ClosestPoint;
+			ClosestSegmentIndex = i;
+		}
+	}
+
+	// 3. 验证位置条件
+	const bool bIsCurrentNearPath = FVector::DistSquared2D(CurrentLocation, ClosestPointOnPath) < FMath::Square(PathRadius);
+	const bool bIsGoalNearEnd = FVector::DistSquared2D(GoalLocation, PathPoints.Last()) < FMath::Square(PathRadius);
+	const bool bPathValid = bIsCurrentNearPath && bIsGoalNearEnd;
+
+	// 4. 计算预测目标点（支持跨越多线段）
+	const float PredictDistance = FMath::Max(LookAheadDistance, MoveSpeed * 0.5f);
+	FVector TargetPoint = ClosestPointOnPath;
+	float RemainingDistance = PredictDistance;
+	int32 CurrentSegmentIndex = ClosestSegmentIndex;
+
+	while (RemainingDistance > 0 && CurrentSegmentIndex < PathPoints.Num() - 1)
+	{
+		const FVector SegmentStart = (CurrentSegmentIndex == ClosestSegmentIndex) ? TargetPoint : PathPoints[CurrentSegmentIndex];
+		const FVector SegmentEnd = PathPoints[CurrentSegmentIndex + 1];
+
+		const FVector SegmentDir = (SegmentEnd - SegmentStart).GetSafeNormal();
+		const float SegmentLength = FVector::Distance(SegmentStart, SegmentEnd);
+
+		if (SegmentLength >= RemainingDistance)
+		{
+			TargetPoint = SegmentStart + SegmentDir * RemainingDistance;
+			RemainingDistance = 0;
+		}
+		else
+		{
+			TargetPoint = SegmentEnd;
+			RemainingDistance -= SegmentLength;
+			CurrentSegmentIndex++;
+		}
+	}
+
+	// 5. 计算最终方向
+	SteeringDirection = (TargetPoint - CurrentLocation).GetSafeNormal();
+
+	// 6. 返回验证结果
+	return bPathValid;
+}
+
+// 辅助函数：计算线段上最近点
+FVector ABattleFrameBattleControl::FindClosestPointOnSegment(const FVector& Point, const FVector& StartPoint, const FVector& EndPoint)
+{
+	const FVector Segment = EndPoint - StartPoint;
+	const float SegmentLengthSq = Segment.SizeSquared();
+
+	if (SegmentLengthSq < KINDA_SMALL_NUMBER)
+		return StartPoint;
+
+	const float t = FMath::Clamp(FVector::DotProduct(Point - StartPoint, Segment) / SegmentLengthSq, 0.0f, 1.0f);
+	return StartPoint + t * Segment;
+}
 
 //-------------------------------RVO2D Copyright 2023, EastFoxStudio. All Rights Reserved-------------------------------
 

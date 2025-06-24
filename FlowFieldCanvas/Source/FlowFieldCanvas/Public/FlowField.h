@@ -308,22 +308,4 @@ public:
 
 	UTexture2D* TransientTexture;
 
-	TAtomic<int32> TraceRemaining{ 0 };
-
-	//--------------------------------------------------------A*-----------------------------------------------------------------
-
-public:
-	// A* 路径查找函数
-	bool FindPathAStar(const FVector2D& StartCoord, const FVector2D& GoalCoord, TArray<FVector>& OutPath);
-
-	UFUNCTION(BlueprintCallable, Category = "Pathfinding")
-	FVector GetSteeringDirection(const FVector& CurrentLocation,
-		const TArray<FVector>& PathPoints,
-		float MoveSpeed,
-		float LookAheadDistance = 300.0f,
-		float PathRadius = 100.0f);
-
-private:
-	// 辅助函数：计算点到线段的最短距离和最近点
-	FVector FindClosestPointOnSegment(const FVector& Point, const FVector& SegmentStart, const FVector& SegmentEnd);
 };

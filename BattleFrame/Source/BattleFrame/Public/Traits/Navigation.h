@@ -15,7 +15,15 @@ public:
 	TSoftObjectPtr<AFlowField> FlowFieldToUse;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "更换流场后要设该值为true来通知更新数据"))
-	bool bIsDirtyData = true;
+	bool bReloadFlowField = true;
 
-	AFlowField* FlowField = nullptr;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "使用A星寻路。禁用后会直线移动到目标点。"))
+	bool bUseAStar = true;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "A星寻路重新计算时间间隔"))
+	float AStarCoolDown = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "绘制Debug图形"))
+	bool bDrawDebugShape = false;
+
 };

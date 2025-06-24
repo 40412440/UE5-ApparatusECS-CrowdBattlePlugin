@@ -27,6 +27,7 @@
 #include "Traits/PoppingText.h"
 #include "Traits/Sleeping.h"
 #include "Traits/Patrolling.h"
+#include "Traits/Navigating.h"
 #include "BattleFrameFunctionLibraryRT.h"
 #include "NiagaraSubjectRenderer.h"
 
@@ -98,6 +99,7 @@ void UBFSubjectiveAgentComponent::InitializeTraits(AActor* OwnerActor)
     AgentConfig.SetTrait(FMoving());
     AgentConfig.SetTrait(DataAsset->Patrol);
     AgentConfig.SetTrait(DataAsset->Navigation);
+    AgentConfig.SetTrait(FNavigating());
     AgentConfig.SetTrait(DataAsset->Avoidance);
     AgentConfig.SetTrait(FAvoiding());
     AgentConfig.SetTrait(DataAsset->Appear);

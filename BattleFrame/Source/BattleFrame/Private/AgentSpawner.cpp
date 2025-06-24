@@ -24,11 +24,12 @@
 #include "Traits/RegisterMultiple.h"
 #include "Traits/Team.h"
 #include "Traits/Avoiding.h"
+#include "Traits/Navigating.h"
+#include "Traits/Activated.h"
 #include "AnimToTextureDataAsset.h"
 #include "NiagaraSubjectRenderer.h"
 #include "BattleFrameBattleControl.h"
 #include "BattleFrameFunctionLibraryRT.h"
-#include "Traits/Activated.h"
 #include "SubjectHandle.h"
 
 
@@ -127,6 +128,7 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsRectangular
     AgentConfig.SetTrait(FMoving());
     AgentConfig.SetTrait(DataAsset->Patrol);
     AgentConfig.SetTrait(DataAsset->Navigation);
+    AgentConfig.SetTrait(FNavigating());
     AgentConfig.SetTrait(DataAsset->Avoidance);
     AgentConfig.SetTrait(FAvoiding());
     AgentConfig.SetTrait(DataAsset->Appear);
@@ -319,6 +321,7 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsByConfigRectangular
     AgentRecord.SetTrait(AgentConfig->Chase);
     AgentRecord.SetTrait(AgentConfig->Patrol);
     AgentRecord.SetTrait(AgentConfig->Navigation);
+    AgentRecord.SetTrait(FNavigating());
     AgentRecord.SetTrait(AgentConfig->Avoidance);
     AgentRecord.SetTrait(FAvoiding());
     AgentRecord.SetTrait(AgentConfig->Appear);
