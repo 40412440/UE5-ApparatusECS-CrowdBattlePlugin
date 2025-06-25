@@ -37,8 +37,7 @@ This plugin is open source, but has the following dependencies:
   - Niagara + VAT for rendering
   - RVO2 for avoidance/collision
   - Neighbour grid for collision detection
-  - Flow field for navigation
-  - Does not support networking
+  - Flow field and A* for navigation
 
 ## Features
 
@@ -71,13 +70,11 @@ Comprehensive crowd battle system. Demo maps are included in the plugin's conten
 In progress:
 1. Tower defence demo map
 2. Agent blendspace 1D
-3. Agent individual navigation
-4. Sprite rendering support
-5. TurboSequence GPU SKM support
-6. Control agents with mouse
-7. Move in formation
-8. Network replication
-9. RTS demo map
-10. MassEntity branch
+3. Sprite rendering support
+4. TurboSequence GPU SKM support
+5. More BP Nodes
+6. Network replication
+7. RTS demo map
+8. MassEntity branch
 
 ## Leave a star if you find this project useful ;)
