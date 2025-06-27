@@ -302,6 +302,28 @@ public:
 		}
 	};
 
+	FORCEINLINE FCellStruct& GetCellAtCoord(AFlowField* FlowField, const FVector2D& Coord, bool& bOutIsValid)
+	{
+		// 默认返回第一个单元格（防止返回无效引用）
+		FCellStruct* ResultCell = &FlowField->CurrentCellsArray[0];
+		bOutIsValid = false;
+
+		const bool bIsValidCoord = (Coord.X >= 0 && Coord.X < FlowField->xNum) && (Coord.Y >= 0 && Coord.Y < FlowField->yNum);
+
+		const int32 Index = FlowField->CoordToIndex(Coord);
+		const int32 CellCount = FlowField->CurrentCellsArray.Num();
+		const bool bIsValidIndex = Index < CellCount;
+
+		// 计算最终索引（确保不越界）
+		const int32 NearestIndex = FMath::Clamp(Index, 0, CellCount - 1);
+		ResultCell = &FlowField->CurrentCellsArray[NearestIndex];
+
+		// 设置有效性标志
+		bOutIsValid = bIsValidCoord && bIsValidIndex;
+
+		return *ResultCell;
+	}
+
 	static FVector FindNewPatrolGoalLocation(const FPatrol Patrol, const FCollider Collider, const FTrace Trace, const FTracing Tracing, const FLocated Located, const FScaled Scaled, int32 MaxAttempts);
 
 	void DrawDebugSector(UWorld* World, const FVector& Center, const FVector& Direction, float Radius, float AngleDegrees, float Height, const FColor& Color, bool bPersistentLines, float LifeTime, uint8 DepthPriority, float Thickness);

@@ -79,6 +79,9 @@ USTRUCT(BlueprintType) struct FCellStruct
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "FFCanvas", meta = (DisplayName = "XYCoordinate", ToolTip = "The coordinate of this cell on grid"))
 	FVector2D gridCoord = FVector2D(0, 0);
 
+	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "FFCanvas", meta = (DisplayName = "GroundNormal", ToolTip = "Which coord it will end up in"))
+	FVector2D goalCoord = FVector2D(0, 0);
+
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "FFCanvas", meta = (DisplayName = "WorldLocation", ToolTip = "The world location of this cell's center point"))
 	FVector worldLoc = FVector(0, 0, 0);
 
@@ -114,18 +117,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FFCanvas", meta = (ToolTip = "Get the grid coordinate at the given world location"))
 	bool WorldToGridBP(UPARAM(ref) const FVector& Location, FVector2D& gridCoord);
 
-	UFUNCTION(BlueprintCallable, Category = "FFCanvas", meta = (ToolTip = "Get the cell at the given world location"))
-	FCellStruct& GetCellAtLocationBP(const FVector& Location, bool& bOutIsValid);
+	UFUNCTION(BlueprintCallable, Category = "FFCanvas", meta = (ToolTip = "Get the array index at the given world location"))
+	bool WorldToIndexBP(UPARAM(ref) const FVector& Location, int32& Index);
 
-	FORCEINLINE int32 CoordToIndex(const FVector2D& GridCoord)
-	{
-		return GridCoord.X * yNum + GridCoord.Y;
-	};
+	UFUNCTION(BlueprintCallable, Category = "FFCanvas", meta = (ToolTip = "Get the cell at the given world location"))
+	FCellStruct& GetCellAtLocationBP(UPARAM(ref) const FVector& Location, bool& bOutIsValid);
+
+	UFUNCTION(BlueprintCallable, Category = "FFCanvas", meta = (ToolTip = "Get the average flow field direction at the given world location within radius"))
+	FVector GetAverageDirectionBP(UPARAM(ref) const FVector& Location, const float Radius, bool& bOutIsValid);
 
 	FORCEINLINE bool WorldToGrid(const FVector& Location, FVector2D& gridCoord)
 	{
-		//TRACE_CPUPROFILER_EVENT_SCOPE_STR("WorldToGrid");
-
 		FVector relativeLocation = (Location - actorLoc).RotateAngleAxis(-actorRot.Yaw, FVector(0, 0, 1)) + offsetLoc;
 		float cellRadius = cellSize / 2;
 
@@ -141,29 +143,145 @@ public:
 		return bIsValidCoord;
 	};
 
-	FORCEINLINE FCellStruct& GetCellAtLocation(const FVector& Location, bool& bOutIsValid)
+	FORCEINLINE bool WorldToIndex(const FVector& Location, int32& Index)
 	{
-		// 默认返回第一个单元格（防止返回无效引用）
-		FCellStruct* ResultCell = &CurrentCellsArray[0];
-		bOutIsValid = false;
+		if (!bIsBeginPlay)
+		{
+			FVector2D NearestCoord;
+			const bool bIsValidCoord = WorldToGrid(Location, NearestCoord);
 
-		FVector2D NearestCoord;
-		const bool bIsValidCoord = WorldToGrid(Location, NearestCoord);
+			const int32 NearestIndex = CoordToIndex(NearestCoord);
+			const int32 CellCount = CurrentCellsArray.Num();
+			const bool bIsValidIndex = NearestIndex < CellCount;
 
-		const int32 Index = CoordToIndex(NearestCoord);
-		const int32 CellCount = CurrentCellsArray.Num();
-		const bool bIsValidIndex = Index < CellCount;
+			// 计算最终索引（确保不越界）
+			Index = FMath::Clamp(NearestIndex, 0, CellCount - 1);
 
-		// 计算最终索引（确保不越界）
-		const int32 NearestIndex = FMath::Clamp(Index, 0, CellCount - 1);
-		ResultCell = &CurrentCellsArray[NearestIndex];
-
-		// 设置有效性标志
-		bOutIsValid = bIsValidCoord && bIsValidIndex;
-
-		return *ResultCell;
+			return bIsValidCoord && bIsValidIndex;
+		}
+		else
+		{
+			Index = 0;
+			return false;
+		}
 	}
 
+	FORCEINLINE int32 CoordToIndex(const FVector2D& GridCoord)
+	{
+		return GridCoord.X * yNum + GridCoord.Y;
+	};
+
+	FORCEINLINE FCellStruct& GetCellAtLocation(const FVector& Location, bool& bOutIsValid)
+	{
+		if (!bIsBeginPlay)
+		{
+			FCellStruct* ResultCell = &CurrentCellsArray[0];
+			bOutIsValid = false;
+
+			FVector2D NearestCoord;
+			const bool bIsValidCoord = WorldToGrid(Location, NearestCoord);
+
+			const int32 Index = CoordToIndex(NearestCoord);
+			const int32 CellCount = CurrentCellsArray.Num();
+			const bool bIsValidIndex = Index < CellCount;
+
+			// 计算最终索引（确保不越界）
+			const int32 NearestIndex = FMath::Clamp(Index, 0, CellCount - 1);
+			ResultCell = &CurrentCellsArray[NearestIndex];
+
+			// 设置有效性标志
+			bOutIsValid = bIsValidCoord && bIsValidIndex;
+
+			return *ResultCell;
+		}
+		else
+		{
+			bOutIsValid = false;
+			return DefaultCell;
+		}
+	}
+
+	FORCEINLINE FVector GetAverageDirection(const FVector& Location, const float Radius, bool& bOutIsValid)
+	{
+		bOutIsValid = false;
+
+		if (bIsBeginPlay)
+		{
+			return FVector::ZeroVector;
+		}
+
+		FVector TotalDir = FVector::ZeroVector;
+		int32 ValidCellCount = 0;
+
+		// 计算圆形参数
+		const float RadiusSq = Radius * Radius;
+		const float HalfCellSize = cellSize * 0.5f;
+		const float CellBoundOffset = HalfCellSize + Radius; // 相交检测优化
+
+		// 计算圆心在相对坐标系中的位置
+		FVector RelativeCenter = (Location - actorLoc).RotateAngleAxis(-actorRot.Yaw, FVector(0, 0, 1)) + offsetLoc;
+
+		// 计算网格坐标范围（扩大范围确保覆盖所有可能相交的格子）
+		const int32 MinGridX = FMath::Clamp(FMath::FloorToInt((RelativeCenter.X - CellBoundOffset) / cellSize), 0, xNum - 1);
+		const int32 MaxGridX = FMath::Clamp(FMath::CeilToInt((RelativeCenter.X + CellBoundOffset) / cellSize), 0, xNum - 1);
+		const int32 MinGridY = FMath::Clamp(FMath::FloorToInt((RelativeCenter.Y - CellBoundOffset) / cellSize), 0, yNum - 1);
+		const int32 MaxGridY = FMath::Clamp(FMath::CeilToInt((RelativeCenter.Y + CellBoundOffset) / cellSize), 0, yNum - 1);
+
+		// 遍历所有可能相交的网格
+		for (int32 x = MinGridX; x <= MaxGridX; ++x)
+		{
+			for (int32 y = MinGridY; y <= MaxGridY; ++y)
+			{
+				const FVector2D GridCoord(x, y);
+				const int32 Index = CoordToIndex(GridCoord);
+
+				if (Index >= 0 && Index < CurrentCellsArray.Num())
+				{
+					const FCellStruct& Cell = CurrentCellsArray[Index];
+
+					// 检查格子类型
+					//if (Cell.cost == 255) continue;
+
+					// 计算格子边界
+					const float CellMinX = Cell.worldLoc.X - HalfCellSize;
+					const float CellMaxX = Cell.worldLoc.X + HalfCellSize;
+					const float CellMinY = Cell.worldLoc.Y - HalfCellSize;
+					const float CellMaxY = Cell.worldLoc.Y + HalfCellSize;
+
+					// 计算最近点并检查相交
+					const float ClosestX = FMath::Clamp(Location.X, CellMinX, CellMaxX);
+					const float ClosestY = FMath::Clamp(Location.Y, CellMinY, CellMaxY);
+
+					const float Dx = Location.X - ClosestX;
+					const float Dy = Location.Y - ClosestY;
+					const float DistSq = Dx * Dx + Dy * Dy;
+
+					if (DistSq <= RadiusSq)
+					{
+						TotalDir += Cell.dir;
+						++ValidCellCount;
+					}
+				}
+			}
+		}
+
+		// 计算平均方向
+		if (ValidCellCount > 0)
+		{
+			TotalDir /= ValidCellCount;
+			TotalDir.Z = 0; // 确保Z轴为0
+
+			if (!TotalDir.IsNearlyZero(1e-4f))
+			{
+				TotalDir.Normalize();
+			}
+
+			bOutIsValid = true;
+			return TotalDir;
+		}
+
+		return FVector::ZeroVector;
+	}
 
 
 	void InitFlowField(EInitMode InitMode);
@@ -172,7 +290,6 @@ public:
 	void CalculateFlowField(TArray<FCellStruct>& InCurrentCellsArray);
 	void DrawCells(EInitMode InitMode);
 	void DrawArrows(EInitMode InitMode);
-	//void DrawDigits(EInitMode InitMode);
 	void UpdateTimer();
 	FCellStruct EnvQuery(const FVector2D gridCoord);
 
@@ -190,24 +307,14 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnyWhere, Category = "FFCanvas|Visualize", meta = (ToolTip = "If True: Shows the flow field arrows in-editor"))
 	bool drawArrowsInEditor = true;
 
-	//UPROPERTY(BlueprintReadWrite, EditAnyWhere, Category = "FFCanvas|Visualize", meta = (ToolTip = "If True: Display digits in-editor"))
-	//bool drawDigitsInEditor = true;
-
 	UPROPERTY(BlueprintReadWrite, EditAnyWhere, Category = "FFCanvas|Visualize", meta = (ToolTip = "If True: Shows the debug grid in-game"))
 	bool drawCellsInGame = true;
 
 	UPROPERTY(BlueprintReadWrite, EditAnyWhere, Category = "FFCanvas|Visualize", meta = (ToolTip = "If True: Shows the flow field arrows in-game"))
 	bool drawArrowsInGame = true;
 
-	//UPROPERTY(BlueprintReadWrite, EditAnyWhere, Category = "FFCanvas|Visualize", meta = (ToolTip = "If True: Display digits in-game"))
-	//bool drawDigitsInGame = true;
-
-	//UPROPERTY(BlueprintReadWrite, EditAnyWhere, Category = "FFCanvas|Visualize", meta = (ToolTip = "If True: Display digits in-game"))
-	//EDigitType DigitType = EDigitType::Cost;
-
-
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FFCanvas", meta = (ToolTip = "Goal Actor. If none, will use variable goalLocation instead"))
-	TSoftObjectPtr<AActor> goalActor;
+	TArray<TSoftObjectPtr<AActor>> GoalActors;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FFCanvas", meta = (ToolTip = "The scale of the flow field pathfinding boundary in units"))
 	FVector flowFieldSize = FVector(1000, 1000, 300);
@@ -246,47 +353,47 @@ public:
 	//--------------------------------------------------------Not Exposed Settings-----------------------------------------------------------------
 
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "FFCanvas|Material")
-	UMaterialInterface* ArrowBaseMat;
+	TObjectPtr<UMaterialInterface> ArrowBaseMat;
 
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "FFCanvas|Material")
-	UMaterialInterface* CellBaseMat;
+	TObjectPtr<UMaterialInterface> CellBaseMat;
 
 	//UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "FFCanvas|Material")
-	//UMaterialInterface* DigitBaseMat;
+	//TObjectPtr<UMaterialInterface> DigitBaseMat;
 
-	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "FFCanvas", meta = (ToolTip = "Update this value manually if you don't want to fill in a goal actor"))
-	FVector goalLocation = GetActorLocation();
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "FFCanvas", meta = (ToolTip = "Set this value manually if you don't want to fill in a goal actor"))
+	TArray<FVector> GoalLocations;
+
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "FFCanvas", meta = (ToolTip = "The cost value here will be added to the cell's cost"))
+	TMap<int32,int32> ExtraCosts;
+
 
 	//--------------------------------------------------------Components-----------------------------------------------------------------
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadWrite, Category = "FFCanvas|Components")
-	UBoxComponent* Volume;
+	TObjectPtr<UBoxComponent> Volume;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadWrite, Category = "FFCanvas|Components")
-	UInstancedStaticMeshComponent* ISM_Arrows;
-
-	//UPROPERTY(VisibleDefaultsOnly, BlueprintReadWrite, Category = "FFCanvas|Components")
-	//UInstancedStaticMeshComponent* ISM_Digits;
+	TObjectPtr<UInstancedStaticMeshComponent> ISM_Arrows;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadWrite, Category = "FFCanvas|Components")
-	UDecalComponent* Decal_Cells;
+	TObjectPtr<UDecalComponent> Decal_Cells;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadWrite, Category = "FFCanvas|Components")
-	UBillboardComponent* Billboard;
+	TObjectPtr<UBillboardComponent> Billboard;
 
 	//--------------------------------------------------------ReadOnly-----------------------------------------------------------------
 
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "FFCanvas", meta = (ToolTip = "Store ground info"))
 	TArray<FCellStruct> InitialCellsArray;
-	//TArray<FCellStruct> InitialCellsArray;
 
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "FFCanvas", meta = (ToolTip = "Store generated flow field data"))
 	TArray<FCellStruct> CurrentCellsArray;
-	//TArray<FCellStruct> CurrentCellsArray;
 
 	//--------------------------------------------------------Cached-----------------------------------------------------------------
 
-	float nextTickTimeLeft = 0;
+	float nextTickTimeLeft = RefreshInterval;
+
 	bool bIsGridDirty = true;
 	bool bIsBeginPlay = true;
 
@@ -296,16 +403,25 @@ public:
 	FVector offsetLoc = FVector(0, 0, 0);
 	FVector relativeLoc = FVector(0, 0, 0);
 
-	UMaterialInstanceDynamic* ArrowDMI;
-	UMaterialInstanceDynamic* CellDMI;
-	UMaterialInstanceDynamic* DigitDMI;
+	TObjectPtr<UMaterialInstanceDynamic> ArrowDMI;
+	TObjectPtr<UMaterialInstanceDynamic> CellDMI;
+	TObjectPtr<UMaterialInstanceDynamic> DigitDMI;
 
-	bool bIsValidGoalCoord = false;
-	FVector2D goalGridCoord = FVector2D(0, 0);
+	TSet<FVector2D> GridModifiedSet;
+	TSet<FVector2D> DirModifiedSet;
+
+	TArray<FVector> GoalActorLocations;
+
+	TArray<bool> bIsValidGoalCoords;
+	TArray<FVector2D> GoalGridCoords;
 
 	int32 xNum = FMath::RoundToInt(flowFieldSize.X / cellSize);
 	int32 yNum = FMath::RoundToInt(flowFieldSize.Y / cellSize);
 
-	UTexture2D* TransientTexture;
+	TObjectPtr<UTexture2D> TransientTexture;
+
+	TAtomic<int32> TraceRemaining{ 0 };
+
+	FCellStruct DefaultCell = FCellStruct();
 
 };

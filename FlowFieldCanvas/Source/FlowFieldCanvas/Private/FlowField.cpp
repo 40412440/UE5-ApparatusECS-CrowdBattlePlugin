@@ -5,12 +5,13 @@
 #include <vector>
 #include "Async/Async.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Engine/Engine.h"
 
 AFlowField::AFlowField()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	USceneComponent* DefaultRoot = CreateDefaultSubobject<USceneComponent>(TEXT("DefaultSceneRoot"));
+	TObjectPtr<USceneComponent> DefaultRoot = CreateDefaultSubobject<USceneComponent>(TEXT("DefaultSceneRoot"));
 	RootComponent = DefaultRoot;
 
 	Volume = CreateDefaultSubobject<UBoxComponent>(TEXT("Volume"));
@@ -24,13 +25,6 @@ AFlowField::AFlowField()
 	ISM_Arrows->SetGenerateOverlapEvents(false);
 	ISM_Arrows->SetCastShadow(false);
 	ISM_Arrows->SetReceivesDecals(false);
-
-	//ISM_Digits = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Digit Display"));
-	//ISM_Digits->SetupAttachment(DefaultRoot);
-	//ISM_Digits->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
-	//ISM_Digits->SetGenerateOverlapEvents(false);
-	//ISM_Digits->SetCastShadow(false);
-	//ISM_Digits->SetReceivesDecals(false);
 
 	Decal_Cells = CreateDefaultSubobject<UDecalComponent>(TEXT("Cell Decal"));
 	Decal_Cells->SetupAttachment(DefaultRoot);
@@ -57,15 +51,12 @@ void AFlowField::DrawDebug()
 
 		CreateGrid();
 
-		CurrentCellsArray = InitialCellsArray;
-
 		CalculateFlowField(CurrentCellsArray);
 
 		DrawCells(EInitMode::Construction);
 
 		DrawArrows(EInitMode::Construction);
 
-		//DrawDigits(EInitMode::Construction);
 	}
 }
 
@@ -81,15 +72,11 @@ void AFlowField::UpdateFlowField()
 
 	CreateGrid();
 
-	CurrentCellsArray = InitialCellsArray;
-
 	CalculateFlowField(CurrentCellsArray);
 
 	DrawCells(InitMode);
 
 	DrawArrows(InitMode);
-
-	//DrawDigits(InitMode);
 
 	bIsBeginPlay = false;
 }
@@ -98,7 +85,7 @@ void AFlowField::TickFlowField()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("TickFlowField");
 
-	if (nextTickTimeLeft <= 0)
+	if (nextTickTimeLeft <= 0.f)
 	{
 		UpdateFlowField();
 	}
@@ -111,9 +98,19 @@ bool AFlowField::WorldToGridBP(UPARAM(ref) const FVector& Location, FVector2D& g
 	return WorldToGrid(Location, gridCoord);
 }
 
-FCellStruct& AFlowField::GetCellAtLocationBP(const FVector& Location, bool& bOutIsValid)
+bool AFlowField::WorldToIndexBP(UPARAM(ref) const FVector& Location, int32& Index)
+{
+	return WorldToIndex(Location, Index);
+}
+
+FCellStruct& AFlowField::GetCellAtLocationBP(UPARAM(ref) const FVector& Location, bool& bOutIsValid)
 {
 	return GetCellAtLocation(Location, bOutIsValid);
+}
+
+FVector AFlowField::GetAverageDirectionBP(UPARAM(ref) const FVector& Location, const float Radius, bool& bOutIsValid)
+{
+	return GetAverageDirection(Location, Radius, bOutIsValid);
 }
 
 void AFlowField::InitFlowField(EInitMode InitMode)
@@ -226,14 +223,41 @@ void AFlowField::GetGoalLocation()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("GetGoalLocation");
 
-	if (IsValid(goalActor.Get()))
+	// Gather goal actor locations
+	GoalActorLocations.Empty();
+
+	for (const auto& GoalActor : GoalActors)
 	{
-		goalLocation = goalActor->GetActorLocation();
-		WorldToGrid(goalLocation, goalGridCoord);
+		if (IsValid(GoalActor.LoadSynchronous()))
+		{
+			FVector GoalActorLocation = GoalActor->GetActorLocation();
+			GoalActorLocations.Add(GoalActorLocation);
+		}
 	}
-	else
+
+	// Fill GoalGridCoords
+	GoalGridCoords.Empty();
+
+	TArray<FVector> AllLocations;
+	AllLocations.Append(GoalActorLocations);
+	AllLocations.Append(GoalLocations);
+	
+	for (const auto& Location : AllLocations)
 	{
-		WorldToGrid(goalLocation, goalGridCoord);
+		FVector2D GridCoord;
+		WorldToGrid(Location, GridCoord);
+		GoalGridCoords.Add(GridCoord);
+	}
+
+	// Add a default value if array is empty
+	if (GoalGridCoords.Num() == 0)
+	{
+		FVector GoalLocation = GetActorLocation();
+		FVector2D GridCoord;
+		WorldToGrid(GoalLocation, GridCoord);
+
+		GoalActorLocations.Add(GoalLocation);
+		GoalGridCoords.Add(GridCoord);
 	}
 }
 
@@ -265,7 +289,10 @@ void AFlowField::CalculateFlowField(TArray<FCellStruct>& InCurrentCellsArray)
 
 	int32 numCells = InCurrentCellsArray.Num();
 
-	auto IsValidCoord = [&](FVector2D gridCoord) -> bool { return gridCoord.X >= 0 && gridCoord.X < xNum && gridCoord.Y >= 0 && gridCoord.Y < yNum; };
+	auto IsValidCoord = [&](FVector2D gridCoord) -> bool {
+		return gridCoord.X >= 0 && gridCoord.X < xNum && gridCoord.Y >= 0 && gridCoord.Y < yNum;
+		};
+
 	auto IsValidDiagonal = [&](std::vector<FVector2D> neighborCoords, int32 indexA, int32 indexB) -> bool
 		{
 			bool result = true;
@@ -296,18 +323,28 @@ void AFlowField::CalculateFlowField(TArray<FCellStruct>& InCurrentCellsArray)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("CreateIntegrationField");
 
-		FCellStruct& targetCell = InCurrentCellsArray[CoordToIndex(goalGridCoord)];
-		targetCell.cost = 0;
-		targetCell.dist = 0;
-
 		std::priority_queue<FCellStruct, std::vector<FCellStruct>, CostCompare> CellsToCheck;
-		CellsToCheck.push(targetCell);
 
+		// 初始化目标点
+		for (const auto& Coord : GoalGridCoords)
+		{
+			const int32 Index = CoordToIndex(Coord);
+			FCellStruct& TargetCell = InCurrentCellsArray[Index];
+			TargetCell.dist = 0;
+			TargetCell.goalCoord = Coord; // 设置目标点自身的goalCoord
+			CellsToCheck.push(TargetCell);
+		}
+
+		// 计算积分场
 		while (!CellsToCheck.empty())
 		{
 			FCellStruct currentCell = CellsToCheck.top();
 			FVector2D currentCoord = currentCell.gridCoord;
 			CellsToCheck.pop();
+
+			// 跳过已更新的过时节点
+			if (currentCell.dist != InCurrentCellsArray[CoordToIndex(currentCoord)].dist)
+				continue;
 
 			std::vector<FVector2D> neighborCoords;
 
@@ -340,7 +377,8 @@ void AFlowField::CalculateFlowField(TArray<FCellStruct>& InCurrentCellsArray)
 
 				if (!IsValidCoord(neighborCoord)) continue;
 
-				FCellStruct& neighborCell = InCurrentCellsArray[CoordToIndex(neighborCoord)];
+				const int32 NeighborIndex = CoordToIndex(neighborCoord);
+				FCellStruct& neighborCell = InCurrentCellsArray[NeighborIndex];
 
 				if (bIgnoreInternalObstacleCells && neighborCell.cost == 255) continue;
 
@@ -353,7 +391,10 @@ void AFlowField::CalculateFlowField(TArray<FCellStruct>& InCurrentCellsArray)
 				}
 
 				float heightDifference = FMath::Abs(currentCell.worldLoc.Z - neighborCell.worldLoc.Z);
-				float horizontalDistance = FVector2D::Distance(FVector2D(currentCell.worldLoc.X, currentCell.worldLoc.Y), FVector2D(neighborCell.worldLoc.X, neighborCell.worldLoc.Y));
+				float horizontalDistance = FVector2D::Distance(
+					FVector2D(currentCell.worldLoc.X, currentCell.worldLoc.Y),
+					FVector2D(neighborCell.worldLoc.X, neighborCell.worldLoc.Y)
+				);
 				float slopeAngle = FMath::RadiansToDegrees(FMath::Atan(heightDifference / horizontalDistance));
 
 				if (slopeAngle > maxWalkableAngle && currentCell.cost != 255) continue;
@@ -363,6 +404,7 @@ void AFlowField::CalculateFlowField(TArray<FCellStruct>& InCurrentCellsArray)
 				if (newDist < neighborCell.dist)
 				{
 					neighborCell.dist = newDist;
+					neighborCell.goalCoord = currentCell.goalCoord; // 继承当前节点的目标坐标
 					CellsToCheck.push(neighborCell);
 				}
 			}
@@ -413,7 +455,10 @@ void AFlowField::CalculateFlowField(TArray<FCellStruct>& InCurrentCellsArray)
 					}
 
 					float heightDifference = FMath::Abs(currentCell.worldLoc.Z - neighborCell.worldLoc.Z);
-					float horizontalDistance = FVector2D::Distance(FVector2D(currentCell.worldLoc.X, currentCell.worldLoc.Y), FVector2D(neighborCell.worldLoc.X, neighborCell.worldLoc.Y));
+					float horizontalDistance = FVector2D::Distance(
+						FVector2D(currentCell.worldLoc.X, currentCell.worldLoc.Y),
+						FVector2D(neighborCell.worldLoc.X, neighborCell.worldLoc.Y)
+					);
 					float slopeAngle = FMath::RadiansToDegrees(FMath::Atan(heightDifference / horizontalDistance));
 
 					if (slopeAngle > maxWalkableAngle && currentCell.cost != 255) continue;
@@ -428,7 +473,10 @@ void AFlowField::CalculateFlowField(TArray<FCellStruct>& InCurrentCellsArray)
 
 				if (hasBestCell)
 				{
-					currentCell.dir = UKismetMathLibrary::GetDirectionUnitVector(currentCell.worldLoc, bestCell.worldLoc);
+					currentCell.dir = UKismetMathLibrary::GetDirectionUnitVector(
+						currentCell.worldLoc,
+						bestCell.worldLoc
+					);
 				}
 				else
 				{
@@ -436,7 +484,6 @@ void AFlowField::CalculateFlowField(TArray<FCellStruct>& InCurrentCellsArray)
 				}
 			});
 	}
-
 }
 
 void AFlowField::DrawCells(EInitMode InitMode)
@@ -458,7 +505,9 @@ void AFlowField::DrawCells(EInitMode InitMode)
 		// Create transient texture
 		TransientTexture = UTexture2D::CreateTransient(xNum, yNum);
 
-		FTexture2DMipMap* MipMap = &TransientTexture->GetPlatformData()->Mips[0];// for version api compatibility
+		// UE5及以后版本的代码
+		FTexture2DMipMap* MipMap = &TransientTexture->GetPlatformData()->Mips[0];
+
 		FByteBulkData* ImageData = &MipMap->BulkData;
 		uint8* RawImageData = (uint8*)ImageData->Lock(LOCK_READ_WRITE);
 
@@ -471,7 +520,7 @@ void AFlowField::DrawCells(EInitMode InitMode)
 
 			RawImageData[PixelIndex + 3] = Cell.type != ECellType::Empty ? 255 : 0; // Set the Alpha channel
 			RawImageData[PixelIndex + 2] = Cell.cost; // Set the R channel with cost value
-			RawImageData[PixelIndex + 1] = 0;
+			RawImageData[PixelIndex + 1] = GridModifiedSet.Contains(Cell.gridCoord) ? 255 : 0; // Set the G channel
 			RawImageData[PixelIndex + 0] = FMath::Clamp(FMath::RoundToInt(FMath::Clamp(float(Cell.dist), 0.f, largestCellDist) / largestCellDist * 255), 0, 255); // Set the B channel with dist
 		}
 
@@ -514,7 +563,6 @@ void AFlowField::DrawArrows(EInitMode InitMode)
 			FQuat CombinedQuat = RotateInPlaneQuat * AlignToNormalQuat;
 			FRotator AlignToNormalRot = CombinedQuat.Rotator();
 
-			// ========== 关键修改开始 ==========
 			// 计算坡度影响的高度偏移 (法线Z分量越小=坡度越大)
 			const float BaseHeight = cellSize * 0.01f;       // 基础高度
 			const float MaxExtraHeight = cellSize * 0.5f;   // 最大额外高度
@@ -540,6 +588,13 @@ void AFlowField::DrawArrows(EInitMode InitMode)
 				//Trans = ToLocalTransform(ISM_Digits, Trans);
 				ISM_Arrows->UpdateInstanceTransform(CellIndex, Trans, true, false, true);
 				ISM_Arrows->SetCustomDataValue(CellIndex, 0, 2, false);
+			}
+			else if (DirModifiedSet.Contains(Cell.gridCoord))
+			{
+				// If the arrow was modified, set custom data = 1 (so they will be blue arrows)
+				//Trans = ToLocalTransform(ISM_Arrows, Trans);
+				ISM_Arrows->UpdateInstanceTransform(CellIndex, Trans, true, false, true);
+				ISM_Arrows->SetCustomDataValue(CellIndex, 0, 1, false);
 			}
 			else
 			{
@@ -581,7 +636,7 @@ FCellStruct AFlowField::EnvQuery(const FVector2D gridCoord)
 	worldLoc = (worldLoc - actorLoc).RotateAngleAxis(actorRot.Yaw, FVector(0, 0, 1)) + actorLoc;
 
 	// Array of actors for trace to ignore
-	TArray<AActor*> IgnoreActors;
+	TArray<TObjectPtr<AActor>> IgnoreActors;
 
 	if (traceGround)
 	{

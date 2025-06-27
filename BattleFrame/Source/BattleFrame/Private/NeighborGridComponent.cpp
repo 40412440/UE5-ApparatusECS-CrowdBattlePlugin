@@ -1141,6 +1141,10 @@ void UNeighborGridComponent::Update()
 			FCollider& Collider,
 			FGridData& GridData)
 		{
+			const FVector& Location = Located.Location;
+
+			if (!IsInside(Location)) return;
+
 			if (Subject.HasTrait<FTracing>()) 
 			{
 				auto& Tracing = Subject.GetTraitRef<FTracing>();
@@ -1149,7 +1153,6 @@ void UNeighborGridComponent::Update()
 				Tracing.Unlock();
 			}
 
-			const FVector& Location = Located.Location;
 			GridData.Location = FVector3f(Location);
 			GridData.Radius = Collider.Radius * Scaled.Scale;
 
@@ -1172,10 +1175,7 @@ void UNeighborGridComponent::Update()
 			// 使用统一的单元格注册逻辑
 			if (!Subject.HasFlag(RegisterMultipleFlag)) 
 			{
-				if (IsInside(Location)) 
-				{
-					RegisterCell(LocationToIndex(Location), GridData);
-				}
+				RegisterCell(LocationToIndex(Location), GridData);
 			}
 			else 
 			{
