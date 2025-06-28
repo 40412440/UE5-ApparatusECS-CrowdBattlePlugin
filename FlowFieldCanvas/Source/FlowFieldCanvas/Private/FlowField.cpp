@@ -51,12 +51,13 @@ void AFlowField::DrawDebug()
 
 		CreateGrid();
 
+		CurrentCellsArray = InitialCellsArray;
+
 		CalculateFlowField(CurrentCellsArray);
 
 		DrawCells(EInitMode::Construction);
 
 		DrawArrows(EInitMode::Construction);
-
 	}
 }
 
@@ -71,6 +72,8 @@ void AFlowField::UpdateFlowField()
 	GetGoalLocation();
 
 	CreateGrid();
+
+	CurrentCellsArray = InitialCellsArray;
 
 	CalculateFlowField(CurrentCellsArray);
 

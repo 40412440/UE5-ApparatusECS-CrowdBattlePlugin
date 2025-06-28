@@ -1554,8 +1554,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 
 					if (LIKELY(bIsSet))
-					{
-						
+					{					
 						// 计算投影高度
 						const float PlaneD = -FVector::DotProduct(HighestGroundNormal, HighestGroundLocation);
 						const float GroundHeight = (-PlaneD - HighestGroundNormal.X * SelfLocation.X - HighestGroundNormal.Y * SelfLocation.Y) / HighestGroundNormal.Z;
