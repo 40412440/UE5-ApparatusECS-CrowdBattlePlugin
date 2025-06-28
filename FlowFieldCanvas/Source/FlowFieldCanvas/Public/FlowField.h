@@ -201,6 +201,28 @@ public:
 		}
 	}
 
+	FORCEINLINE FCellStruct& GetCellAtCoord(const FVector2D& Coord, bool& bOutIsValid)
+	{
+		// 默认返回第一个单元格（防止返回无效引用）
+		FCellStruct* ResultCell = &CurrentCellsArray[0];
+		bOutIsValid = false;
+
+		const bool bIsValidCoord = (Coord.X >= 0 && Coord.X < xNum) && (Coord.Y >= 0 && Coord.Y < yNum);
+
+		const int32 Index = CoordToIndex(Coord);
+		const int32 CellCount = CurrentCellsArray.Num();
+		const bool bIsValidIndex = Index < CellCount;
+
+		// 计算最终索引（确保不越界）
+		const int32 NearestIndex = FMath::Clamp(Index, 0, CellCount - 1);
+		ResultCell = &CurrentCellsArray[NearestIndex];
+
+		// 设置有效性标志
+		bOutIsValid = bIsValidCoord && bIsValidIndex;
+
+		return *ResultCell;
+	}
+
 	FORCEINLINE FVector GetAverageDirection(const FVector& Location, const float Radius, bool& bOutIsValid)
 	{
 		bOutIsValid = false;

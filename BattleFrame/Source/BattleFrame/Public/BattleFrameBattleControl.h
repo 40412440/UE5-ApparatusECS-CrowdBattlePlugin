@@ -149,7 +149,6 @@ public:
 	TQueue<FDebugCircleConfig, EQueueMode::Mpsc> DebugCircleQueue;
 
 
-
 private:
 
 	// all filters we gonna use
@@ -302,26 +301,95 @@ public:
 		}
 	};
 
-	FORCEINLINE FCellStruct& GetCellAtCoord(AFlowField* FlowField, const FVector2D& Coord, bool& bOutIsValid)
+	FORCEINLINE bool GetInterpolatedWorldLoc(AFlowField* flowField, const FVector& location, const float angleThreshold, FVector& outInterpolatedWorldLoc)
 	{
-		// 默认返回第一个单元格（防止返回无效引用）
-		FCellStruct* ResultCell = &FlowField->CurrentCellsArray[0];
-		bOutIsValid = false;
+		// 初始化输出为无效值
+		outInterpolatedWorldLoc = FVector::ZeroVector;
 
-		const bool bIsValidCoord = (Coord.X >= 0 && Coord.X < FlowField->xNum) && (Coord.Y >= 0 && Coord.Y < FlowField->yNum);
+		// 检查是否已开始游戏
+		if (flowField->bIsBeginPlay)
+		{
+			return false;
+		}
 
-		const int32 Index = FlowField->CoordToIndex(Coord);
-		const int32 CellCount = FlowField->CurrentCellsArray.Num();
-		const bool bIsValidIndex = Index < CellCount;
+		// 计算相对位置
+		FVector relativeLocation = (location - flowField->actorLoc).RotateAngleAxis(-flowField->actorRot.Yaw, FVector(0, 0, 1)) + flowField->offsetLoc;
+		float cellRadius = flowField->cellSize / 2.0f;
 
-		// 计算最终索引（确保不越界）
-		const int32 NearestIndex = FMath::Clamp(Index, 0, CellCount - 1);
-		ResultCell = &FlowField->CurrentCellsArray[NearestIndex];
+		// 计算连续网格坐标
+		float continuousGridX = (relativeLocation.X - cellRadius) / flowField->cellSize;
+		float continuousGridY = (relativeLocation.Y - cellRadius) / flowField->cellSize;
 
-		// 设置有效性标志
-		bOutIsValid = bIsValidCoord && bIsValidIndex;
+		// 获取左下角索引和小数部分
+		int32 baseX = FMath::FloorToInt(continuousGridX);
+		int32 baseY = FMath::FloorToInt(continuousGridY);
+		float fractionX = continuousGridX - baseX;
+		float fractionY = continuousGridY - baseY;
 
-		return *ResultCell;
+		// 检查四个点是否都在网格内
+		if (baseX >= 0 && (baseX + 1) < flowField->xNum &&
+			baseY >= 0 && (baseY + 1) < flowField->yNum)
+		{
+			// 获取四个角点的单元格
+			bool isValid00, isValid10, isValid01, isValid11;
+			FCellStruct& cell00 = flowField->GetCellAtCoord(FVector2D(baseX, baseY), isValid00);
+			FCellStruct& cell10 = flowField->GetCellAtCoord(FVector2D(baseX + 1, baseY), isValid10);
+			FCellStruct& cell01 = flowField->GetCellAtCoord(FVector2D(baseX, baseY + 1), isValid01);
+			FCellStruct& cell11 = flowField->GetCellAtCoord(FVector2D(baseX + 1, baseY + 1), isValid11);
+
+			// 确保所有单元格都有效
+			if (isValid00 && isValid10 && isValid01 && isValid11)
+			{
+				// 双线性插值位置
+				FVector interpBottom = FMath::Lerp(cell00.worldLoc, cell10.worldLoc, fractionX);
+				FVector interpTop = FMath::Lerp(cell01.worldLoc, cell11.worldLoc, fractionX);
+				outInterpolatedWorldLoc = FMath::Lerp(interpBottom, interpTop, fractionY);
+
+				// 计算与四个角点的最大坡度
+				float maxSlopeAngle = 0.0f;
+				const TArray<FVector> cornerPoints = {
+					cell00.worldLoc,
+					cell10.worldLoc,
+					cell01.worldLoc,
+					cell11.worldLoc
+				};
+
+				for (const FVector& cornerPoint : cornerPoints)
+				{
+					// 计算水平距离（忽略Z轴）
+					FVector horizontalVec = cornerPoint - outInterpolatedWorldLoc;
+					horizontalVec.Z = 0.0f;
+					const float horizontalDistance = horizontalVec.Size();
+
+					// 跳过距离过小的点（避免除以0）
+					if (horizontalDistance < KINDA_SMALL_NUMBER) continue;
+
+					// 计算高度差
+					const float heightDiff = FMath::Abs(cornerPoint.Z - outInterpolatedWorldLoc.Z);
+
+					// 计算坡度角度（atan(高度差/水平距离)）
+					const float slopeAngle = FMath::RadiansToDegrees(FMath::Atan(heightDiff / horizontalDistance));
+
+					// 更新最大坡度
+					if (slopeAngle > maxSlopeAngle)
+					{
+						maxSlopeAngle = slopeAngle;
+					}
+				}
+
+				//UE_LOG(LogTemp, Warning, TEXT("maxSlopeAngle = %.2f degrees"), maxSlopeAngle);
+
+				// 检查坡度是否超过阈值
+				if (maxSlopeAngle > angleThreshold)
+				{
+					return false; // 坡度太陡，无效位置
+				}
+
+				return true; // 有效位置且坡度可接受
+			}
+		}
+
+		return false; // 基础条件不满足
 	}
 
 	static FVector FindNewPatrolGoalLocation(const FPatrol Patrol, const FCollider Collider, const FTrace Trace, const FTracing Tracing, const FLocated Located, const FScaled Scaled, int32 MaxAttempts);

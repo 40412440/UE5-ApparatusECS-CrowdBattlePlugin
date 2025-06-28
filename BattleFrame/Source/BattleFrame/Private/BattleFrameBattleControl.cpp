@@ -972,12 +972,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// 必须要有一个流场
 				if (UNLIKELY(!bIsValidFF))
 				{
-					//UE_LOG(LogTemp, Warning, TEXT("Agent doesn't have a flowfield thus cannot move | Agent没有流场无法移动"));
+					UE_LOG(LogTemp, Warning, TEXT("Agent doesn't have a flowfield thus cannot move | Agent没有流场无法移动"));
 					return;
 				}
 
-				FVector SelfLocation = Located.Location;
-				float SelfRadius = Collider.Radius * Scaled.Scale;
+				const FVector SelfLocation = Located.Location;
+				const float SelfRadius = Collider.Radius * Scaled.Scale;
 
 				// 必须获取因为之后要用到地面高度
 				bool bInside_BaseFF;
@@ -1500,64 +1500,86 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				if (LIKELY(bIsValidFF)) // 没有流场则跳过，因为不知道地面高度
 				{
 					// 寻找最高地面
+					FVector GroundLocation = FVector::ZeroVector;
 					bool bIsSet = false;
-					FVector HighestGroundLocation = FVector::ZeroVector;
-					FVector HighestGroundNormal = FVector::UpVector;
 
-					// Center Point
-					if (bInside_BaseFF)
-					{
-						bIsSet = true;
-						HighestGroundLocation = Cell_BaseFF.worldLoc;
-						HighestGroundNormal = Cell_BaseFF.normal;
-					}
-
-					// 计算球体覆盖区域的所有潜在格子
-					FVector2D GridCoordMin, GridCoordMax;
-
-					// 得到边界范围
-					FVector SphereMin = SelfLocation - FVector(SelfRadius, SelfRadius, 0);
-					FVector SphereMax = SelfLocation + FVector(SelfRadius, SelfRadius, 0);
-
-					Navigating.FlowField->WorldToGrid(SphereMin, GridCoordMin);
-					Navigating.FlowField->WorldToGrid(SphereMax, GridCoordMax);
-
-					// 遍历球形覆盖的所有可能格子
-					for (int32 X = GridCoordMin.X; X <= GridCoordMax.X; ++X)
-					{
-						for (int32 Y = GridCoordMin.Y; Y <= GridCoordMax.Y; ++Y)
+					// 定义球体追踪lambda函数
+					auto PerformSphereTrace = [&](FVector& OutLocation) -> bool
 						{
-							FVector2D GridCoord(X, Y);
+							TRACE_CPUPROFILER_EVENT_SCOPE_STR("SphereTraceForGround");
+							const float TraceDistance = FMath::Abs(SelfLocation.Z - Move.Z.KillZ);
+							const FVector TraceStart = SelfLocation + FVector(0, 0, SelfRadius);
+							const FVector TraceEnd = FVector(SelfLocation.X, SelfLocation.Y, Move.Z.KillZ);
 
-							if (GridCoord == Cell_BaseFF.gridCoord) continue;
+							FCollisionShape CollisionShape;
+							CollisionShape.SetSphere(SelfRadius);
 
-							// 读取当前格子
-							bool bInside;
-							FCellStruct& Cell = GetCellAtCoord(Navigating.FlowField, GridCoord, bInside);
+							FCollisionQueryParams TraceParams;
+							TraceParams.bTraceComplex = true;
+							TraceParams.AddIgnoredActor(this);
 
-							// 更新最高的地面位置
-							if (bInside)
+							FHitResult HitResult;
+							UWorld* World = GetWorld();
+
+							TArray<TObjectPtr<AActor>> IgnoreActors;
+							bool bHit = UKismetSystemLibrary::SphereTraceSingleForObjects(
+								World,
+								TraceStart,
+								TraceEnd,
+								SelfRadius,
+								Move.Z.GroundObjectType,
+								true,
+								IgnoreActors,
+								EDrawDebugTrace::None,
+								HitResult,
+								true,
+								FLinearColor::Gray,
+								FLinearColor::Red,
+								1);
+
+							if (bHit)
 							{
-								if (!bIsSet)
-								{
-									bIsSet = true;
-									HighestGroundLocation = Cell.worldLoc;
-									HighestGroundNormal = Cell.normal;
-								}
-								else if (Cell.worldLoc.Z > HighestGroundLocation.Z)
-								{		
-									HighestGroundLocation = Cell.worldLoc;
-									HighestGroundNormal = Cell.normal;
-								}
+								OutLocation = HitResult.Location;
+								OutLocation.Z -= SelfRadius;
 							}
-						}
+
+							//if (Move.bDrawDebugShape)
+							//{
+							//	FDebugSphereConfig Config;
+							//	Config.Radius = SelfRadius * 0.1f;
+							//	Config.Location = OutLocation;
+							//	Config.LineThickness = 5.f;
+							//	Config.Color = bHit ? FColor::Green : FColor::Red;
+							//	DebugSphereQueue.Enqueue(Config);
+							//}
+
+							return bHit;
+						};
+
+					// 根据选择的模式进行地面采样
+					switch (Move.Z.GroundTraceMode)
+					{
+						case EGroundTraceMode::FlowFieldAndSphereTrace:
+							// 模式1：优先使用流场，失败时回退到球体追踪
+							bIsSet = GetInterpolatedWorldLoc(Navigating.FlowField, SelfLocation, Move.Z.SphereTraceAngleThreshold, GroundLocation);
+							if (!bIsSet) bIsSet = PerformSphereTrace(GroundLocation);
+							break;
+
+						case EGroundTraceMode::FlowField:
+							// 模式2：仅使用流场采样
+							bIsSet = GetInterpolatedWorldLoc(Navigating.FlowField, SelfLocation, Move.Z.SphereTraceAngleThreshold, GroundLocation);
+							break;
+
+						case EGroundTraceMode::SphereTrace:
+							// 模式3：直接使用球体追踪
+							bIsSet = PerformSphereTrace(GroundLocation);
+							break;
 					}
 
 					if (LIKELY(bIsSet))
 					{					
 						// 计算投影高度
-						const float PlaneD = -FVector::DotProduct(HighestGroundNormal, HighestGroundLocation);
-						const float GroundHeight = (-PlaneD - HighestGroundNormal.X * SelfLocation.X - HighestGroundNormal.Y * SelfLocation.Y) / HighestGroundNormal.Z;
+						const float GroundHeight = GroundLocation.Z;
 
 						if (UNLIKELY(Move.Z.bCanFly))
 						{
@@ -1566,10 +1588,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						}
 						else
 						{
-							const float CollisionThreshold = GroundHeight + Collider.Radius * Scaled.Scale;
+							const float CollisionThreshold = GroundHeight + SelfRadius;
 
 							// 高度状态判断
-							if (UNLIKELY(SelfLocation.Z - CollisionThreshold > Collider.Radius * Scaled.Scale * 0.1f))// need a bit of tolerance or it will be hard to decide is it is on ground or in the air
+							if (UNLIKELY(SelfLocation.Z - CollisionThreshold > SelfRadius * 0.1f))// need a bit of tolerance or it will be hard to decide is it is on ground or in the air
 							{
 								// 应用重力
 								Moving.CurrentVelocity.Z += Move.Z.Gravity * SafeDeltaTime;
@@ -1583,7 +1605,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							else
 							{
 								// 地面接触处理
-								const float GroundContactThreshold = GroundHeight - Collider.Radius * Scaled.Scale;
+								const float GroundContactThreshold = GroundHeight - SelfRadius;
 
 								// 着陆状态切换
 								if (Moving.bFalling)
@@ -1594,13 +1616,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								}
 
 								// 平滑移动到地面
-								Located.Location.Z = FMath::FInterpTo(SelfLocation.Z, CollisionThreshold, SafeDeltaTime, 15.0f);
+								Located.Location.Z = CollisionThreshold/*FMath::FInterpTo(SelfLocation.Z, CollisionThreshold, SafeDeltaTime, 15.0f)*/;
 							}
 						}
 					}
 					else
 					{
-						UE_LOG(LogTemp, Warning, TEXT("bIsNotSet"));
 						if (UNLIKELY(Move.Z.bCanFly))
 						{
 							Moving.CurrentVelocity.Z *= 0.9f;
@@ -3940,6 +3961,23 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	// WIP 调试图形 | Draw Debug Shapes
 	#pragma region
 	{
+		// 绘制点队列
+		while (!DebugPointQueue.IsEmpty())
+		{
+			FDebugPointConfig Config;
+			DebugPointQueue.Dequeue(Config);
+
+			DrawDebugPoint(
+				CurrentWorld,
+				Config.Location,
+				Config.Size,
+				Config.Color,
+				false,
+				-1.f,
+				3
+			);
+		}
+
 		// 绘制胶囊体队列
 		while (!DebugCapsuleQueue.IsEmpty())
 		{

@@ -402,7 +402,7 @@ public:
 	float Duration = 0.f;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "线宽"))
-	float LineThickness = 0.f;
+	float Size = 1.f;
 
 };
 
