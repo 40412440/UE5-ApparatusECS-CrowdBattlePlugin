@@ -1616,7 +1616,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								}
 
 								// 平滑移动到地面
-								Located.Location.Z = CollisionThreshold/*FMath::FInterpTo(SelfLocation.Z, CollisionThreshold, SafeDeltaTime, 15.0f)*/;
+								Located.Location.Z = /*CollisionThreshold*/FMath::FInterpTo(SelfLocation.Z, CollisionThreshold, SafeDeltaTime, SelfRadius*0.5);
 							}
 						}
 					}
