@@ -35,7 +35,7 @@ This plugin is open source, but has the following dependencies:
 - **Technology Stack**:
   - ECS for logic
   - Niagara + VAT for rendering
-  - RVO2 for avoidance/collision
+  - RVO2 for avoidance
   - Neighbour grid for collision detection
   - Flow field and A* for navigation
 
