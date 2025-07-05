@@ -9,6 +9,7 @@
 #include "HAL/Platform.h"
 #include "Traits/SubType.h"
 #include "Traits/Animation.h"
+#include "Traits/Animating.h"
 #include "Traits/RenderBatchData.h"
 #include "Traits/Located.h" 
 #include "Traits/Rendering.h"
@@ -91,7 +92,8 @@ void ANiagaraSubjectRenderer::Register()
 			const FDirected& Directed,
 			const FScaled& Scaled,
 			const FHealthBar& HealthBar,
-			const FAnimation& Anim)
+			const FAnimation& Animation,
+			const FAnimating& Animating)
 		{
 			FQuat Rotation{ FQuat::Identity };
 			Rotation = Directed.Direction.Rotation().Quaternion();
@@ -136,13 +138,19 @@ void ANiagaraSubjectRenderer::Register()
 				Data->OrientationArray[NewInstanceId] = SubjectTransform.GetRotation();
 				Data->ScaleArray[NewInstanceId] = SubjectTransform.GetScale3D();
 
-				Data->Anim_Lerp_Array[NewInstanceId] = 0;
+				// Dynamic params 0, encode multiple values into a single float
+				float Elem0 = ABattleFrameBattleControl::EncodeAnimationIndices(Animating.AnimIndex0, Animating.AnimIndex1, Animating.AnimIndex2);
+				float Elem1 = ABattleFrameBattleControl::EncodePauseFrames(Animating.AnimPauseFrame0, Animating.AnimPauseFrame1, Animating.AnimPauseFrame2);
+				float Elem2 = ABattleFrameBattleControl::EncodePlayRates(Animating.AnimPlayRate0, Animating.AnimPlayRate1, Animating.AnimPlayRate2);
+				float Elem3 = ABattleFrameBattleControl::EncodeStatusEffects(Animating.HitGlow, Animating.IceFxInterped, Animating.FireFxInterped, Animating.PoisonFxInterped);
 
-				Data->Anim_Index0_Index1_PauseTime0_PauseTime1_Array[NewInstanceId] = FVector4(Anim.AnimIndex0, Anim.AnimIndex1, Anim.AnimPauseTime0, Anim.AnimPauseTime1);
-				Data->Anim_TimeStamp0_TimeStamp1_PlayRate0_Playrate1_Array[NewInstanceId] = FVector4(GetGameTimeSinceCreation(), GetGameTimeSinceCreation(), 1, 1);
+				Data->AnimIndex_PauseFrame_Playrate_MatFx_Array[NewInstanceId] = FVector4(Elem0, Elem1, Elem2, Elem3);
 
-				Data->Mat_Dissolve_HitGlow_Team_Fire_Array[NewInstanceId] = FVector4(1, 0, 0, 0);
-				Data->Mat_Ice_Poison_Array[NewInstanceId] = FVector4(0, 0, 0, 0);
+				// Dynamic params 1
+				Data->AnimTimeStamp_Array[NewInstanceId] = FVector4(Animating.AnimCurrentTime0 - Animating.AnimOffsetTime0, Animating.AnimCurrentTime1 - Animating.AnimOffsetTime1, Animating.AnimCurrentTime2 - Animating.AnimOffsetTime2, 0);
+
+				// Pariticle color
+				Data->AnimLerp0_AnimLerp1_Team_Dissolve_Array[NewInstanceId] = FVector4(Animating.AnimLerp0, Animating.AnimLerp1, Animating.Team, Animating.Dissolve);
 
 				Data->HealthBar_Opacity_CurrentRatio_TargetRatio_Array[NewInstanceId] = FVector(HealthBar.Opacity, HealthBar.CurrentRatio, HealthBar.TargetRatio);
 
@@ -159,13 +167,19 @@ void ANiagaraSubjectRenderer::Register()
 				Data->OrientationArray.Add(SubjectTransform.GetRotation());
 				Data->ScaleArray.Add(SubjectTransform.GetScale3D());
 
-				Data->Anim_Lerp_Array.Add(0);
+				// Dynamic params 0, encode multiple values into a single float
+				float Elem0 = ABattleFrameBattleControl::EncodeAnimationIndices(Animating.AnimIndex0, Animating.AnimIndex1, Animating.AnimIndex2);
+				float Elem1 = ABattleFrameBattleControl::EncodePauseFrames(Animating.AnimPauseFrame0, Animating.AnimPauseFrame1, Animating.AnimPauseFrame2);
+				float Elem2 = ABattleFrameBattleControl::EncodePlayRates(Animating.AnimPlayRate0, Animating.AnimPlayRate1, Animating.AnimPlayRate2);
+				float Elem3 = ABattleFrameBattleControl::EncodeStatusEffects(Animating.HitGlow, Animating.IceFxInterped, Animating.FireFxInterped, Animating.PoisonFxInterped);
 
-				Data->Anim_Index0_Index1_PauseTime0_PauseTime1_Array.Add(FVector4(Anim.AnimIndex0, Anim.AnimIndex1, Anim.AnimPauseTime0, Anim.AnimPauseTime1));
-				Data->Anim_TimeStamp0_TimeStamp1_PlayRate0_Playrate1_Array.Add(FVector4(GetGameTimeSinceCreation(), GetGameTimeSinceCreation(), 1, 1));
+				Data->AnimIndex_PauseFrame_Playrate_MatFx_Array.Add(FVector4(Elem0, Elem1, Elem2, Elem3));
 
-				Data->Mat_Dissolve_HitGlow_Team_Fire_Array.Add(FVector4(1, 0, 0, 0));
-				Data->Mat_Ice_Poison_Array.Add(FVector4(0, 0, 0, 0));
+				// Dynamic params 1
+				Data->AnimTimeStamp_Array.Add(FVector4(Animating.AnimCurrentTime0 - Animating.AnimOffsetTime0, Animating.AnimCurrentTime1 - Animating.AnimOffsetTime1, Animating.AnimCurrentTime2 - Animating.AnimOffsetTime2, 0));
+
+				// Pariticle color
+				Data->AnimLerp0_AnimLerp1_Team_Dissolve_Array.Add(FVector4(Animating.AnimLerp0, Animating.AnimLerp1, Animating.Team, Animating.Dissolve));
 
 				Data->HealthBar_Opacity_CurrentRatio_TargetRatio_Array.Add(FVector(HealthBar.Opacity, HealthBar.CurrentRatio, HealthBar.TargetRatio));
 

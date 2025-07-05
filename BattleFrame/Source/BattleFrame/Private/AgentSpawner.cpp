@@ -139,6 +139,7 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsRectangular
     AgentConfig.SetTrait(DataAsset->Hit);
     AgentConfig.SetTrait(DataAsset->Death);
     AgentConfig.SetTrait(DataAsset->Animation);
+    AgentConfig.SetTrait(FAnimating());
     AgentConfig.SetTrait(DataAsset->HealthBar);
     AgentConfig.SetTrait(DataAsset->TextPop);
     AgentConfig.SetTrait(FPoppingText());
@@ -331,6 +332,7 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsByConfigRectangular
     AgentRecord.SetTrait(AgentConfig->Hit);
     AgentRecord.SetTrait(AgentConfig->Death);
     AgentRecord.SetTrait(AgentConfig->Animation);
+    AgentRecord.SetTrait(FAnimating());
     AgentRecord.SetTrait(AgentConfig->HealthBar);
     AgentRecord.SetTrait(AgentConfig->TextPop);
     AgentRecord.SetTrait(FPoppingText());
@@ -451,25 +453,30 @@ void AAgentSpawner::ActivateAgent( FSubjectHandle Agent )// strange apparatus bu
     auto Sleep = Agent.GetTrait<FSleep>();
     auto Patrol = Agent.GetTrait<FPatrol>();
     auto Animation = Agent.GetTrait<FAnimation>();
+    auto Animating = Agent.GetTrait<FAnimating>();
     auto Team = Agent.GetTrait<FTeam>();
     auto SubType = Agent.GetTrait<FSubType>();
     auto Avoidance = Agent.GetTrait<FAvoidance>();
 
-    Animation.AnimToTextureData = Animation.AnimToTextureDataAsset.LoadSynchronous(); // DataAsset Solid Pointer
+    Animating.AnimToTextureData = Animation.AnimToTextureDataAsset.LoadSynchronous(); // DataAsset Solid Pointer
 
-    if (IsValid(Animation.AnimToTextureData))
+    if (IsValid(Animating.AnimToTextureData))
     {
-        Animation.AnimLengthArray.Empty();
+        Animating.AnimPauseFrameArray.Empty();
 
-        for (FAnimToTextureAnimInfo CurrentAnim : Animation.AnimToTextureData->Animations)
+        for (FAnimToTextureAnimInfo CurrentAnim : Animating.AnimToTextureData->Animations)
         {
-            Animation.AnimLengthArray.Add((CurrentAnim.EndFrame - CurrentAnim.StartFrame) / Animation.AnimToTextureData->SampleRate);
+            Animating.AnimPauseFrameArray.Add(CurrentAnim.EndFrame - CurrentAnim.StartFrame);
         }
+
+        Animating.SampleRate = Animating.AnimToTextureData->SampleRate;
+        Animating.AnimIndex0 = Animating.AnimIndex1 = Animating.AnimIndex2 = Animation.IndexOfIdleAnim;
+        Animating.CurrentMontageSlot = 2;
     }
 
     if (Appear.bEnable)
     {
-        Animation.Dissolve = 1;
+        Animating.Dissolve = 1;
         Agent.SetTrait(FAppearing());
     }
     else
@@ -477,10 +484,7 @@ void AAgentSpawner::ActivateAgent( FSubjectHandle Agent )// strange apparatus bu
         Agent.RemoveTrait<FAppearing>();
     }
 
-    Animation.AnimOffsetTime0 = FMath::RandRange(Animation.IdleRandomTimeOffset.X, Animation.IdleRandomTimeOffset.Y);
-    Animation.AnimOffsetTime1 = FMath::RandRange(Animation.IdleRandomTimeOffset.X, Animation.IdleRandomTimeOffset.Y);
-
-    Agent.SetTrait(Animation);
+    Agent.SetTrait(Animating);
 
     if (Sleep.bEnable)
     {
@@ -532,22 +536,30 @@ void AAgentSpawner::ActivateAgent( FSubjectHandle Agent )// strange apparatus bu
     // 如果场上没有，生成该怪物的渲染器
     if (CurrentWorld && BattleControl && !BattleControl->ExistingRenderers.Contains(SubType.Index))
     {
-        FActorSpawnParameters SpawnParams;
-        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-        SpawnParams.bNoFail = true;
+        TSubclassOf<ANiagaraSubjectRenderer> RendererClass = Animation.RendererClass.LoadSynchronous();
 
-        // 直接生成目标类型
-        ANiagaraSubjectRenderer* RendererActor = CurrentWorld->SpawnActor<ANiagaraSubjectRenderer>(Animation.RendererClass, FTransform::Identity, SpawnParams);
-
-        // 设置SubType参数
-        if (RendererActor)
+        if (IsValid(RendererClass))
         {
-            BattleControl->ExistingRenderers.Add(SubType.Index);
-            RendererActor->SubType.Index = SubType.Index;
-            RendererActor->SetActorTickEnabled(true);
+            FActorSpawnParameters SpawnParams;
+            SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+            SpawnParams.bNoFail = true;
+
+            // 直接生成目标类型
+            ANiagaraSubjectRenderer* RendererActor = CurrentWorld->SpawnActor<ANiagaraSubjectRenderer>(RendererClass, FTransform::Identity, SpawnParams);
+
+            // 设置SubType参数
+            if (RendererActor)
+            {
+                BattleControl->ExistingRenderers.Add(SubType.Index);
+                RendererActor->SubType.Index = SubType.Index;
+                RendererActor->SetActorTickEnabled(true);
+            }
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Animation.RendererClass is invalid | Animation.RendererClass无效"));
         }
     }
-
 }
 
 void AAgentSpawner::KillAllAgents()

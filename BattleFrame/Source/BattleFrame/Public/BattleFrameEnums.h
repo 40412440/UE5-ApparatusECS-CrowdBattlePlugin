@@ -126,3 +126,17 @@ enum class EDeathEventState : uint8
 	SuicideAttack UMETA(DisplayName = "SuicideAttack", ToolTip = "自杀攻击"),
 	KillZ UMETA(DisplayName = "KillZ", ToolTip = "低于强制移除高度")
 };
+
+UENUM(BlueprintType)
+enum class EAnimState : uint8
+{
+	Dirty UMETA(DisplayName = "Dirty"),
+	BS_IdleMove UMETA(DisplayName = "Blendspace_Idle-Move"),
+	Appearing UMETA(DisplayName = "Appearing"),
+	Sleeping UMETA(DisplayName = "Sleeping"),
+	Attacking UMETA(DisplayName = "Attacking"),
+	BeingHit UMETA(DisplayName = "BeingHit"),
+	Dying UMETA(DisplayName = "Dying"),
+	Falling UMETA(DisplayName = "Falling"),
+	Jumping UMETA(DisplayName = "Jumping")
+};

@@ -139,7 +139,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FDirected& Directed,
 				FAppear& Appear,
 				FAppearing& Appearing,
-				FAnimation& Animation)
+				FAnimating& Animating)
 			{
 				// Initial execute
 				if (Appearing.time == 0)
@@ -202,7 +202,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						}
 						else
 						{
-							Animation.Dissolve = 0;// unhide
+							Animating.Dissolve = 0;// unhide
 						}
 
 						// Animation
@@ -234,15 +234,14 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		Chain->OperateConcurrently(
 			[&](FSolidSubjectHandle Subject,
-				FAnimation& Animation,
+				FAnimating& Animating,
 				FAppear& Appear,
 				FAppearAnim& AppearAnim)
 			{
 				if (AppearAnim.animTime == 0)
 				{
 					// 状态机
-					Animation.SubjectState = ESubjectState::Appearing;
-					Animation.PreviousSubjectState = ESubjectState::Dirty;
+					Animating.AnimState = EAnimState::Appearing;
 				}
 				
 				if (AppearAnim.animTime >= Appear.Duration)
@@ -266,7 +265,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		Chain->OperateConcurrently(
 			[&](FSolidSubjectHandle Subject,
-				FAnimation& Animation,
+				FAnimating& Animating,
 				FAppearDissolve& AppearDissolve,
 				FCurves& Curves)
 			{
@@ -275,7 +274,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				if (!Curve || Curve->GetNumKeys() == 0) return;
 
 				const auto EndTime = Curve->GetLastKey().Time;
-				Animation.Dissolve = 1 - Curve->Eval(FMath::Clamp(AppearDissolve.dissolveTime, 0, EndTime));
+				Animating.Dissolve = 1 - Curve->Eval(FMath::Clamp(AppearDissolve.dissolveTime, 0, EndTime));
 
 				if (AppearDissolve.dissolveTime > EndTime)
 				{
@@ -972,7 +971,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// 必须要有一个流场
 				if (UNLIKELY(!bIsValidFF))
 				{
-					UE_LOG(LogTemp, Warning, TEXT("Agent doesn't have a flowfield thus cannot move | Agent没有流场无法移动"));
+					UE_LOG(LogTemp, Warning, TEXT("Navigation.FlowField is invalid | Navigation.FlowField无效"));
 					return;
 				}
 
@@ -2010,7 +2009,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FScaled& Scaled,
 				FCollider& Collider,
 				FRendering& Rendering,
-				FAnimation& Animation,
+				FAnimating& Animating,
 				FAttack& Attack,
 				FAttacking& Attacking,
 				FMoving& Moving,
@@ -2055,8 +2054,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					if (UNLIKELY(Attacking.Time == 0)) // First Execute
 					{
 						// Animation
-						Animation.SubjectState = ESubjectState::Attacking;
-						Animation.PreviousSubjectState = ESubjectState::Dirty;
+						Animating.AnimState = EAnimState::Attacking;
 
 						FVector SpawnLocation = Located.Location;
 						FQuat SpawnRotation = Directed.Direction.ToOrientationQuat();
@@ -2245,7 +2243,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						if (Attacking.State == EAttackState::PostCast) // First Execute
 						{
 							Attacking.State = EAttackState::Cooling;
-							Animation.SubjectState = ESubjectState::Idle;
+							Animating.AnimState = EAnimState::BS_IdleMove;
 
 							// Attack Event Cooling 
 							if (Subject.HasTrait<FIsSubjective>())
@@ -2300,7 +2298,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		Chain->OperateConcurrently(
 			[&](FSolidSubjectHandle Subject,
-				FAnimation& Animation,
+				FAnimating& Animating,
 				FHitGlow& HitGlow,
 				FCurves& Curves)
 			{
@@ -2314,7 +2312,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				const auto EndTime = Curve->GetLastKey().Time;
 
 				// 受击发光
-				Animation.HitGlow = Curve->Eval(HitGlow.GlowTime);
+				Animating.HitGlow = Curve->Eval(HitGlow.GlowTime);
 
 				// 更新发光时间
 				if (HitGlow.GlowTime < EndTime)
@@ -2325,7 +2323,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// 计时器完成后删除 Trait
 				if (HitGlow.GlowTime >= EndTime)
 				{
-					Animation.HitGlow = 0; // 重置发光值
+					Animating.HitGlow = 0; // 重置发光值
 					Subject->RemoveTraitDeferred<FHitGlow>(); // 延迟删除 Trait
 				}
 
@@ -2407,27 +2405,27 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					TargetSlowing.Slowers.Add(FSubjectHandle(Subject));
 					TargetSlowing.Unlock();
 
-					const bool bHasAnimation = Slower.SlowTarget.HasTrait<FAnimation>();
+					const bool bHasAnimating = Slower.SlowTarget.HasTrait<FAnimating>();
 
 					// 开启材质特效
-					if (bHasAnimation)
+					if (bHasAnimating)
 					{
-						auto& TargetAnimation = Slower.SlowTarget.GetTraitRef<FAnimation, EParadigm::Unsafe>();
+						auto& TargetAnimating = Slower.SlowTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
 
-						TargetAnimation.Lock();
+						TargetAnimating.Lock();
 						switch (Slower.DmgType)
 						{
 							case EDmgType::Fire:
-								TargetAnimation.FireFx = 1;
+								TargetAnimating.FireFx = 1;
 								break;
 							case EDmgType::Ice:
-								TargetAnimation.IceFx = 1;
+								TargetAnimating.IceFx = 1;
 								break;
 							case EDmgType::Poison:
-								TargetAnimation.PoisonFx = 1;
+								TargetAnimating.PoisonFx = 1;
 								break;
 						}
-						TargetAnimation.Unlock();
+						TargetAnimating.Unlock();
 					}
 
 					Slower.bJustSpawned = false;
@@ -2442,10 +2440,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					TargetSlowing.Slowers.Remove(FSubjectHandle(Subject));
 					TargetSlowing.Unlock();
 
-					const bool bHasAnimation = Slower.SlowTarget.HasTrait<FAnimation>();
+					const bool bHasAnimating = Slower.SlowTarget.HasTrait<FAnimating>();
 
 					// 重置材质特效
-					if (bHasAnimation)
+					if (bHasAnimating)
 					{
 						bool bHasSameDmgType = false;
 
@@ -2478,22 +2476,22 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						// 如果没有同伤害类型的马甲，可以重置材质特效了
 						if (!bHasSameDmgType)
 						{
-							auto& TargetAnimation = Slower.SlowTarget.GetTraitRef<FAnimation, EParadigm::Unsafe>();
+							auto& TargetAnimating = Slower.SlowTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
 
-							TargetAnimation.Lock();
+							TargetAnimating.Lock();
 							switch (Slower.DmgType)
 							{
 								case EDmgType::Fire:
-									TargetAnimation.FireFx = 0;
+									TargetAnimating.FireFx = 0;
 									break;
 								case EDmgType::Ice:
-									TargetAnimation.IceFx = 0;
+									TargetAnimating.IceFx = 0;
 									break;
 								case EDmgType::Poison:
-									TargetAnimation.PoisonFx = 0;
+									TargetAnimating.PoisonFx = 0;
 									break;
 							}
-							TargetAnimation.Unlock();
+							TargetAnimating.Unlock();
 						}
 					}
 
@@ -2536,26 +2534,26 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					TargetTemporalDamaging.TemporalDamagers.Add(FSubjectHandle(Subject));
 					TargetTemporalDamaging.Unlock();
 
-					const bool bHasAnimation = TemporalDamager.TemporalDamageTarget.HasTrait<FAnimation>();
+					const bool bHasAnimating = TemporalDamager.TemporalDamageTarget.HasTrait<FAnimating>();
 
-					if (bHasAnimation)
+					if (bHasAnimating)
 					{
-						auto& TargetAnimation = TemporalDamager.TemporalDamageTarget.GetTraitRef<FAnimation, EParadigm::Unsafe>();
+						auto& TargetAnimating = TemporalDamager.TemporalDamageTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
 
-						TargetAnimation.Lock();
+						TargetAnimating.Lock();
 						switch (TemporalDamager.DmgType)
 						{
 							case EDmgType::Fire:
-								TargetAnimation.FireFx = 1;
+								TargetAnimating.FireFx = 1;
 								break;
 							case EDmgType::Ice:
-								TargetAnimation.IceFx = 1;
+								TargetAnimating.IceFx = 1;
 								break;
 							case EDmgType::Poison:
-								TargetAnimation.PoisonFx = 1;
+								TargetAnimating.PoisonFx = 1;
 								break;
 						}
-						TargetAnimation.Unlock();
+						TargetAnimating.Unlock();
 					}
 
 					TemporalDamager.bJustSpawned = false;
@@ -2571,10 +2569,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					TargetTemporalDamaging.TemporalDamagers.Remove(FSubjectHandle(Subject));
 					TargetTemporalDamaging.Unlock();
 
-					const bool bHasAnimation = TemporalDamager.TemporalDamageTarget.HasTrait<FAnimation>();
+					const bool bHasAnimating = TemporalDamager.TemporalDamageTarget.HasTrait<FAnimating>();
 
 					// 重置材质特效
-					if (bHasAnimation)
+					if (bHasAnimating)
 					{
 						bool bHasSameDmgType = false;
 
@@ -2607,22 +2605,22 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						// 如果没有同伤害类型的马甲，可以重置材质特效了
 						if (!bHasSameDmgType)
 						{
-							auto& TargetAnimation = TemporalDamager.TemporalDamageTarget.GetTraitRef<FAnimation, EParadigm::Unsafe>();
+							auto& TargetAnimating = TemporalDamager.TemporalDamageTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
 
-							TargetAnimation.Lock();
+							TargetAnimating.Lock();
 							switch (TemporalDamager.DmgType)
 							{
 								case EDmgType::Fire:
-									TargetAnimation.FireFx = 0;
+									TargetAnimating.FireFx = 0;
 									break;
 								case EDmgType::Ice:
-									TargetAnimation.IceFx = 0;
+									TargetAnimating.IceFx = 0;
 									break;
 								case EDmgType::Poison:
-									TargetAnimation.PoisonFx = 0;
+									TargetAnimating.PoisonFx = 0;
 									break;
 							}
-							TargetAnimation.Unlock();
+							TargetAnimating.Unlock();
 						}
 					}
 
@@ -2983,7 +2981,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		Chain->OperateConcurrently(
 			[&](FSolidSubjectHandle Subject,
-				FAnimation& Animation,
+				FAnimating& Animating,
 				FDeathDissolve& DeathDissolve,
 				FDeath& Death,
 				FCurves& Curves)
@@ -3013,7 +3011,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// 计算溶解效果
 				if (DeathDissolve.dissolveTime >= Death.FadeOutDelay && (DeathDissolve.dissolveTime - Death.FadeOutDelay) < EndTime)
 				{
-					Animation.Dissolve = 1 - Curve->Eval(DeathDissolve.dissolveTime - Death.FadeOutDelay);
+					Animating.Dissolve = 1 - Curve->Eval(DeathDissolve.dissolveTime - Death.FadeOutDelay);
 				}
 
 				// 更新溶解时间
@@ -3033,13 +3031,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		Chain->OperateConcurrently(
 			[&](FSolidSubjectHandle Subject,
-				FAnimation& Animation,
+				FAnimating& Animating,
 				FDeathAnim& DeathAnim)
 			{
 				if (DeathAnim.animTime == 0)
 				{
-					Animation.SubjectState = ESubjectState::Dying;
-					Animation.PreviousSubjectState = ESubjectState::Dirty;
+					Animating.AnimState = EAnimState::Dying;
 				}
 
 				DeathAnim.animTime += SafeDeltaTime;
@@ -3060,139 +3057,207 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		Chain->OperateConcurrently(
 			[&](FSolidSubjectHandle Subject,
-				FAnimation& Anim,
+				FAnimation& Animation,
+				FAnimating& Animating,
 				FAppear& Appear,
 				FAttack& Attack,
+				FDefence& Defence,
 				FDeath& Death,
 				FMove& Move,
 				FMoving& Moving,
 				FSlowing& Slowing)
 			{
-				// 待机-移动切换 | Idle-Move Switch
+				// switch back to BS_IdleMove
 				const bool bIsAppearing = Subject.HasTrait<FAppearing>();
+				const bool bIsAttacking = Subject.HasTrait<FAttacking>();
 				const bool bIsDying = Subject.HasTrait<FDying>();
+				const bool bIsMoving = !bIsAppearing && !bIsAttacking && !bIsDying;
 
-				if (!bIsAppearing && !bIsDying)
-				{
-					const bool bIsAttacking = Subject.HasTrait<FAttacking>();
-
-					if (bIsAttacking)
-					{
-						EAttackState State = Subject.GetTraitRef<FAttacking>().State;
-
-						if (State == EAttackState::Cooling)// if is attacking but cooling, we use idle-move anim
-						{
-							const bool IsMoving = Moving.CurrentVelocity.Size2D() > Move.XY.MoveSpeed * 0.05f/* || Moving.CurrentAngularVelocity > Move.Yaw.TurnSpeed * 0.1f*/;// take into account angular velocity
-							Anim.SubjectState = IsMoving ? ESubjectState::Moving : ESubjectState::Idle;
-						}
-					}
-					else
-					{
-						const bool IsMoving = Moving.CurrentVelocity.Size2D() > Move.XY.MoveSpeed * 0.05f/* || Moving.CurrentAngularVelocity > Move.Yaw.TurnSpeed * 0.1f*/;
-						Anim.SubjectState = IsMoving ? ESubjectState::Moving : ESubjectState::Idle;
-					}
-				}
+				if (bIsMoving) Animating.AnimState = EAnimState::BS_IdleMove;
 
 				// 动画状态机 | Anim State Machine
-				if ( Anim.AnimLerp == 1)
+				switch (Animating.AnimState) // i sampled vat 3 times in shader. the following code use them to simulate an idle-move-montage state machine with anim blending
 				{
-					switch (Anim.SubjectState)
+					case EAnimState::BS_IdleMove:
 					{
-						case ESubjectState::None:
+						if (Animating.AnimState != Animating.PreviousAnimState)
 						{
-							if (Anim.SubjectState != Anim.PreviousSubjectState)
+							if (Animating.CurrentMontageSlot == 1)
 							{
-								CopyAnimData(Anim);
-								Anim.AnimCurrentTime1 = GetGameTimeSinceCreation();
-								Anim.AnimIndex1 = Anim.IndexOfIdleAnim;
-								Anim.AnimPauseTime1 = 0;
-								Anim.AnimPlayRate1 = 0;
+								CopyAnimData(Animating, 1, 2);// copy anim from slot 1 to slot 2
+								Animating.CurrentMontageSlot = 2;
 							}
 
-							break;
+							// write idle anim to slot 0
+							Animating.AnimCurrentTime0 = GetGameTimeSinceCreation();
+							Animating.AnimIndex0 = Animation.IndexOfIdleAnim;
+							Animating.AnimPauseFrame0 = 0;
+							Animating.AnimOffsetTime0 = FMath::RandRange(Animation.IdleRandomTimeOffset.X, Animation.IdleRandomTimeOffset.Y);
+							Animating.AnimPlayRate0 = Animation.IdlePlayRate * Slowing.CombinedSlowMult;
+
+							// write move anim to slot 1
+							Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
+							Animating.AnimIndex1 = Animation.IndexOfMoveAnim;
+							Animating.AnimPauseFrame1 = 0;
+							Animating.AnimOffsetTime1 = FMath::RandRange(Animation.MoveRandomTimeOffset.X, Animation.MoveRandomTimeOffset.Y);
+							Animating.AnimPlayRate1 = Animation.MovePlayRate * Slowing.CombinedSlowMult;
+
+							// reset AnimLerp1
+							Animating.AnimLerp1 = 1;
+
+							Animating.PreviousAnimState = Animating.AnimState;
 						}
 
-						case ESubjectState::Appearing:
-						{
-							if (Anim.SubjectState != Anim.PreviousSubjectState)
-							{
-								CopyAnimData(Anim);
-								Anim.AnimCurrentTime1 = GetGameTimeSinceCreation();
-								Anim.AnimIndex1 = Anim.IndexOfAppearAnim;
-								Anim.AnimPauseTime1 = Anim.AnimLengthArray.Num() > Anim.IndexOfAppearAnim ? Anim.AnimLengthArray[Anim.IndexOfAppearAnim] : 0;
-								Anim.AnimPlayRate1 = Anim.AnimPauseTime1 / Appear.Duration;
-								Anim.AnimLerp = 1;// since appearing is definitely the first anim to play
-							}
+						// write blendspace ratio into AnimLerp0
+						const TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
+						const TRange<float> OutputRange(0, 1);
+						float Input = FMath::Max(Moving.CurrentVelocity.Size2D(), FMath::Abs(Moving.CurrentAngularVelocity));
+						Animating.AnimLerp0 = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
+						//UE_LOG(LogTemp, Warning, TEXT("CurrentAngularVelocity: %f"), Moving.CurrentAngularVelocity);
 
-							break;
-						}
+						// transit from slot 2 to slot 0 - 1 using AnimLerp1
+						Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 - SafeDeltaTime * Animation.LerpSpeed, 0, 1);
 
-						case ESubjectState::Idle:
-						{
-							if (Anim.SubjectState != Anim.PreviousSubjectState)
-							{
-								CopyAnimData(Anim);
-								Anim.AnimCurrentTime1 = GetGameTimeSinceCreation();
-								Anim.AnimIndex1 = Anim.IndexOfIdleAnim;
-								Anim.AnimPauseTime1 = 0;
-								Anim.AnimOffsetTime1 = FMath::RandRange(Anim.IdleRandomTimeOffset.X, Anim.IdleRandomTimeOffset.Y);
-							}
-
-							Anim.AnimPlayRate1 = Anim.IdlePlayRate * Slowing.CombinedSlowMult;
-
-							break;
-						}
-
-						case ESubjectState::Moving:
-						{
-							if (Anim.SubjectState != Anim.PreviousSubjectState)
-							{
-								CopyAnimData(Anim);
-								Anim.AnimCurrentTime1 = GetGameTimeSinceCreation();
-								Anim.AnimIndex1 = Anim.IndexOfMoveAnim;
-								Anim.AnimPauseTime1 = 0;
-								Anim.AnimOffsetTime1 = FMath::RandRange(Anim.MoveRandomTimeOffset.X, Anim.MoveRandomTimeOffset.Y);
-							}
-
-							Anim.AnimPlayRate1 = Anim.MovePlayRate * Slowing.CombinedSlowMult;
-
-							break;
-						}
-
-						case ESubjectState::Attacking:
-						{
-							if (Anim.SubjectState != Anim.PreviousSubjectState)
-							{
-								CopyAnimData(Anim);
-								Anim.AnimCurrentTime1 = GetGameTimeSinceCreation();
-							}
-
-							Anim.AnimIndex1 = Anim.IndexOfAttackAnim;
-							Anim.AnimPauseTime1 = Anim.AnimLengthArray.Num() > Anim.IndexOfAttackAnim ? Anim.AnimLengthArray[Anim.IndexOfAttackAnim] : 0;
-							Anim.AnimPlayRate1 = Anim.AnimPauseTime1 / Attack.DurationPerRound * Slowing.CombinedSlowMult;
-
-							break;
-						}
-
-						case ESubjectState::Dying:
-						{
-							if (Anim.SubjectState != Anim.PreviousSubjectState)
-							{
-								CopyAnimData(Anim);
-								Anim.AnimCurrentTime1 = GetGameTimeSinceCreation();
-								Anim.AnimIndex1 = Anim.IndexOfDeathAnim;
-								Anim.AnimPauseTime1 = Anim.AnimLengthArray.Num() > Anim.IndexOfDeathAnim ? Anim.AnimLengthArray[Anim.IndexOfDeathAnim] : 0;
-								Anim.AnimPlayRate1 = Anim.AnimPauseTime1 / Death.AnimLength;
-							}
-
-							break;
-						}
+						break;
 					}
 
-					Anim.PreviousSubjectState = Anim.SubjectState;
-				}
+					case EAnimState::Appearing:
+					{
+						if (Animating.AnimState != Animating.PreviousAnimState)
+						{
+							Animating.CurrentMontageSlot = 2;
 
-				Anim.AnimLerp = FMath::Clamp(Anim.AnimLerp + SafeDeltaTime * Anim.LerpSpeed, 0, 1);
+							// write appear anim into slot 2
+							Animating.AnimCurrentTime2 = GetGameTimeSinceCreation();
+							Animating.AnimIndex2 = Animation.IndexOfAppearAnim;
+							Animating.AnimPauseFrame2 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfAppearAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfAppearAnim] : 0;
+							Animating.AnimPlayRate2 = Animating.AnimPauseFrame2 / Animating.SampleRate / Appear.Duration;
+							Animating.AnimLerp1 = 1;
+
+							Animating.PreviousAnimState = Animating.AnimState;
+						}
+
+						break;
+					}
+
+					case EAnimState::Attacking:
+					{
+						if (Animating.AnimState != Animating.PreviousAnimState)
+						{
+							if (Animating.PreviousAnimState == EAnimState::BS_IdleMove)
+							{
+								Animating.CurrentMontageSlot = 2;
+
+								// write Attack anim into slot 2
+								Animating.AnimCurrentTime2 = GetGameTimeSinceCreation();
+								Animating.AnimIndex2 = Animation.IndexOfAttackAnim;
+								Animating.AnimPauseFrame2 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfAttackAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfAttackAnim] : 0;
+								Animating.AnimPlayRate2 = Animating.AnimPauseFrame2 / Animating.SampleRate / Attack.DurationPerRound;
+								Animating.AnimPlayRate2 *= Defence.bCanSlowATKSpeed ? Slowing.CombinedSlowMult : 1;
+								Animating.AnimLerp1 = 0;
+							}
+							else
+							{
+								if (Animating.CurrentMontageSlot == 1)
+								{
+									CopyAnimData(Animating, 1, 0);// copy anim from 1 to slot 0
+								}
+								else
+								{
+									CopyAnimData(Animating, 2, 0);// copy anim from 1 to slot 0
+								}
+
+								// write Attack anim into slot 1
+								Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
+								Animating.AnimIndex1 = Animation.IndexOfAttackAnim;
+								Animating.AnimPauseFrame1 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfAttackAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfAttackAnim] : 0;
+								Animating.AnimPlayRate1 = Animating.AnimPauseFrame1 / Animating.SampleRate / Attack.DurationPerRound;
+								Animating.AnimPlayRate1 *= Defence.bCanSlowATKSpeed ? Slowing.CombinedSlowMult : 1;
+								Animating.AnimLerp0 = 0;
+								Animating.AnimLerp1 = 0;
+							}
+
+							Animating.PreviousAnimState = Animating.AnimState;
+						}
+
+						if (Animating.CurrentMontageSlot == 1)
+						{
+							// transit from slot 0 to slot 1 using AnimLerp0
+							Animating.AnimLerp0 = FMath::Clamp(Animating.AnimLerp0 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
+						}
+						else
+						{
+							// write blendspace ratio into AnimLerp0
+							const TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
+							const TRange<float> OutputRange(0, 1);
+							float Input = FMath::Max(Moving.CurrentVelocity.Size2D(), FMath::Abs(Moving.CurrentAngularVelocity));
+							Animating.AnimLerp0 = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
+
+							// transit from slot 0 - 1 to slot 2 using AnimLerp1
+							Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
+						}
+
+						break;
+					}
+
+					case EAnimState::Dying:
+					{
+						if (Animating.AnimState != Animating.PreviousAnimState)
+						{
+							if (Animating.PreviousAnimState == EAnimState::BS_IdleMove)
+							{
+								Animating.CurrentMontageSlot = 2;
+
+								// write Death anim into slot 2
+								Animating.AnimCurrentTime2 = GetGameTimeSinceCreation();
+								Animating.AnimIndex2 = Animation.IndexOfDeathAnim;
+								Animating.AnimPauseFrame2 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfDeathAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfDeathAnim] : 0;
+								Animating.AnimPlayRate2 = Animating.AnimPauseFrame2 / Animating.SampleRate / Death.AnimLength;
+								Animating.AnimLerp1 = 0;
+							}
+							else
+							{
+								if (Animating.CurrentMontageSlot == 1)
+								{
+									CopyAnimData(Animating, 1, 0);// copy anim from 1 to slot 0
+								}
+								else
+								{
+									CopyAnimData(Animating, 2, 0);// copy anim from 1 to slot 0
+								}
+
+								// write Death anim into slot 1
+								Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
+								Animating.AnimIndex1 = Animation.IndexOfDeathAnim;
+								Animating.AnimPauseFrame1 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfDeathAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfDeathAnim] : 0;
+								Animating.AnimPlayRate1 = Animating.AnimPauseFrame1 / Animating.SampleRate / Death.AnimLength;
+								Animating.AnimLerp0 = 0;
+								Animating.AnimLerp1 = 0;
+							}
+
+							Animating.PreviousAnimState = Animating.AnimState;
+						}
+
+						if (Animating.CurrentMontageSlot == 1)
+						{
+							// transit from slot 0 to slot 1 using AnimLerp0
+							Animating.AnimLerp0 = FMath::Clamp(Animating.AnimLerp0 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
+						}
+						else
+						{
+							// write blendspace ratio into AnimLerp0
+							const TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
+							const TRange<float> OutputRange(0, 1);
+							float Input = FMath::Max(Moving.CurrentVelocity.Size2D(), FMath::Abs(Moving.CurrentAngularVelocity));
+							Animating.AnimLerp0 = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
+
+							// transit from slot 0 - 1 to slot 2 using AnimLerp1
+							Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
+						}
+
+						break;
+					}
+				}
 
 			}, ThreadsCount, BatchSize);
 	}
@@ -3234,11 +3299,17 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FDirected& Directed,
 				FScaled& Scaled,
 				FCollider& Collider,
-				FAnimation& Anim,
+				FAnimation& Animation,
+				FAnimating& Animating,
 				FHealth& Health,
 				FHealthBar& HealthBar,
 				FPoppingText& PoppingText)
 			{
+				// Interp MatFx data
+				Animating.IceFxInterped = FMath::FInterpTo(Animating.IceFxInterped, Animating.IceFx, SafeDeltaTime, 5);
+				Animating.FireFxInterped = FMath::FInterpTo(Animating.FireFxInterped, Animating.FireFx, SafeDeltaTime, 5);
+				Animating.PoisonFxInterped = FMath::FInterpTo(Animating.PoisonFxInterped, Animating.PoisonFx, SafeDeltaTime, 5);
+
 				FRenderBatchData& Data = Rendering.Renderer.GetTraitRef<FRenderBatchData, EParadigm::Unsafe>();
 
 				FQuat Rotation{ FQuat::Identity };
@@ -3250,7 +3321,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				float Radius = Collider.Radius * Scaled.Scale;
 
 				// 在计算转换时减去Radius
-				FTransform SubjectTransform(Rotation * Data.OffsetRotation.Quaternion(), Located.Location + Data.OffsetLocation - FVector(0, 0, Radius), FinalScale); // 减去Z轴上的Radius					
+				FTransform SubjectTransform(Rotation * Data.OffsetRotation.Quaternion(), Located.Location + Data.OffsetLocation - FVector(0, 0, Radius), FinalScale); // 减去Z轴上的Radius			
 
 				int32 InstanceId = Rendering.InstanceId;
 
@@ -3264,20 +3335,19 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				Data.OrientationArray[InstanceId] = SubjectTransform.GetRotation();
 				Data.ScaleArray[InstanceId] = SubjectTransform.GetScale3D();
 
-				// Pariticle color R
-				Data.Anim_Lerp_Array[InstanceId] = Anim.AnimLerp;
+				// Dynamic params 0, encode multiple values into a single float
+				float Elem0 = EncodeAnimationIndices(Animating.AnimIndex0, Animating.AnimIndex1, Animating.AnimIndex2);
+				float Elem1 = EncodePauseFrames(Animating.AnimPauseFrame0, Animating.AnimPauseFrame1, Animating.AnimPauseFrame2);
+				float Elem2 = EncodePlayRates(Animating.AnimPlayRate0, Animating.AnimPlayRate1, Animating.AnimPlayRate2);
+				float Elem3 = EncodeStatusEffects(Animating.HitGlow, Animating.IceFxInterped, Animating.FireFxInterped, Animating.PoisonFxInterped);
 
-				// Dynamic params 0
-				Data.Anim_Index0_Index1_PauseTime0_PauseTime1_Array[InstanceId] = FVector4(Anim.AnimIndex0, Anim.AnimIndex1, Anim.AnimPauseTime0, Anim.AnimPauseTime1);
+				Data.AnimIndex_PauseFrame_Playrate_MatFx_Array[InstanceId] = FVector4(Elem0, Elem1, Elem2, Elem3);
 
 				// Dynamic params 1
-				Data.Anim_TimeStamp0_TimeStamp1_PlayRate0_Playrate1_Array[InstanceId] = FVector4(Anim.AnimCurrentTime0 - Anim.AnimOffsetTime0, Anim.AnimCurrentTime1 - Anim.AnimOffsetTime1, Anim.AnimPlayRate0, Anim.AnimPlayRate1);
+				Data.AnimTimeStamp_Array[InstanceId] = FVector4(Animating.AnimCurrentTime0 - Animating.AnimOffsetTime0, Animating.AnimCurrentTime1 - Animating.AnimOffsetTime1, Animating.AnimCurrentTime2 - Animating.AnimOffsetTime2, 0);
 
-				// Dynamic params 2
-				Data.Mat_Dissolve_HitGlow_Team_Fire_Array[InstanceId] = FVector4(Anim.Dissolve, Anim.HitGlow, Anim.Team, Anim.FireFx);
-
-				// Dynamic params 3
-				Data.Mat_Ice_Poison_Array[InstanceId] = FVector4(Anim.IceFx, Anim.PoisonFx, 0, 0);
+				// Pariticle color
+				Data.AnimLerp0_AnimLerp1_Team_Dissolve_Array[InstanceId] = FVector4(Animating.AnimLerp0, Animating.AnimLerp1, Animating.Team, Animating.Dissolve);
 
 				// HealthBar
 				Data.HealthBar_Opacity_CurrentRatio_TargetRatio_Array[InstanceId] = FVector(HealthBar.Opacity, HealthBar.CurrentRatio, HealthBar.TargetRatio);
@@ -3359,39 +3429,26 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					Data.ScaleArray
 				);
 
-				// -----------------VAT Auto Play------------------------------
+				// ---------------------VAT------------------------------
 
-				UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(
+				UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector4(
 					Data.SpawnedNiagaraSystem,
-					FName("Anim_Lerp_Array"),
-					Data.Anim_Lerp_Array
+					FName("AnimIndex_PauseFrame_Playrate_MatFx_Array"),
+					Data.AnimIndex_PauseFrame_Playrate_MatFx_Array
 				);
 
 				UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector4(
 					Data.SpawnedNiagaraSystem,
-					FName("Anim_Index0_Index1_PauseTime0_PauseTime1_Array"),
-					Data.Anim_Index0_Index1_PauseTime0_PauseTime1_Array
+					FName("AnimTimeStamp_Array"),
+					Data.AnimTimeStamp_Array
 				);
 
 				UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector4(
 					Data.SpawnedNiagaraSystem,
-					FName("Anim_TimeStamp0_TimeStamp1_PlayRate0_Playrate1_Array"),
-					Data.Anim_TimeStamp0_TimeStamp1_PlayRate0_Playrate1_Array
+					FName("AnimLerp0_AnimLerp1_Team_Dissolve_Array"),
+					Data.AnimLerp0_AnimLerp1_Team_Dissolve_Array
 				);
 
-				// ------------------Material FX---------------------------
-
-				UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector4(
-					Data.SpawnedNiagaraSystem,
-					FName("Mat_Dissolve_HitGlow_Team_Fire_Array"),
-					Data.Mat_Dissolve_HitGlow_Team_Fire_Array
-				);
-
-				UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector4(
-					Data.SpawnedNiagaraSystem,
-					FName("Mat_Ice_Poison_Array"),
-					Data.Mat_Ice_Poison_Array
-				);
 
 				// ------------------HealthBar---------------------------------
 
@@ -5710,6 +5767,152 @@ void ABattleFrameBattleControl::DrawDebugSector(UWorld* World, const FVector& Ce
 	}
 }
 
+bool ABattleFrameBattleControl::GetInterpolatedWorldLoc(AFlowField* flowField, const FVector& location, const float angleThreshold, FVector& outInterpolatedWorldLoc)
+{
+	// 初始化输出为无效值
+	outInterpolatedWorldLoc = FVector::ZeroVector;
+
+	// 检查是否已开始游戏
+	if (flowField->bIsBeginPlay)
+	{
+		return false;
+	}
+
+	// 计算相对位置
+	FVector relativeLocation = (location - flowField->actorLoc).RotateAngleAxis(-flowField->actorRot.Yaw, FVector(0, 0, 1)) + flowField->offsetLoc;
+	float cellRadius = flowField->cellSize / 2.0f;
+
+	// 计算连续网格坐标
+	float continuousGridX = (relativeLocation.X - cellRadius) / flowField->cellSize;
+	float continuousGridY = (relativeLocation.Y - cellRadius) / flowField->cellSize;
+
+	// 获取左下角索引和小数部分
+	int32 baseX = FMath::FloorToInt(continuousGridX);
+	int32 baseY = FMath::FloorToInt(continuousGridY);
+	float fractionX = continuousGridX - baseX;
+	float fractionY = continuousGridY - baseY;
+
+	// 检查四个点是否都在网格内
+	if (baseX >= 0 && (baseX + 1) < flowField->xNum &&
+		baseY >= 0 && (baseY + 1) < flowField->yNum)
+	{
+		// 获取四个角点的单元格
+		bool isValid00, isValid10, isValid01, isValid11;
+		FCellStruct& cell00 = flowField->GetCellAtCoord(FVector2D(baseX, baseY), isValid00);
+		FCellStruct& cell10 = flowField->GetCellAtCoord(FVector2D(baseX + 1, baseY), isValid10);
+		FCellStruct& cell01 = flowField->GetCellAtCoord(FVector2D(baseX, baseY + 1), isValid01);
+		FCellStruct& cell11 = flowField->GetCellAtCoord(FVector2D(baseX + 1, baseY + 1), isValid11);
+
+		// 确保所有单元格都有效
+		if (isValid00 && isValid10 && isValid01 && isValid11)
+		{
+			// 双线性插值位置
+			FVector interpBottom = FMath::Lerp(cell00.worldLoc, cell10.worldLoc, fractionX);
+			FVector interpTop = FMath::Lerp(cell01.worldLoc, cell11.worldLoc, fractionX);
+			outInterpolatedWorldLoc = FMath::Lerp(interpBottom, interpTop, fractionY);
+
+			// 计算与四个角点的最大坡度
+			float maxSlopeAngle = 0.0f;
+			const TArray<FVector> cornerPoints = {
+				cell00.worldLoc,
+				cell10.worldLoc,
+				cell01.worldLoc,
+				cell11.worldLoc
+			};
+
+			for (const FVector& cornerPoint : cornerPoints)
+			{
+				// 计算水平距离（忽略Z轴）
+				FVector horizontalVec = cornerPoint - outInterpolatedWorldLoc;
+				horizontalVec.Z = 0.0f;
+				const float horizontalDistance = horizontalVec.Size();
+
+				// 跳过距离过小的点（避免除以0）
+				if (horizontalDistance < KINDA_SMALL_NUMBER) continue;
+
+				// 计算高度差
+				const float heightDiff = FMath::Abs(cornerPoint.Z - outInterpolatedWorldLoc.Z);
+
+				// 计算坡度角度（atan(高度差/水平距离)）
+				const float slopeAngle = FMath::RadiansToDegrees(FMath::Atan(heightDiff / horizontalDistance));
+
+				// 更新最大坡度
+				if (slopeAngle > maxSlopeAngle)
+				{
+					maxSlopeAngle = slopeAngle;
+				}
+			}
+
+			//UE_LOG(LogTemp, Warning, TEXT("maxSlopeAngle = %.2f degrees"), maxSlopeAngle);
+
+			// 检查坡度是否超过阈值
+			if (maxSlopeAngle > angleThreshold)
+			{
+				return false; // 坡度太陡，无效位置
+			}
+
+			return true; // 有效位置且坡度可接受
+		}
+	}
+
+	return false; // 基础条件不满足
+}
+
+void ABattleFrameBattleControl::CopyAnimData(FAnimating& Animating, int32 From, int32 To)
+{
+	// 确保From和To在有效范围内 (0-2)
+	if (From < 0 || From > 2 || To < 0 || To > 2) return;
+	if (From == To) return; // 相同索引无需拷贝
+
+	// 定义动画参数结构体简化拷贝逻辑
+	struct FAnimParams
+	{
+		float* Index;
+		float* PlayRate;
+		float* CurrentTime;
+		float* OffsetTime;
+		float* PauseTime;
+	};
+
+	// 初始化三组动画参数
+	FAnimParams Source, Dest;
+
+	// 根据From索引设置源参数指针
+	switch (From)
+	{
+		case 0:
+			Source = { &Animating.AnimIndex0, &Animating.AnimPlayRate0, &Animating.AnimCurrentTime0, &Animating.AnimOffsetTime0, &Animating.AnimPauseFrame0 };
+			break;
+		case 1:
+			Source = { &Animating.AnimIndex1, &Animating.AnimPlayRate1, &Animating.AnimCurrentTime1, &Animating.AnimOffsetTime1, &Animating.AnimPauseFrame1 };
+			break;
+		case 2:
+			Source = { &Animating.AnimIndex2, &Animating.AnimPlayRate2, &Animating.AnimCurrentTime2, &Animating.AnimOffsetTime2, &Animating.AnimPauseFrame2 };
+			break;
+	}
+
+	// 根据To索引设置目标参数指针
+	switch (To)
+	{
+		case 0:
+			Dest = { &Animating.AnimIndex0, &Animating.AnimPlayRate0, &Animating.AnimCurrentTime0, &Animating.AnimOffsetTime0, &Animating.AnimPauseFrame0 };
+			break;
+		case 1:
+			Dest = { &Animating.AnimIndex1, &Animating.AnimPlayRate1, &Animating.AnimCurrentTime1, &Animating.AnimOffsetTime1, &Animating.AnimPauseFrame1 };
+			break;
+		case 2:
+			Dest = { &Animating.AnimIndex2, &Animating.AnimPlayRate2, &Animating.AnimCurrentTime2, &Animating.AnimOffsetTime2, &Animating.AnimPauseFrame2 };
+			break;
+	}
+
+	// 执行参数拷贝
+	*Dest.Index = *Source.Index;
+	*Dest.PlayRate = *Source.PlayRate;
+	*Dest.CurrentTime = *Source.CurrentTime;
+	*Dest.OffsetTime = *Source.OffsetTime;
+	*Dest.PauseTime = *Source.PauseTime;
+}
+
 
 //---------------------------------------------------A* Pathfinding-----------------------------------------------------
 
@@ -5756,6 +5959,7 @@ bool ABattleFrameBattleControl::FindPathAStar(AFlowField* FlowField, const FVect
 		float Priority;
 		FVector2D Coord;
 	};
+
 	struct FPriorityCompare
 	{
 		bool operator()(const FPriorityNode& A, const FPriorityNode& B) const
@@ -5763,6 +5967,7 @@ bool ABattleFrameBattleControl::FindPathAStar(AFlowField* FlowField, const FVect
 			return A.Priority > B.Priority;
 		}
 	};
+
 	std::priority_queue<FPriorityNode, std::vector<FPriorityNode>, FPriorityCompare> OpenSet;
 
 	// 初始化起点
@@ -5992,6 +6197,7 @@ FVector ABattleFrameBattleControl::FindClosestPointOnSegment(const FVector& Poin
 	const float t = FMath::Clamp(FVector::DotProduct(Point - StartPoint, Segment) / SegmentLengthSq, 0.0f, 1.0f);
 	return StartPoint + t * Segment;
 }
+
 
 //-------------------------------RVO2D Copyright 2023, EastFoxStudio. All Rights Reserved-------------------------------
 

@@ -17,7 +17,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	float TimeLeft = 0;
 		
-	AFlowField* FlowField = nullptr;
+	TObjectPtr<AFlowField> FlowField = nullptr;
 
 	bool AStarArrived = false;
 

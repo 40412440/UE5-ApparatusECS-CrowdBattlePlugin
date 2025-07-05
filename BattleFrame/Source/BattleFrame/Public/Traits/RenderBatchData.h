@@ -51,13 +51,9 @@ struct BATTLEFRAME_API FRenderBatchData
     TArray<FVector> ScaleArray;
 
     // Anim
-    TArray<float> Anim_Lerp_Array; // Particle color channel
-    TArray<FVector4> Anim_Index0_Index1_PauseTime0_PauseTime1_Array; // Dynamic params 0
-    TArray<FVector4> Anim_TimeStamp0_TimeStamp1_PlayRate0_Playrate1_Array; // Dynamic params 1
-
-    // Material Fx
-    TArray<FVector4> Mat_Dissolve_HitGlow_Team_Fire_Array; // Dynamic params 2
-    TArray<FVector4> Mat_Ice_Poison_Array; // Dynamic params 3
+    TArray<FVector4> AnimIndex_PauseFrame_Playrate_MatFx_Array; // Dynamic params 0
+    TArray<FVector4> AnimTimeStamp_Array; // Dynamic params 1
+    TArray<FVector4> AnimLerp0_AnimLerp1_Team_Dissolve_Array; // Particle color channel
 
     // HealthBar
     TArray<FVector> HealthBar_Opacity_CurrentRatio_TargetRatio_Array;
@@ -86,13 +82,10 @@ struct BATTLEFRAME_API FRenderBatchData
         OrientationArray=Data.OrientationArray;
         ScaleArray = Data.ScaleArray;
 
-        Anim_Lerp_Array = Data.Anim_Lerp_Array;
+        AnimLerp0_AnimLerp1_Team_Dissolve_Array = Data.AnimLerp0_AnimLerp1_Team_Dissolve_Array;
 
-        Anim_Index0_Index1_PauseTime0_PauseTime1_Array = Data.Anim_Index0_Index1_PauseTime0_PauseTime1_Array;
-        Anim_TimeStamp0_TimeStamp1_PlayRate0_Playrate1_Array = Data.Anim_TimeStamp0_TimeStamp1_PlayRate0_Playrate1_Array;
-
-        Mat_Dissolve_HitGlow_Team_Fire_Array = Data.Mat_Dissolve_HitGlow_Team_Fire_Array;
-        Mat_Ice_Poison_Array = Data.Mat_Ice_Poison_Array;
+        AnimIndex_PauseFrame_Playrate_MatFx_Array = Data.AnimIndex_PauseFrame_Playrate_MatFx_Array;
+        AnimTimeStamp_Array = Data.AnimTimeStamp_Array;
 
         HealthBar_Opacity_CurrentRatio_TargetRatio_Array = Data.HealthBar_Opacity_CurrentRatio_TargetRatio_Array;
 
@@ -116,13 +109,10 @@ struct BATTLEFRAME_API FRenderBatchData
         OrientationArray = Data.OrientationArray;
         ScaleArray = Data.ScaleArray;
 
-        Anim_Lerp_Array = Data.Anim_Lerp_Array;
+        AnimLerp0_AnimLerp1_Team_Dissolve_Array = Data.AnimLerp0_AnimLerp1_Team_Dissolve_Array;
 
-        Anim_Index0_Index1_PauseTime0_PauseTime1_Array = Data.Anim_Index0_Index1_PauseTime0_PauseTime1_Array;
-        Anim_TimeStamp0_TimeStamp1_PlayRate0_Playrate1_Array = Data.Anim_TimeStamp0_TimeStamp1_PlayRate0_Playrate1_Array;
-
-        Mat_Dissolve_HitGlow_Team_Fire_Array = Data.Mat_Dissolve_HitGlow_Team_Fire_Array;
-        Mat_Ice_Poison_Array = Data.Mat_Ice_Poison_Array;
+        AnimIndex_PauseFrame_Playrate_MatFx_Array = Data.AnimIndex_PauseFrame_Playrate_MatFx_Array;
+        AnimTimeStamp_Array = Data.AnimTimeStamp_Array;
 
         HealthBar_Opacity_CurrentRatio_TargetRatio_Array = Data.HealthBar_Opacity_CurrentRatio_TargetRatio_Array;
 

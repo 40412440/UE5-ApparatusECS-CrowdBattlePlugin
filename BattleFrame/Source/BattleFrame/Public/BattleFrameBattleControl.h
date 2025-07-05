@@ -30,6 +30,7 @@
 #include "Traits/Debuff.h"
 #include "Traits/DmgSphere.h"
 #include "Traits/Animation.h"
+#include "Traits/Animating.h"
 #include "Traits/Trace.h"
 #include "Traits/Damage.h"
 #include "Traits/PoppingText.h"
@@ -223,7 +224,16 @@ public:
 
 	void ApplyDamageToSubjectsDeferred(const FSubjectArray& Subjects, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FVector& HitFromLocation, const FDmgSphere& DmgSphere, const FDebuff& Debuff, TArray<FDmgResult>& DamageResults);
 
-	//---------------------------------------------Helpers------------------------------------------------------------------
+	static FVector FindNewPatrolGoalLocation(const FPatrol Patrol, const FCollider Collider, const FTrace Trace, const FTracing Tracing, const FLocated Located, const FScaled Scaled, int32 MaxAttempts);
+
+	static void DrawDebugSector(UWorld* World, const FVector& Center, const FVector& Direction, float Radius, float AngleDegrees, float Height, const FColor& Color, bool bPersistentLines, float LifeTime, uint8 DepthPriority, float Thickness);
+
+	static bool GetInterpolatedWorldLoc(AFlowField* flowField, const FVector& location, const float angleThreshold, FVector& outInterpolatedWorldLoc);
+
+	static void CopyAnimData(FAnimating& Animating, int32 From, int32 To);
+
+
+	//----------------------------------------Helper Functions------------------------------------------------------------------
 
 	FORCEINLINE std::pair<bool, float> ProcessCritDamage(float BaseDamage, float damageMult, float Probability)
 	{
@@ -242,16 +252,6 @@ public:
 		}
 
 		return { IsCritical, ActualDamage };  // 返回pair
-	}
-
-	FORCEINLINE void CopyAnimData(FAnimation& Animation)
-	{
-		Animation.AnimLerp = 0;
-		Animation.AnimIndex0 = Animation.AnimIndex1;
-		Animation.AnimCurrentTime0 = Animation.AnimCurrentTime1;
-		Animation.AnimOffsetTime0 = Animation.AnimOffsetTime1;
-		Animation.AnimPauseTime0 = Animation.AnimPauseTime1;
-		Animation.AnimPlayRate0 = Animation.AnimPlayRate1;
 	}
 
 	FORCEINLINE static FTransform LocalOffsetToWorld(FQuat WorldRotation, FVector WorldLocation, FTransform LocalTransform)
@@ -301,100 +301,65 @@ public:
 		}
 	};
 
-	FORCEINLINE bool GetInterpolatedWorldLoc(AFlowField* flowField, const FVector& location, const float angleThreshold, FVector& outInterpolatedWorldLoc)
+	// PackData ：三个AnimIndex,整数,各分配10位
+	FORCEINLINE static float EncodeAnimationIndices(int AnimIndex0, int AnimIndex1, int AnimIndex2)
 	{
-		// 初始化输出为无效值
-		outInterpolatedWorldLoc = FVector::ZeroVector;
+		// 确保输入在有效范围内 (0-1023)
+		AnimIndex0 = FMath::Clamp(AnimIndex0, 0, 1023);
+		AnimIndex1 = FMath::Clamp(AnimIndex1, 0, 1023);
+		AnimIndex2 = FMath::Clamp(AnimIndex2, 0, 1023);
 
-		// 检查是否已开始游戏
-		if (flowField->bIsBeginPlay)
-		{
-			return false;
-		}
+		// 位组合：| 未使用 | AnimIndex2 | AnimIndex1 | AnimIndex0 |
+		uint32 packed = (static_cast<uint32>(AnimIndex2) << 20) |
+			(static_cast<uint32>(AnimIndex1) << 10) |
+			static_cast<uint32>(AnimIndex0);
 
-		// 计算相对位置
-		FVector relativeLocation = (location - flowField->actorLoc).RotateAngleAxis(-flowField->actorRot.Yaw, FVector(0, 0, 1)) + flowField->offsetLoc;
-		float cellRadius = flowField->cellSize / 2.0f;
-
-		// 计算连续网格坐标
-		float continuousGridX = (relativeLocation.X - cellRadius) / flowField->cellSize;
-		float continuousGridY = (relativeLocation.Y - cellRadius) / flowField->cellSize;
-
-		// 获取左下角索引和小数部分
-		int32 baseX = FMath::FloorToInt(continuousGridX);
-		int32 baseY = FMath::FloorToInt(continuousGridY);
-		float fractionX = continuousGridX - baseX;
-		float fractionY = continuousGridY - baseY;
-
-		// 检查四个点是否都在网格内
-		if (baseX >= 0 && (baseX + 1) < flowField->xNum &&
-			baseY >= 0 && (baseY + 1) < flowField->yNum)
-		{
-			// 获取四个角点的单元格
-			bool isValid00, isValid10, isValid01, isValid11;
-			FCellStruct& cell00 = flowField->GetCellAtCoord(FVector2D(baseX, baseY), isValid00);
-			FCellStruct& cell10 = flowField->GetCellAtCoord(FVector2D(baseX + 1, baseY), isValid10);
-			FCellStruct& cell01 = flowField->GetCellAtCoord(FVector2D(baseX, baseY + 1), isValid01);
-			FCellStruct& cell11 = flowField->GetCellAtCoord(FVector2D(baseX + 1, baseY + 1), isValid11);
-
-			// 确保所有单元格都有效
-			if (isValid00 && isValid10 && isValid01 && isValid11)
-			{
-				// 双线性插值位置
-				FVector interpBottom = FMath::Lerp(cell00.worldLoc, cell10.worldLoc, fractionX);
-				FVector interpTop = FMath::Lerp(cell01.worldLoc, cell11.worldLoc, fractionX);
-				outInterpolatedWorldLoc = FMath::Lerp(interpBottom, interpTop, fractionY);
-
-				// 计算与四个角点的最大坡度
-				float maxSlopeAngle = 0.0f;
-				const TArray<FVector> cornerPoints = {
-					cell00.worldLoc,
-					cell10.worldLoc,
-					cell01.worldLoc,
-					cell11.worldLoc
-				};
-
-				for (const FVector& cornerPoint : cornerPoints)
-				{
-					// 计算水平距离（忽略Z轴）
-					FVector horizontalVec = cornerPoint - outInterpolatedWorldLoc;
-					horizontalVec.Z = 0.0f;
-					const float horizontalDistance = horizontalVec.Size();
-
-					// 跳过距离过小的点（避免除以0）
-					if (horizontalDistance < KINDA_SMALL_NUMBER) continue;
-
-					// 计算高度差
-					const float heightDiff = FMath::Abs(cornerPoint.Z - outInterpolatedWorldLoc.Z);
-
-					// 计算坡度角度（atan(高度差/水平距离)）
-					const float slopeAngle = FMath::RadiansToDegrees(FMath::Atan(heightDiff / horizontalDistance));
-
-					// 更新最大坡度
-					if (slopeAngle > maxSlopeAngle)
-					{
-						maxSlopeAngle = slopeAngle;
-					}
-				}
-
-				//UE_LOG(LogTemp, Warning, TEXT("maxSlopeAngle = %.2f degrees"), maxSlopeAngle);
-
-				// 检查坡度是否超过阈值
-				if (maxSlopeAngle > angleThreshold)
-				{
-					return false; // 坡度太陡，无效位置
-				}
-
-				return true; // 有效位置且坡度可接受
-			}
-		}
-
-		return false; // 基础条件不满足
+		return *reinterpret_cast<float*>(&packed);
 	}
 
-	static FVector FindNewPatrolGoalLocation(const FPatrol Patrol, const FCollider Collider, const FTrace Trace, const FTracing Tracing, const FLocated Located, const FScaled Scaled, int32 MaxAttempts);
+	// PackData ：三个AnimPauseFrame,整数,各分配10位
+	FORCEINLINE static float EncodePauseFrames(int Frame0, int Frame1, int Frame2)
+	{
+		Frame0 = FMath::Clamp(Frame0, 0, 1023);
+		Frame1 = FMath::Clamp(Frame1, 0, 1023);
+		Frame2 = FMath::Clamp(Frame2, 0, 1023);
 
-	void DrawDebugSector(UWorld* World, const FVector& Center, const FVector& Direction, float Radius, float AngleDegrees, float Height, const FColor& Color, bool bPersistentLines, float LifeTime, uint8 DepthPriority, float Thickness);
+		uint32 packed = (static_cast<uint32>(Frame2) << 20) |
+			(static_cast<uint32>(Frame1) << 10) |
+			static_cast<uint32>(Frame0);
+
+		return *reinterpret_cast<float*>(&packed);
+	}
+
+	// PackData ：三个AnimPlayrate,浮点,各分配10位,数值范围(0-10 → 0-1023)
+	FORCEINLINE static float EncodePlayRates(float Rate0, float Rate1, float Rate2)
+	{
+		// 线性映射到整数范围
+		const float Scale = 1023.0f / 10.0f;
+		uint32 iRate0 = static_cast<uint32>(FMath::Clamp(Rate0, 0.0f, 10.0f) * Scale);
+		uint32 iRate1 = static_cast<uint32>(FMath::Clamp(Rate1, 0.0f, 10.0f) * Scale);
+		uint32 iRate2 = static_cast<uint32>(FMath::Clamp(Rate2, 0.0f, 10.0f) * Scale);
+
+		uint32 packed = (iRate2 << 20) | (iRate1 << 10) | iRate0;
+		return *reinterpret_cast<float*>(&packed);
+	}
+
+	// PackData ：四个MaterialFx,浮点,各分配8位,数值范围(0-1 → 0-255)
+	FORCEINLINE static float EncodeStatusEffects(float HitGlow, float Frozen, float Burning, float Poisoned)
+	{
+		const float Scale = 255.0f;
+		uint32 iHit = static_cast<uint32>(FMath::Clamp(HitGlow, 0.0f, 1.0f) * Scale);
+		uint32 iFrozen = static_cast<uint32>(FMath::Clamp(Frozen, 0.0f, 1.0f) * Scale);
+		uint32 iBurning = static_cast<uint32>(FMath::Clamp(Burning, 0.0f, 1.0f) * Scale);
+		uint32 iPoison = static_cast<uint32>(FMath::Clamp(Poisoned, 0.0f, 1.0f) * Scale);
+
+		// 位组合：| Poisoned | Burning | Frozen | HitGlow |
+		uint32 packed = (iPoison << 24) | (iBurning << 16) | (iFrozen << 8) | iHit;
+		return *reinterpret_cast<float*>(&packed);
+	}
+
+
+	//--------------------------------------------A Star------------------------------------------------------------------
 
 	bool FindPathAStar(AFlowField* FlowField, const FVector& StartLocation, const FVector& GoalLocation, TArray<FVector>& OutPath);
 
