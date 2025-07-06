@@ -144,6 +144,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// Initial execute
 				if (Appearing.time == 0)
 				{
+					Appearing.time += 0.0001f;
+
 					// Actor
 					for (const FActorSpawnConfig& Config : Appear.SpawnActor)
 					{
@@ -321,6 +323,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		// Trace By Filter
 		auto Chain = Mechanism->EnchainSolid(AgentTraceFilter);
+		Chain->Retain();
 		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, 200, ThreadsCount, BatchSize);
 
 		TArray<FValidSubjects> ValidSubjectsArray;
@@ -339,23 +342,23 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					switch (Moving.MoveState)
 					{
 					case EMoveState::Sleeping: // 休眠时索敌
-						CoolDown = Trace.SectorTrace.Sleep.CoolDown;
+						CoolDown = Trace.SectorTrace.Sleep.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
 						break;
 
 					case EMoveState::Patrolling: // 巡逻时索敌
-						CoolDown = Trace.SectorTrace.Patrol.CoolDown;
+						CoolDown = Trace.SectorTrace.Patrol.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
 						break;
 
 					case EMoveState::PatrolWaiting: // 巡逻时索敌
-						CoolDown = Trace.SectorTrace.Patrol.CoolDown;
+						CoolDown = Trace.SectorTrace.Patrol.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
 						break;
 
 					case EMoveState::ChasingTarget: // 追逐时索敌
-						CoolDown = Trace.SectorTrace.Chase.CoolDown;
+						CoolDown = Trace.SectorTrace.Chase.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
 						break;
 
 					case EMoveState::ReachedTarget: // 追逐时索敌
-						CoolDown = Trace.SectorTrace.Chase.CoolDown;
+						CoolDown = Trace.SectorTrace.Chase.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
 						break;
 
 					case EMoveState::MovingToLocation: // 一般情况
@@ -738,6 +741,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 			});
 
+		Chain->Release();
+		Chain->Reset(true);
 		Mechanism->ApplyDeferreds();
 	}
 	#pragma endregion
@@ -1239,7 +1244,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				else 
 				{
 					DistanceToGoal = FVector::Dist2D(SelfLocation, Moving.Goal);
-					bIsInAcceptanceRadius = false/*DistanceToGoal <= Move.XY.AcceptanceRadius*/;
+					bIsInAcceptanceRadius = DistanceToGoal <= Move.XY.AcceptanceRadius;
 					FinalAcceptenceRadius = Move.XY.AcceptanceRadius;
 
 					EMoveState NewMoveState = bIsInAcceptanceRadius ? EMoveState::ArrivedAtLocation : EMoveState::MovingToLocation;
@@ -2026,6 +2031,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					{
 						Subject.RemoveTraitDeferred<FAttacking>();// 移除攻击状态
 						Moving.LaunchVelSum = FVector::ZeroVector; // 击退力清零
+						if (!Tracing.TraceResult.IsValid()) Tracing.TimeLeft = 0; //可立即重新索敌
 
 						// Attack End Event
 						if (Subject.HasTrait<FIsSubjective>())
@@ -2278,8 +2284,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 
 					// 更新计时器
-					Defence.bCanSlowATKSpeed ? Attacking.Time += SafeDeltaTime * Slowing.CombinedSlowMult : Attacking.Time += SafeDeltaTime;
-
+					Defence.bCanSlowATKSpeed ? Attacking.Time += FMath::Clamp(SafeDeltaTime * Slowing.CombinedSlowMult,0.0001f, FLT_MAX) : Attacking.Time += SafeDeltaTime;
 				}
 
 			}, ThreadsCount, BatchSize);
@@ -2887,6 +2892,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 				if (Dying.Time == 0)
 				{
+					Dying.Time += 0.0001f;
+
 					// Actor
 					for (const FActorSpawnConfig& Config : Death.SpawnActor)
 					{
@@ -3093,14 +3100,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							Animating.AnimIndex0 = Animation.IndexOfIdleAnim;
 							Animating.AnimPauseFrame0 = 0;
 							Animating.AnimOffsetTime0 = FMath::RandRange(Animation.IdleRandomTimeOffset.X, Animation.IdleRandomTimeOffset.Y);
-							Animating.AnimPlayRate0 = Animation.IdlePlayRate * Slowing.CombinedSlowMult;
 
 							// write move anim to slot 1
 							Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
 							Animating.AnimIndex1 = Animation.IndexOfMoveAnim;
 							Animating.AnimPauseFrame1 = 0;
 							Animating.AnimOffsetTime1 = FMath::RandRange(Animation.MoveRandomTimeOffset.X, Animation.MoveRandomTimeOffset.Y);
-							Animating.AnimPlayRate1 = Animation.MovePlayRate * Slowing.CombinedSlowMult;
 
 							// reset AnimLerp1
 							Animating.AnimLerp1 = 1;
@@ -3117,6 +3122,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 						// transit from slot 2 to slot 0 - 1 using AnimLerp1
 						Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 - SafeDeltaTime * Animation.LerpSpeed, 0, 1);
+
+						Animating.AnimPlayRate0 = Animation.IdlePlayRate * FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX);
+						Animating.AnimPlayRate1 = Animation.MovePlayRate * FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX);
+						//UE_LOG(LogTemp, Warning, TEXT("SlowMultIs: %f"), Slowing.CombinedSlowMult);
 
 						break;
 					}
@@ -3152,8 +3161,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								Animating.AnimCurrentTime2 = GetGameTimeSinceCreation();
 								Animating.AnimIndex2 = Animation.IndexOfAttackAnim;
 								Animating.AnimPauseFrame2 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfAttackAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfAttackAnim] : 0;
-								Animating.AnimPlayRate2 = Animating.AnimPauseFrame2 / Animating.SampleRate / Attack.DurationPerRound;
-								Animating.AnimPlayRate2 *= Defence.bCanSlowATKSpeed ? Slowing.CombinedSlowMult : 1;
 								Animating.AnimLerp1 = 0;
 							}
 							else
@@ -3165,14 +3172,13 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								else
 								{
 									CopyAnimData(Animating, 2, 0);// copy anim from 1 to slot 0
+									Animating.CurrentMontageSlot = 1;
 								}
 
 								// write Attack anim into slot 1
 								Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
 								Animating.AnimIndex1 = Animation.IndexOfAttackAnim;
 								Animating.AnimPauseFrame1 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfAttackAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfAttackAnim] : 0;
-								Animating.AnimPlayRate1 = Animating.AnimPauseFrame1 / Animating.SampleRate / Attack.DurationPerRound;
-								Animating.AnimPlayRate1 *= Defence.bCanSlowATKSpeed ? Slowing.CombinedSlowMult : 1;
 								Animating.AnimLerp0 = 0;
 								Animating.AnimLerp1 = 0;
 							}
@@ -3184,6 +3190,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						{
 							// transit from slot 0 to slot 1 using AnimLerp0
 							Animating.AnimLerp0 = FMath::Clamp(Animating.AnimLerp0 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
+
+							Animating.AnimPlayRate1 = Animating.AnimPauseFrame1 / Animating.SampleRate / Attack.DurationPerRound;
+							Animating.AnimPlayRate1 *= Defence.bCanSlowATKSpeed ? FMath::Clamp(Slowing.CombinedSlowMult,0.0001f,FLT_MAX) : 1;
 						}
 						else
 						{
@@ -3195,6 +3204,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 							// transit from slot 0 - 1 to slot 2 using AnimLerp1
 							Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
+
+							Animating.AnimPlayRate2 = Animating.AnimPauseFrame2 / Animating.SampleRate / Attack.DurationPerRound;
+							Animating.AnimPlayRate2 *= Defence.bCanSlowATKSpeed ? FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX) : 1;
 						}
 
 						break;
@@ -3212,7 +3224,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								Animating.AnimCurrentTime2 = GetGameTimeSinceCreation();
 								Animating.AnimIndex2 = Animation.IndexOfDeathAnim;
 								Animating.AnimPauseFrame2 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfDeathAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfDeathAnim] : 0;
-								Animating.AnimPlayRate2 = Animating.AnimPauseFrame2 / Animating.SampleRate / Death.AnimLength;
 								Animating.AnimLerp1 = 0;
 							}
 							else
@@ -3223,14 +3234,14 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								}
 								else
 								{
-									CopyAnimData(Animating, 2, 0);// copy anim from 1 to slot 0
+									CopyAnimData(Animating, 2, 0);// copy anim from 2 to slot 0
+									Animating.CurrentMontageSlot = 1;
 								}
 
 								// write Death anim into slot 1
 								Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
 								Animating.AnimIndex1 = Animation.IndexOfDeathAnim;
 								Animating.AnimPauseFrame1 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfDeathAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfDeathAnim] : 0;
-								Animating.AnimPlayRate1 = Animating.AnimPauseFrame1 / Animating.SampleRate / Death.AnimLength;
 								Animating.AnimLerp0 = 0;
 								Animating.AnimLerp1 = 0;
 							}
@@ -3242,6 +3253,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						{
 							// transit from slot 0 to slot 1 using AnimLerp0
 							Animating.AnimLerp0 = FMath::Clamp(Animating.AnimLerp0 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
+
+							Animating.AnimPlayRate1 = Animating.AnimPauseFrame1 / Animating.SampleRate / Death.AnimLength;
 						}
 						else
 						{
@@ -3253,6 +3266,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 							// transit from slot 0 - 1 to slot 2 using AnimLerp1
 							Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
+
+							Animating.AnimPlayRate2 = Animating.AnimPauseFrame2 / Animating.SampleRate / Death.AnimLength;
 						}
 
 						break;
