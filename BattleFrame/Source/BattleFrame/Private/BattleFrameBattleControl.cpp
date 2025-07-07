@@ -743,6 +743,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		Chain->Release();
 		Chain->Reset(true);
+
 		Mechanism->ApplyDeferreds();
 	}
 	#pragma endregion
@@ -3403,9 +3404,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// 重置和隐藏限制数组成员
 				Data.FreeTransforms.Reset();
 
-				for (int32 i = Data.ValidTransforms.IndexOf(false);
-					i < Data.Transforms.Num();
-					i = Data.ValidTransforms.IndexOf(false, i + 1))
+				for (int32 i = Data.ValidTransforms.IndexOf(false); i < Data.Transforms.Num(); i = Data.ValidTransforms.IndexOf(false, i + 1))
 				{
 					Data.FreeTransforms.Add(i);
 					Data.InsidePool_Array[i] = true;
@@ -5882,42 +5881,47 @@ void ABattleFrameBattleControl::CopyAnimData(FAnimating& Animating, int32 From, 
 	// 定义动画参数结构体简化拷贝逻辑
 	struct FAnimParams
 	{
-		float* Index;
-		float* PlayRate;
-		float* CurrentTime;
-		float* OffsetTime;
-		float* PauseTime;
+		float* Index = nullptr;
+		float* PlayRate = nullptr;
+		float* CurrentTime = nullptr;
+		float* OffsetTime = nullptr;
+		float* PauseTime = nullptr;
 	};
 
 	// 初始化三组动画参数
-	FAnimParams Source, Dest;
+	FAnimParams Source;
+	FAnimParams Dest;
 
 	// 根据From索引设置源参数指针
 	switch (From)
 	{
-		case 0:
-			Source = { &Animating.AnimIndex0, &Animating.AnimPlayRate0, &Animating.AnimCurrentTime0, &Animating.AnimOffsetTime0, &Animating.AnimPauseFrame0 };
-			break;
-		case 1:
-			Source = { &Animating.AnimIndex1, &Animating.AnimPlayRate1, &Animating.AnimCurrentTime1, &Animating.AnimOffsetTime1, &Animating.AnimPauseFrame1 };
-			break;
-		case 2:
-			Source = { &Animating.AnimIndex2, &Animating.AnimPlayRate2, &Animating.AnimCurrentTime2, &Animating.AnimOffsetTime2, &Animating.AnimPauseFrame2 };
-			break;
+	case 0:
+		Source = { &Animating.AnimIndex0, &Animating.AnimPlayRate0, &Animating.AnimCurrentTime0, &Animating.AnimOffsetTime0, &Animating.AnimPauseFrame0 };
+		break;
+	case 1:
+		Source = { &Animating.AnimIndex1, &Animating.AnimPlayRate1, &Animating.AnimCurrentTime1, &Animating.AnimOffsetTime1, &Animating.AnimPauseFrame1 };
+		break;
+	case 2:
+		Source = { &Animating.AnimIndex2, &Animating.AnimPlayRate2, &Animating.AnimCurrentTime2, &Animating.AnimOffsetTime2, &Animating.AnimPauseFrame2 };
+		break;
+	default: // 添加default分支避免警告
+		return; // 实际上不会执行到这里
 	}
 
 	// 根据To索引设置目标参数指针
 	switch (To)
 	{
-		case 0:
-			Dest = { &Animating.AnimIndex0, &Animating.AnimPlayRate0, &Animating.AnimCurrentTime0, &Animating.AnimOffsetTime0, &Animating.AnimPauseFrame0 };
-			break;
-		case 1:
-			Dest = { &Animating.AnimIndex1, &Animating.AnimPlayRate1, &Animating.AnimCurrentTime1, &Animating.AnimOffsetTime1, &Animating.AnimPauseFrame1 };
-			break;
-		case 2:
-			Dest = { &Animating.AnimIndex2, &Animating.AnimPlayRate2, &Animating.AnimCurrentTime2, &Animating.AnimOffsetTime2, &Animating.AnimPauseFrame2 };
-			break;
+	case 0:
+		Dest = { &Animating.AnimIndex0, &Animating.AnimPlayRate0, &Animating.AnimCurrentTime0, &Animating.AnimOffsetTime0, &Animating.AnimPauseFrame0 };
+		break;
+	case 1:
+		Dest = { &Animating.AnimIndex1, &Animating.AnimPlayRate1, &Animating.AnimCurrentTime1, &Animating.AnimOffsetTime1, &Animating.AnimPauseFrame1 };
+		break;
+	case 2:
+		Dest = { &Animating.AnimIndex2, &Animating.AnimPlayRate2, &Animating.AnimCurrentTime2, &Animating.AnimOffsetTime2, &Animating.AnimPauseFrame2 };
+		break;
+	default: // 添加default分支避免警告
+		return; // 实际上不会执行到这里
 	}
 
 	// 执行参数拷贝
@@ -5947,10 +5951,7 @@ bool ABattleFrameBattleControl::FindPathAStar(AFlowField* FlowField, const FVect
 	FVector2D GoalCoord;
 	FlowField->WorldToGrid(GoalLocation, GoalCoord);
 
-	if (!IsValidCoord(StartCoord) || !IsValidCoord(GoalCoord))
-	{
-		return false;
-	}
+	if (!IsValidCoord(StartCoord) || !IsValidCoord(GoalCoord)) return false;
 
 	// 获取起点终点索引
 	const int32 StartIndex = FlowField->CoordToIndex(StartCoord);
