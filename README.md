@@ -58,7 +58,7 @@ Comprehensive crowd battle system. Demo maps are included in the plugin's conten
   - Spawning actor fx and sound on birth atk hit and death
   - Draw Debug Shapes
 - **NS GPU Particle VAT**:
-  - Basic A to B animation blending
+  - Basic Idle-Move-Montage anim state machine with blending
   - Editor utility widget to set up VAT in 1 click
 - **NS GPU Particle UI**:
   - Health Bar, Text Pop, Ground Ring
@@ -69,12 +69,11 @@ Comprehensive crowd battle system. Demo maps are included in the plugin's conten
 
 In progress:
 1. Tower defence demo map
-2. Agent blendspace 1D
+2. ECS projectile system
 3. Sprite rendering support
-4. TurboSequence GPU SKM support
-5. More BP Nodes
+5. MassEntity branch
+5. GPU SKM support with TurboSequence
 6. Network replication
 7. RTS demo map
-8. MassEntity branch
 
 ## Leave a star if you find this project useful ;)
