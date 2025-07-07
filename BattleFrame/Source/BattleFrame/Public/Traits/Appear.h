@@ -38,6 +38,6 @@ public:
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
     TArray<FSoundConfig> PlaySound;
 
-    bool bAppearStarted = false;
+    //bool bAppearStarted = false;
 
 };

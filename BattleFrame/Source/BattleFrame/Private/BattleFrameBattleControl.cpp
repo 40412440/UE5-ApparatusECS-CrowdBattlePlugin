@@ -70,23 +70,13 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 	//------------------数据统计 | Statistics-------------------
 
-	// 统计Agent数量 | Agent Counter
-	#pragma region
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("Agent Count");
-
-		auto Chain = Mechanism->Enchain(AgentCountFilter);
-		AgentCount = Chain->IterableNum();
-		Chain->Reset(true);
-	}
-	#pragma endregion
-
-	// 统计游戏时长 | Game Time Counter
+	// 数据统计统计 | Statistics
 	#pragma region
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("Agent Statistics");
 
 		auto Chain = Mechanism->EnchainSolid(AgentStatFilter);
+		AgentCount = Chain->IterableNum();
 		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
 
 		Chain->OperateConcurrently([&](FSolidSubjectHandle Subject, FStatistics& Stats)
@@ -125,7 +115,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 	//----------------------出生 | Appear-----------------------
 
-	// 出生总 | Appear Main
+	// 出生 | Appear
 	#pragma region
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("AgentAppearMain");
@@ -139,12 +129,13 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FDirected& Directed,
 				FAppear& Appear,
 				FAppearing& Appearing,
-				FAnimating& Animating)
+				FAnimating& Animating,
+				FCurves& Curves)
 			{
 				// Initial execute
-				if (Appearing.time == 0)
+				if (Appearing.Time == 0 && !Appearing.bInitialized)
 				{
-					Appearing.time += 0.0001f;
+					Appearing.bInitialized = true;
 
 					// Actor
 					for (const FActorSpawnConfig& Config : Appear.SpawnActor)
@@ -191,99 +182,71 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 				}
 				
-				if (Appearing.time >= Appear.Delay)
+				// Sub Status
+				if (Appearing.Time >= Appear.Delay && !Appearing.bStarted)
 				{
-					if (!Appear.bAppearStarted)
+					Appearing.bStarted = true;
+
+					// Animation
+					if (Appear.bCanPlayAnim)
 					{
-						Appear.bAppearStarted = true;
+						Subject.SetFlag(AppearAnimFlag);
+					}
 
-						// Dissolve In
-						if (Appear.bCanDissolveIn)
-						{
-							Subject.SetTraitDeferred(FAppearDissolve());
-						}
-						else
-						{
-							Animating.Dissolve = 0;// unhide
-						}
-
-						// Animation
-						if (Appear.bCanPlayAnim)
-						{
-							Subject.SetTraitDeferred(FAppearAnim());
-						}
+					// Dissolve In
+					if (Appear.bCanDissolveIn)
+					{
+						Subject.SetFlag(AppearDissolveFlag);
+					}
+					else
+					{
+						Animating.Dissolve = 0;// unhide
 					}
 				}
 
-				if (Appearing.time >= (Appear.Duration + Appear.Delay))
+				// 出生动画 | Birth Anim
+				if (Subject.HasFlag(AppearAnimFlag))
+				{
+					if (Appearing.AnimTime == 0)
+					{
+						// 动画状态机
+						Animating.AnimState = EAnimState::Appearing;
+					}
+
+					if (Appearing.AnimTime >= Appear.Duration)
+					{
+						Subject.SetFlag(AppearAnimFlag,false);
+					}
+
+					Appearing.AnimTime += SafeDeltaTime;
+				}
+
+				// 出生淡入 | Dissolve In
+				if (Subject.HasFlag(AppearDissolveFlag))
+				{
+					auto Curve = Curves.DissolveIn.GetRichCurve();
+
+					if (!Curve || Curve->GetNumKeys() == 0) return;
+
+					const auto EndTime = Curve->GetLastKey().Time;
+					Animating.Dissolve = 1 - Curve->Eval(FMath::Clamp(Appearing.DissolveTime, 0, EndTime));
+
+					if (Appearing.DissolveTime > EndTime)
+					{
+						Subject.SetFlag(AppearDissolveFlag, false);
+					}
+
+					Appearing.DissolveTime += SafeDeltaTime;
+				}
+
+				if (Appearing.Time < (Appear.Duration + Appear.Delay))
+				{
+					Appearing.Time += SafeDeltaTime;
+				}
+				else
 				{
 					Subject.RemoveTraitDeferred<FAppearing>();
 				}
-
-				Appearing.time += SafeDeltaTime;
-
-			}, ThreadsCount, BatchSize);
-	}
-	#pragma endregion
-
-	// 出生动画 | Birth Anim
-	#pragma region
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("AgentAppearAnim");
-
-		auto Chain = Mechanism->EnchainSolid(AgentAppearAnimFilter);
-		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
-
-		Chain->OperateConcurrently(
-			[&](FSolidSubjectHandle Subject,
-				FAnimating& Animating,
-				FAppear& Appear,
-				FAppearAnim& AppearAnim)
-			{
-				if (AppearAnim.animTime == 0)
-				{
-					// 状态机
-					Animating.AnimState = EAnimState::Appearing;
-				}
-				
-				if (AppearAnim.animTime >= Appear.Duration)
-				{
-					Subject.RemoveTraitDeferred<FAppearAnim>();
-				}
-
-				AppearAnim.animTime += SafeDeltaTime;
-
-			}, ThreadsCount, BatchSize);
-	}
-	#pragma endregion
-
-	// 出生淡入 | Dissolve In
-	#pragma region
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("AgentAppearDissolve");
-
-		auto Chain = Mechanism->EnchainSolid(AgentAppearDissolveFilter);
-		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
-
-		Chain->OperateConcurrently(
-			[&](FSolidSubjectHandle Subject,
-				FAnimating& Animating,
-				FAppearDissolve& AppearDissolve,
-				FCurves& Curves)
-			{
-				auto Curve = Curves.DissolveIn.GetRichCurve();
-
-				if (!Curve || Curve->GetNumKeys() == 0) return;
-
-				const auto EndTime = Curve->GetLastKey().Time;
-				Animating.Dissolve = 1 - Curve->Eval(FMath::Clamp(AppearDissolve.dissolveTime, 0, EndTime));
-
-				if (AppearDissolve.dissolveTime > EndTime)
-				{
-					Subject.RemoveTraitDeferred<FAppearDissolve>();
-				}
-
-				AppearDissolve.dissolveTime += SafeDeltaTime;
 
 			}, ThreadsCount, BatchSize);
 	}
@@ -2294,10 +2257,137 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 	//------------------------受击 | Hit-------------------------
 
-	// 受击 | BeingHit
+	// 结算伤害 | Settle Damage
 	#pragma region
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("AgentBeingHit");
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("DecideHealth");
+
+		auto Chain = Mechanism->EnchainSolid(DecideHealthFilter);// it processes hero and prop type too
+		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
+
+		Chain->OperateConcurrently(
+			[&](FSolidSubjectHandle Subject,
+				FHealth& Health,
+				FLocated& Located,
+				FBeingHit& BeingHit)
+			{
+				// 结算伤害
+				while (!Health.DamageToTake.IsEmpty() && !Health.DamageInstigator.IsEmpty())
+				{
+					// 如果怪物死了，跳出循环
+					if (Health.Current <= 0) break;
+
+					FSubjectHandle Instigator = FSubjectHandle();
+					float DamageToTake = 0.f;
+					FVector HitDirection = FVector::ZeroVector;
+
+					Health.DamageInstigator.Dequeue(Instigator);
+					Health.DamageToTake.Dequeue(DamageToTake);
+					Health.HitDirection.Dequeue(HitDirection);
+
+					if (!Health.bLockHealth)
+					{
+						bool bIsValidStats = false;
+						FStatistics* Stats = nullptr;
+
+						if (Instigator.IsValid())
+						{
+							if (Instigator.HasTrait<FStatistics>())
+							{
+								// 伤害与积分最后结算
+								Stats = Instigator.GetTraitPtr<FStatistics, EParadigm::Unsafe>();
+
+								if (Stats->bEnable)
+								{
+									bIsValidStats = true;
+								}
+							}
+						}
+
+						if (Health.Current - DamageToTake > 0) // 不是致命伤害
+						{
+							// 统计数据
+							if (bIsValidStats)
+							{
+								Stats->Lock();
+								Stats->TotalDamage += DamageToTake;
+								Stats->Unlock();
+							}
+						}
+						else // 是致命伤害
+						{
+							Subject.SetTraitDeferred(FDying{ false,0,0,0,0,Instigator,HitDirection });	// 标记为死亡
+
+							if (Subject.HasTrait<FMove>())
+							{
+								Subject.GetTraitRef<FMove, EParadigm::Unsafe>().Z.bCanFly = false; // 如果在飞行会掉下来
+							}
+
+							// 统计数据
+							if (bIsValidStats)
+							{
+								int32 Score = Subject.HasTrait<FAgent>() ? Subject.GetTraitRef<FAgent, EParadigm::Unsafe>().Score : 0;
+
+								Stats->Lock();
+								Stats->TotalDamage += FMath::Min(DamageToTake, Health.Current);
+								Stats->TotalKills += 1;
+								Stats->TotalScore += Score;
+								Stats->Unlock();
+							}
+						}
+
+						// 扣除血量
+						Health.Current -= FMath::Min(DamageToTake, Health.Current);
+					}
+				}
+
+				// 更新血条
+				const bool bHasHealthBar = Subject.HasTrait<FHealthBar>();
+
+				if (bHasHealthBar)
+				{
+					auto& HealthBar = Subject.GetTraitRef<FHealthBar>();
+
+					if (HealthBar.bShowHealthBar)
+					{
+						HealthBar.TargetRatio = FMath::Clamp(Health.Current / Health.Maximum, 0, 1);
+						HealthBar.CurrentRatio = FMath::FInterpConstantTo(HealthBar.CurrentRatio, HealthBar.TargetRatio, SafeDeltaTime, HealthBar.InterpSpeed * 0.1);
+
+						if (HealthBar.HideOnFullHealth)
+						{
+							if (Health.Current == Health.Maximum)
+							{
+								HealthBar.Opacity = 0;
+							}
+							else
+							{
+								HealthBar.Opacity = 1;
+							}
+						}
+						else
+						{
+							HealthBar.Opacity = 1;
+						}
+
+						if (HealthBar.HideOnEmptyHealth && Health.Current <= 0)
+						{
+							HealthBar.Opacity = 0;
+						}
+					}
+					else
+					{
+						HealthBar.Opacity = 0;
+					}
+				}
+
+			}, ThreadsCount, BatchSize);
+	}
+	#pragma endregion
+
+	// 受击效果 | Hit Effect
+	#pragma region
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("AgentHitEffect");
 
 		auto Chain = Mechanism->EnchainSolid(AgentBeingHitFilter);
 		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
@@ -2721,132 +2811,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	// 结算伤害 | Settle Damage
-	#pragma region
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("DecideHealth");
-
-		auto Chain = Mechanism->EnchainSolid(DecideHealthFilter);// it processes hero and prop type too
-		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
-
-		Chain->OperateConcurrently(
-			[&](FSolidSubjectHandle Subject, 
-				FHealth& Health, 
-				FLocated& Located)
-			{
-				// 结算伤害
-				while (!Health.DamageToTake.IsEmpty() && !Health.DamageInstigator.IsEmpty())
-				{
-					// 如果怪物死了，跳出循环
-					if (Health.Current <= 0) break;
-
-					FSubjectHandle Instigator = FSubjectHandle();
-					float DamageToTake = 0.f;
-					FVector HitDirection = FVector::ZeroVector;
-
-					Health.DamageInstigator.Dequeue(Instigator);
-					Health.DamageToTake.Dequeue(DamageToTake);
-					Health.HitDirection.Dequeue(HitDirection);
-
-					if (!Health.bLockHealth)
-					{
-						bool bIsValidStats = false;
-						FStatistics* Stats = nullptr;
-
-						if (Instigator.IsValid())
-						{
-							if (Instigator.HasTrait<FStatistics>())
-							{
-								// 伤害与积分最后结算
-								Stats = Instigator.GetTraitPtr<FStatistics, EParadigm::Unsafe>();
-
-								if (Stats->bEnable)
-								{
-									bIsValidStats = true;
-								}
-							}
-						}
-
-						if (Health.Current - DamageToTake > 0) // 不是致命伤害
-						{
-							// 统计数据
-							if (bIsValidStats)
-							{
-								Stats->Lock();
-								Stats->TotalDamage += DamageToTake;
-								Stats->Unlock();
-							}
-						}
-						else // 是致命伤害
-						{
-							Subject.SetTraitDeferred(FDying{ false,0,0,0,0,Instigator,HitDirection });	// 标记为死亡
-
-							if (Subject.HasTrait<FMove>())
-							{
-								Subject.GetTraitRef<FMove, EParadigm::Unsafe>().Z.bCanFly = false; // 如果在飞行会掉下来
-							}
-
-							// 统计数据
-							if (bIsValidStats)
-							{
-								int32 Score = Subject.HasTrait<FAgent>() ? Subject.GetTraitRef<FAgent, EParadigm::Unsafe>().Score : 0;
-
-								Stats->Lock();
-								Stats->TotalDamage += FMath::Min(DamageToTake, Health.Current);
-								Stats->TotalKills += 1;
-								Stats->TotalScore += Score;
-								Stats->Unlock();
-							}
-						}
-
-						// 扣除血量
-						Health.Current -= FMath::Min(DamageToTake, Health.Current);
-					}
-				}
-
-				// 更新血条
-				const bool bHasHealthBar = Subject.HasTrait<FHealthBar>();
-
-				if (bHasHealthBar)
-				{
-					auto& HealthBar = Subject.GetTraitRef<FHealthBar>();
-
-					if (HealthBar.bShowHealthBar)
-					{
-						HealthBar.TargetRatio = FMath::Clamp(Health.Current / Health.Maximum, 0, 1);
-						HealthBar.CurrentRatio = FMath::FInterpConstantTo(HealthBar.CurrentRatio, HealthBar.TargetRatio, SafeDeltaTime, HealthBar.InterpSpeed * 0.1);
-
-						if (HealthBar.HideOnFullHealth)
-						{
-							if (Health.Current == Health.Maximum)
-							{
-								HealthBar.Opacity = 0;
-							}
-							else
-							{
-								HealthBar.Opacity = 1;
-							}
-						}
-						else
-						{
-							HealthBar.Opacity = 1;
-						}
-
-						if (HealthBar.HideOnEmptyHealth && Health.Current <= 0)
-						{
-							HealthBar.Opacity = 0;
-						}
-					}
-					else
-					{
-						HealthBar.Opacity = 0;
-					}
-				}
-
-			}, ThreadsCount, BatchSize);
-	}
-	#pragma endregion
-
 	//-----------------------死亡 | Death-------------------------
 
 	// 或死亡 | May Die
@@ -2897,6 +2861,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// Init, do once
 				if (Dying.Time == 0 && !Dying.bInitialized)
 				{
+					Dying.bInitialized = true;
+
 					// Actor
 					for (const FActorSpawnConfig& Config : Death.SpawnActor)
 					{
@@ -2947,16 +2913,16 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					{
 						Dying.Duration = Death.DespawnDelay;
 
-						// Fade out
-						if (Death.bCanFadeout)
-						{
-							Subject.SetFlag(DeathDissolveFlag);
-						}
-
 						// Anim
 						if (Death.bCanPlayAnim)
 						{
 							Subject.SetFlag(DeathAnimFlag);
+						}
+
+						// Fade out
+						if (Death.bCanFadeout)
+						{
+							Subject.SetFlag(DeathDissolveFlag);
 						}
 					}
 				}
@@ -2973,32 +2939,38 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 					//----------------------- 死亡消融 | Death Dissolve -------------------------
 					
-					// 获取曲线
-					auto Curve = Curves.DissolveOut.GetRichCurve();
-
-					// 检查曲线是否有关键帧
-					if (!Curve || Curve->GetNumKeys() == 0) return;
-
-					// 获取曲线的最后一个关键帧的时间
-					const auto EndTime = Curve->GetLastKey().Time;
-
-					// 计算溶解效果
-					if (Dying.DeathDissolveTime >= Death.FadeOutDelay && (Dying.DeathDissolveTime - Death.FadeOutDelay) < EndTime)
+					if (Subject.HasFlag(DeathDissolveFlag))
 					{
-						Animating.Dissolve = 1 - Curve->Eval(Dying.DeathDissolveTime - Death.FadeOutDelay);
-					}
+						// 获取曲线
+						auto Curve = Curves.DissolveOut.GetRichCurve();
 
-					// 更新溶解时间
-					Dying.DeathDissolveTime += SafeDeltaTime;
+						// 检查曲线是否有关键帧
+						if (!Curve || Curve->GetNumKeys() == 0) return;
+
+						// 获取曲线的最后一个关键帧的时间
+						const auto EndTime = Curve->GetLastKey().Time;
+
+						// 计算溶解效果
+						if (Dying.DeathDissolveTime >= Death.FadeOutDelay && (Dying.DeathDissolveTime - Death.FadeOutDelay) < EndTime)
+						{
+							Animating.Dissolve = 1 - Curve->Eval(Dying.DeathDissolveTime - Death.FadeOutDelay);
+						}
+
+						// 更新溶解时间
+						Dying.DeathDissolveTime += SafeDeltaTime;
+					}
 
 					//----------------------- 死亡动画 | Death Anim -------------------------
 
-					if (Dying.DeathAnimTime == 0)
+					if (Subject.HasFlag(DeathAnimFlag))
 					{
-						Animating.AnimState = EAnimState::Dying;
-					}
+						if (Dying.DeathAnimTime == 0)
+						{
+							Animating.AnimState = EAnimState::Dying;
+						}
 
-					Dying.DeathAnimTime += SafeDeltaTime;
+						Dying.DeathAnimTime += SafeDeltaTime;
+					}
 				}
 				else
 				{
@@ -4132,8 +4104,6 @@ void ABattleFrameBattleControl::DefineFilters()
 	AgentStatFilter = FFilter::Make<FStatistics>();
 	AgentMayDieFilter = FFilter::Make<FMayDie>();
 	AgentAppeaFilter = FFilter::Make<FAgent, FRendering, FLocated, FDirected, FScaled, FAppear, FAppearing, FAnimation, FActivated>();
-	AgentAppearAnimFilter = FFilter::Make<FAgent, FRendering, FAnimation, FAppear, FAppearAnim, FActivated>();
-	AgentAppearDissolveFilter = FFilter::Make<FAgent, FRendering, FAppearDissolve, FAnimation, FCurves, FActivated>();
 	AgentTraceFilter = FFilter::Make<FAgent, FLocated, FDirected, FScaled, FCollider, FSleep, FPatrol, FTrace, FTracing, FMoving, FRendering, FActivated>().Exclude<FAppearing, FAttacking, FDying>();
 	AgentAttackFilter = FFilter::Make<FAgent, FAttack, FRendering, FLocated, FDirected, FCollider, FScaled, FTrace, FActivated>().Exclude<FAppearing, FSleeping, FPatrolling, FDying>();
 	AgentAttackingFilter = FFilter::Make<FAgent, FAttack, FRendering, FLocated, FDirected, FScaled, FAnimation, FAttacking, FMove, FMoving, FTrace, FTracing, FDebuff, FDamage, FDefence, FSlowing, FActivated>().Exclude<FAppearing, FSleeping, FPatrolling, FDying>();
@@ -4155,7 +4125,7 @@ void ABattleFrameBattleControl::DefineFilters()
 
 	RenderBatchFilter = FFilter::Make<FRenderBatchData>();
 	SpeedLimitOverrideFilter = FFilter::Make<FCollider, FLocated, FSphereObstacle>();
-	DecideHealthFilter = FFilter::Make<FHealth, FLocated, FActivated>().Exclude<FDying>();
+	DecideHealthFilter = FFilter::Make<FBeingHit, FHealth, FLocated, FActivated>().Exclude<FDying>();
 	SubjectFilterBase = FFilter::Make<FLocated, FDirected, FScaled, FCollider, FAvoidance, FAvoiding, FGridData, FActivated>().Exclude<FSphereObstacle, FBoxObstacle>().ExcludeFlag(DeathDisableCollisionFlag);
 }
 
@@ -4207,6 +4177,8 @@ void ABattleFrameBattleControl::ApplyDamageToSubjects(const FSubjectArray& Subje
 
 		FDmgResult DmgResult;
 		DmgResult.DamagedSubject = Overlapper;
+
+		FBeingHit NewBeingHit = !bHasBeingHit ? FBeingHit() : Overlapper.GetTrait<FBeingHit>();
 
 		// 击退
 		FVector HitDirection = FVector::OneVector;
@@ -4282,6 +4254,7 @@ void ABattleFrameBattleControl::ApplyDamageToSubjects(const FSubjectArray& Subje
 
 			// 应用伤害
 			Overlapper.GetTraitRef<FHealth, EParadigm::Unsafe>().DamageToTake.Enqueue(ClampedDamage);
+			Overlapper.GetTraitRef<FHealth, EParadigm::Unsafe>().HitDirection.Enqueue(HitDirection);
 
 			// 记录伤害施加者
 			if (DmgInstigator.IsValid())
@@ -4293,8 +4266,6 @@ void ABattleFrameBattleControl::ApplyDamageToSubjects(const FSubjectArray& Subje
 			{
 				Overlapper.GetTraitRef<FHealth, EParadigm::Unsafe>().DamageInstigator.Enqueue(FSubjectHandle());
 			}
-
-			Overlapper.GetTraitRef<FHealth, EParadigm::Unsafe>().HitDirection.Enqueue(HitDirection);
 
 			// ------------生成文字--------------
 
@@ -4473,45 +4444,29 @@ void ABattleFrameBattleControl::ApplyDamageToSubjects(const FSubjectArray& Subje
 			}
 
 			// Glow
-			if (Hit.bCanGlow)
+			if (Hit.bCanGlow && !bHasHitGlow)
 			{
-				if (!bHasHitGlow)
-				{
-					Overlapper.SetFlag(HitGlowFlag);
+				Overlapper.SetFlag(HitGlowFlag);
 
-					if (!bHasBeingHit)
-					{
-						Overlapper.SetTrait(FBeingHit());
-					}
-					else
-					{
-						auto BeingHit = Overlapper.GetTrait<FBeingHit>();
-						BeingHit.ResetGlow();
-						Overlapper.SetTrait(BeingHit);
-					}
+				if (bHasBeingHit)
+				{
+					NewBeingHit.ResetGlow();
 				}
 			}
 
 			// Jiggle
-			if (Hit.JiggleStr != 0.f)
+			if (Hit.JiggleStr != 0.f && !bHasHitJiggle)
 			{
-				if (!bHasHitJiggle)
-				{
-					Overlapper.SetFlag(HitJiggleFlag);
+				Overlapper.SetFlag(HitJiggleFlag);
 
-					if (!bHasBeingHit)
-					{
-						Overlapper.SetTrait(FBeingHit());
-					}
-					else
-					{
-						auto BeingHit = Overlapper.GetTrait<FBeingHit>();
-						BeingHit.ResetJiggle();
-						Overlapper.SetTrait(BeingHit);
-					}
+				if (bHasBeingHit)
+				{
+					NewBeingHit.ResetJiggle();
 				}
 			}
 		}
+
+		Overlapper.SetTrait(NewBeingHit);
 
 		if (bHasIsSubjective)
 		{
@@ -4573,6 +4528,8 @@ void ABattleFrameBattleControl::ApplyDamageToSubjectsDeferred(const FSubjectArra
 
 		FVector Location = bHasLocated ? Overlapper.GetTrait<FLocated>().Location : FVector::ZeroVector;
 		FVector Direction = bHasDirected ? Overlapper.GetTrait<FDirected>().Direction : FVector::ZeroVector;
+
+		FBeingHit NewBeingHit = !bHasBeingHit ? FBeingHit() : Overlapper.GetTrait<FBeingHit>();
 
 		FDmgResult DmgResult;
 		DmgResult.DamagedSubject = Overlapper;
@@ -4842,41 +4799,29 @@ void ABattleFrameBattleControl::ApplyDamageToSubjectsDeferred(const FSubjectArra
 			}
 
 			// Glow
-			if (Hit.bCanGlow)
+			if (Hit.bCanGlow && !bHasHitGlow)
 			{
-				if (!bHasHitGlow)
-				{
-					Overlapper.SetFlag(HitGlowFlag);
+				Overlapper.SetFlag(HitGlowFlag);
 
-					if (!bHasBeingHit)
-					{
-						Overlapper.SetTraitDeferred(FBeingHit());
-					}
-					else
-					{
-						Overlapper.GetTraitRef<FBeingHit,EParadigm::Unsafe>().ResetGlow();
-					}
+				if (bHasBeingHit)
+				{
+					NewBeingHit.ResetGlow();
 				}
 			}
 
 			// Jiggle
-			if (Hit.JiggleStr != 0.f)
+			if (Hit.JiggleStr != 0.f && !bHasHitJiggle)
 			{
-				if (!bHasHitJiggle)
-				{
-					Overlapper.SetFlag(HitJiggleFlag);
+				Overlapper.SetFlag(HitJiggleFlag);
 
-					if (!bHasBeingHit)
-					{
-						Overlapper.SetTraitDeferred(FBeingHit());
-					}
-					else
-					{
-						Overlapper.GetTraitRef<FBeingHit, EParadigm::Unsafe>().ResetJiggle();
-					}
+				if (bHasBeingHit)
+				{
+					NewBeingHit.ResetJiggle();
 				}
 			}
 		}
+
+		Overlapper.SetTraitDeferred(NewBeingHit);
 
 		if (bHasIsSubjective)
 		{

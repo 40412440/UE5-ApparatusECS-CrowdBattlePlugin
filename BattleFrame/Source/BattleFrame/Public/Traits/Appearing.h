@@ -13,6 +13,10 @@ struct BATTLEFRAME_API FAppearing
  
   public:
 
-	  float time = 0.0f;
+	  bool bInitialized = false;
+	  bool bStarted = false;
+	  float Time = 0.0f;
+	  float AnimTime = 0.0f;
+	  float DissolveTime = 0.f;
 
 };
