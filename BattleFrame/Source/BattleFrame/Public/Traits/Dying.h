@@ -11,9 +11,15 @@ struct BATTLEFRAME_API FDying
  
   public:
 
-	float Time = 0.0f;
+	bool bInitialized = false;
 
 	float Duration = 0.0f;
+
+	float Time = 0.0f;
+
+	float DeathDissolveTime = 0.0f;
+
+	float DeathAnimTime = 0.0f;
 
 	FSubjectHandle Instigator = FSubjectHandle();
 

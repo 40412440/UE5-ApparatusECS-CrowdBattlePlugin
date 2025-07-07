@@ -197,41 +197,6 @@ void UBattleFrameFunctionLibraryRT::SphereSweepForObstacle
 	NeighborGrid->SphereSweepForObstacle(Start, End, Radius, DrawDebugConfig, Hit, TraceResult);
 }
 
-void UBattleFrameFunctionLibraryRT::ApplyDamageToSubjects
-(
-	TArray<FDmgResult>& DamageResults,
-	ABattleFrameBattleControl* BattleControl,
-	UPARAM(ref) const FSubjectArray& Subjects,
-	UPARAM(ref) const FSubjectArray& IgnoreSubjects,
-	UPARAM(ref) const FSubjectHandle DmgInstigator,
-	UPARAM(ref) const FVector& HitFromLocation,
-	UPARAM(ref) const FDmgSphere& DmgSphere,
-	UPARAM(ref) const FDebuff& Debuff
-)
-{
-	DamageResults.Reset();
-
-	// 如果 BattleControl 无效，尝试从 World 查找
-	if (!IsValid(BattleControl))
-	{
-		UWorld* World = GEngine ? GEngine->GetCurrentPlayWorld() : nullptr;
-
-		if (World)
-		{
-			for (TActorIterator<ABattleFrameBattleControl> It(World); It; ++It)
-			{
-				BattleControl = *It;
-				break; // 只取第一个
-			}
-		}
-	}
-
-	// 仍然无效则返回空结果
-	if (!IsValid(BattleControl)) return;
-
-	// 直接填充 DamageResults
-	BattleControl->ApplyDamageToSubjects(Subjects, IgnoreSubjects, DmgInstigator, HitFromLocation, DmgSphere, Debuff, DamageResults);
-}
 
 void UBattleFrameFunctionLibraryRT::ApplyDamageAndDebuff
 (

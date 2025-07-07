@@ -10,10 +10,10 @@ struct BATTLEFRAME_API FHitAnim
  
   public:
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	bool enableAnim = false;
+	//UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	//bool enableAnim = false;
 
-	float animTime = 0.0f;
-	bool animFinished = false;
+	//float animTime = 0.0f;
+	//bool animFinished = false;
 
 };

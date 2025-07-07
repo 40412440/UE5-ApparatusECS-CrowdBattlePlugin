@@ -10,7 +10,7 @@ struct BATTLEFRAME_API FHitGlow
  
   public:
 
-	float GlowTime = 0.0f;
-	bool bGlowFinished = false;
+	//float GlowTime = 0.0f;
+	//bool bGlowFinished = false;
 
 };

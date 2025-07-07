@@ -88,8 +88,19 @@ public:
 	FVector InvCellSizeCache = FVector(1 / 300.f, 1 / 300.f, 1 / 300.f);
 	TArray<TQueue<int32,EQueueMode::Mpsc>> OccupiedCellsQueues;
 
-	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::M;
+	// Agent Sub-Status Flags
+	EFlagmarkBit AppearAnimFlag = EFlagmarkBit::A;
+	EFlagmarkBit AppearDissolveFlag = EFlagmarkBit::B;
+	EFlagmarkBit HitGlowFlag = EFlagmarkBit::C;
+	EFlagmarkBit HitJiggleFlag = EFlagmarkBit::D;
+	EFlagmarkBit HitPoppingTextFlag = EFlagmarkBit::E;
+	EFlagmarkBit HitDecideHealthFlag = EFlagmarkBit::F;
+	EFlagmarkBit DeathAnimFlag = EFlagmarkBit::G;
+	EFlagmarkBit DeathDissolveFlag = EFlagmarkBit::H;
+	EFlagmarkBit DeathDisableCollisionFlag = EFlagmarkBit::I;
+	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::J;
 
+	// All filters we gonna use
 	FFilter RegisterNeighborGrid_Trace_Filter;
 	FFilter RegisterNeighborGrid_SphereObstacle_Filter;
 	FFilter RegisterSubjectFilter;

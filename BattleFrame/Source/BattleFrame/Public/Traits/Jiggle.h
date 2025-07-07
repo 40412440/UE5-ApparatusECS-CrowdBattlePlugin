@@ -10,7 +10,7 @@ struct BATTLEFRAME_API FJiggle
 
 public:
 
-	float JiggleTime = 0.0f;
-	bool JiggleFinished = false;
+	//float JiggleTime = 0.0f;
+	//bool JiggleFinished = false;
 
 };

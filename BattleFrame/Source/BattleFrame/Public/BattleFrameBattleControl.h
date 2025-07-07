@@ -90,6 +90,7 @@
 #include "Traits/TextPopConfig.h"
 #include "Traits/MayDie.h"
 #include "Traits/Tracing.h"
+#include "Traits/BeingHit.h"
 
 #include "BattleFrameBattleControl.generated.h"
 
@@ -119,19 +120,24 @@ public:
 	int32 AgentCount = 0;
 
 	static ABattleFrameBattleControl* Instance;
-	FStreamableManager StreamableManager;
 	UWorld* CurrentWorld = nullptr;
 	AMechanism* Mechanism = nullptr;
 	TArray<UNeighborGridComponent*> NeighborGrids;
-	TSet<int32> ExistingRenderers;
 
-	// Agent Status Flags
-	EFlagmarkBit ReloadFlowFieldFlag = EFlagmarkBit::F;
-	EFlagmarkBit HasPoppingTextFlag = EFlagmarkBit::T;
-	EFlagmarkBit PatrollingFlag = EFlagmarkBit::P;
-	EFlagmarkBit SleepingFlag = EFlagmarkBit::S;
-	EFlagmarkBit ChasingFlag = EFlagmarkBit::C;
-	EFlagmarkBit AttackingFlag = EFlagmarkBit::A;
+	TSet<int32> ExistingRenderers;
+	FStreamableManager StreamableManager;
+
+	// Agent Sub-Status Flags
+	EFlagmarkBit AppearAnimFlag = EFlagmarkBit::A;
+	EFlagmarkBit AppearDissolveFlag = EFlagmarkBit::B;
+	EFlagmarkBit HitGlowFlag = EFlagmarkBit::C;
+	EFlagmarkBit HitJiggleFlag = EFlagmarkBit::D;
+	EFlagmarkBit HitPoppingTextFlag = EFlagmarkBit::E;
+	EFlagmarkBit HitDecideHealthFlag = EFlagmarkBit::F;
+	EFlagmarkBit DeathAnimFlag = EFlagmarkBit::G;
+	EFlagmarkBit DeathDissolveFlag = EFlagmarkBit::H;
+	EFlagmarkBit DeathDisableCollisionFlag = EFlagmarkBit::I;
+	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::J;
 
 	// Event Callbacks
 	TQueue<FAppearData, EQueueMode::Mpsc> OnAppearQueue;
@@ -163,8 +169,7 @@ private:
 	FFilter AgentTraceFilter;
 	FFilter AgentAttackFilter;
 	FFilter AgentAttackingFilter;
-	FFilter AgentHitGlowFilter;
-	FFilter AgentJiggleFilter;
+	FFilter AgentBeingHitFilter;
 	FFilter TemporalDamagerFilter;
 	FFilter SlowerFilter;
 	FFilter DecideHealthFilter;
@@ -218,11 +223,7 @@ public:
 
 	void ApplyDamageToSubjects(const FSubjectArray& Subjects, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FVector& HitFromLocation, const FDamage& FDamage, const FDebuff& Debuff, TArray<FDmgResult>& DamageResults);
 
-	void ApplyDamageToSubjects(const FSubjectArray& Subjects, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FVector& HitFromLocation, const FDmgSphere& DmgSphere, const FDebuff& Debuff, TArray<FDmgResult>& DamageResults);
-
 	void ApplyDamageToSubjectsDeferred(const FSubjectArray& Subjects, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FVector& HitFromLocation, const FDamage& FDamage, const FDebuff& Debuff, TArray<FDmgResult>& DamageResults);
-
-	void ApplyDamageToSubjectsDeferred(const FSubjectArray& Subjects, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FVector& HitFromLocation, const FDmgSphere& DmgSphere, const FDebuff& Debuff, TArray<FDmgResult>& DamageResults);
 
 	static FVector FindNewPatrolGoalLocation(const FPatrol Patrol, const FCollider Collider, const FTrace Trace, const FTracing Tracing, const FLocated Located, const FScaled Scaled, int32 MaxAttempts);
 
@@ -280,7 +281,7 @@ public:
 			//UE_LOG(LogTemp, Warning, TEXT("OldTrait"));
 			PoppingText.Unlock();
 
-			Config.Owner.SetFlag(HasPoppingTextFlag, true);
+			Config.Owner.SetFlag(HitPoppingTextFlag, true);
 		}
 	}
 

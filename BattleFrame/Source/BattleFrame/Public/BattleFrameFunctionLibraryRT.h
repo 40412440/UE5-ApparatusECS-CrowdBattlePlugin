@@ -119,19 +119,6 @@ public:
         UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig = FTraceDrawDebugConfig()
     );
 
-    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Misc", meta = (AutoCreateRefTerm = "Subjects, IgnoreSubjects, DmgInstigator, HitFromLocation, DmgSphere, Debuff", DisplayName = "ApplyDamageToSubjects(Deprecated)"))
-    static void ApplyDamageToSubjects
-    (
-        TArray<FDmgResult>& DamageResults,
-        ABattleFrameBattleControl* BattleControl = nullptr,
-        UPARAM(ref) const FSubjectArray& Subjects = FSubjectArray(),
-        UPARAM(ref) const FSubjectArray& IgnoreSubjects = FSubjectArray(),
-        UPARAM(ref) const FSubjectHandle DmgInstigator = FSubjectHandle(),
-        UPARAM(ref) const FVector& HitFromLocation = FVector(0, 0, 0),
-        UPARAM(ref) const FDmgSphere& DmgSphere = FDmgSphere(),
-        UPARAM(ref) const FDebuff& Debuff = FDebuff()
-    );
-
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | Misc", meta = (AutoCreateRefTerm = "Subjects, IgnoreSubjects, DmgInstigator, HitFromLocation, Damage, Debuff", Keywords = "Apply Damage"))
     static void ApplyDamageAndDebuff
     (

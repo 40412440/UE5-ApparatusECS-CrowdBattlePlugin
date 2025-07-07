@@ -10,8 +10,8 @@ struct BATTLEFRAME_API FDeathAnim
  
   public:
 
-	bool enableAnim = false;
-	float animTime = 0.0f;
-	bool animFinished = false;
+	//bool enableAnim = false;
+	float DeathAnimTime = 0.0f;
+	//bool animFinished = false;
 
 };

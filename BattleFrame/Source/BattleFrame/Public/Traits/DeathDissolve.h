@@ -10,6 +10,6 @@ struct BATTLEFRAME_API FDeathDissolve
  
   public:
 
-	float dissolveTime = 0.0f;
+	float DeathDissolveTime = 0.0f;
 
 };
