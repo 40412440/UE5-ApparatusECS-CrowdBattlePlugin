@@ -1,7 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "BattleFrameFunctionLibraryRT.h"
-#include "Traits/Located.h"
 #include "SubjectHandle.h"
 #include "SubjectRecord.h"
 #include "EngineUtils.h"

@@ -5,11 +5,8 @@
 */
 
 #include "NiagaraFXRenderer.h"
-#include "Traits/Directed.h"
-#include "Traits/Scaled.h"
 #include "Traits/Rendering.h"
 #include "Traits/SpawningFx.h"
-#include "Traits/Located.h"
 #include "NiagaraDataInterfaceArrayFunctionLibrary.h"
 #include "BattleFrameBattleControl.h"
 

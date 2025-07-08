@@ -12,11 +12,8 @@
 
 #include "Traits/Avoidance.h"
 #include "Traits/GridData.h"
-#include "Traits/Located.h"
 #include "Traits/Collider.h"
 #include "Traits/SphereObstacle.h"
-#include "Traits/RegisterMultiple.h"
-#include "Traits/Avoiding.h"
 #include "RVOSphereObstacle.generated.h"
 
 UCLASS(Blueprintable)

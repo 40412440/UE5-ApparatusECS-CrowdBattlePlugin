@@ -26,23 +26,16 @@
 #include "RVOVector2.h"
 #include "RVODefinitions.h"
 #include "Traits/Avoidance.h"
-#include "Traits/RegisterMultiple.h"
 #include "Traits/Collider.h"
-#include "Traits/Located.h"
 #include "Traits/BoxObstacle.h"
-#include "Traits/Moving.h"
 #include "Traits/SphereObstacle.h"
-#include "Traits/Appearing.h"
 #include "Traits/Move.h"
 #include "Traits/Trace.h"
 #include "Traits/GridData.h"
-#include "Traits/Avoiding.h"
-#include "Traits/Corpse.h"
-#include "Traits/Dying.h"
 #include "Traits/Activated.h"
-#include "Traits/Agent.h"
 #include "Traits/Patrol.h"
-#include "Traits/Directed.h"
+#include "Traits/PrimaryType.h"
+#include "Traits/Transform.h"
 #include "Math/UnrealMathUtility.h"
 #include "NeighborGridComponent.generated.h"
 
@@ -59,7 +52,7 @@ class BATTLEFRAME_API UNeighborGridComponent : public UMechanicalActorComponent
 public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance)
-	int32 MaxThreadsAllowed = FMath::Clamp(FPlatformMisc::NumberOfWorkerThreadsToSpawn(), 1, 20);
+	int32 MaxThreadsAllowed = FMath::Clamp(FPlatformMisc::NumberOfWorkerThreadsToSpawn(), 1, FPlatformMisc::NumberOfCoresIncludingHyperthreads());
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Performance)
 	int32 MinBatchSizeAllowed = 100;

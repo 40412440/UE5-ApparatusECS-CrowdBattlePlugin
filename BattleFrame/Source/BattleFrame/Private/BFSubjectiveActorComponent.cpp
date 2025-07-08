@@ -1,15 +1,10 @@
 #include "BFSubjectiveActorComponent.h"
 #include "Traits/Health.h"
 #include "Traits/GridData.h"
-#include "Traits/Located.h"
-#include "Traits/Directed.h"
-#include "Traits/Scaled.h"
 #include "Traits/Collider.h"
 #include "Traits/BindFlowField.h"
 #include "Traits/Activated.h"
 #include "Traits/IsSubjective.h"
-#include "Traits/TemporalDamaging.h"
-#include "Traits/Slowing.h"
 
 UBFSubjectiveActorComponent::UBFSubjectiveActorComponent()
 {

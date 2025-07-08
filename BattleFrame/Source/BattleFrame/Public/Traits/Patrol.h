@@ -59,3 +59,15 @@ public:
 	FVector Origin = FVector::ZeroVector;
 
 };
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FPatrolling
+{
+	GENERATED_BODY()
+
+public:
+
+	float MoveTimeLeft = 0;
+	float WaitTimeLeft = 0;
+
+};

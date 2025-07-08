@@ -211,6 +211,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					{
 						// 动画状态机
 						Animating.AnimState = EAnimState::Appearing;
+						Animating.bUpdateAnimState = true;
 					}
 
 					if (Appearing.AnimTime >= Appear.Duration)
@@ -304,33 +305,33 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 					switch (Moving.MoveState)
 					{
-					case EMoveState::Sleeping: // 休眠时索敌
-						CoolDown = Trace.SectorTrace.Sleep.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
-						break;
+						case EMoveState::Sleeping: // 休眠时索敌
+							CoolDown = Trace.SectorTrace.Sleep.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
+							break;
 
-					case EMoveState::Patrolling: // 巡逻时索敌
-						CoolDown = Trace.SectorTrace.Patrol.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
-						break;
+						case EMoveState::Patrolling: // 巡逻时索敌
+							CoolDown = Trace.SectorTrace.Patrol.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
+							break;
 
-					case EMoveState::PatrolWaiting: // 巡逻时索敌
-						CoolDown = Trace.SectorTrace.Patrol.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
-						break;
+						case EMoveState::PatrolWaiting: // 巡逻时索敌
+							CoolDown = Trace.SectorTrace.Patrol.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
+							break;
 
-					case EMoveState::ChasingTarget: // 追逐时索敌
-						CoolDown = Trace.SectorTrace.Chase.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
-						break;
+						case EMoveState::ChasingTarget: // 追逐时索敌
+							CoolDown = Trace.SectorTrace.Chase.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
+							break;
 
-					case EMoveState::ReachedTarget: // 追逐时索敌
-						CoolDown = Trace.SectorTrace.Chase.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
-						break;
+						case EMoveState::ReachedTarget: // 追逐时索敌
+							CoolDown = Trace.SectorTrace.Chase.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
+							break;
 
-					case EMoveState::MovingToLocation: // 一般情况
-						CoolDown = Trace.SectorTrace.Common.CoolDown;
-						break;
+						case EMoveState::MovingToLocation: // 一般情况
+							CoolDown = Trace.SectorTrace.Common.CoolDown;
+							break;
 
-					case EMoveState::ArrivedAtLocation: // 一般情况
-						CoolDown = Trace.SectorTrace.Common.CoolDown;
-						break;
+						case EMoveState::ArrivedAtLocation: // 一般情况
+							CoolDown = Trace.SectorTrace.Common.CoolDown;
+							break;
 					}
 
 					Tracing.TimeLeft = CoolDown;
@@ -414,6 +415,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FPatrol& Patrol = Subject.GetTraitRef<FPatrol>();
 				FChase& Chase = Subject.GetTraitRef<FChase>();
 				FMoving& Moving = Subject.GetTraitRef<FMoving>();
+				FNavigating& Navigating = Subject.GetTraitRef<FNavigating>();
 
 				// 确定用哪一套索敌参数
 				bool bFinalCheckVisibility = false;
@@ -554,127 +556,141 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				if (bCanTrace)
 				{
 					// Draw Debug Config
+					FTraceDrawDebugConfig EmptyDebugConfig;
+
 					FTraceDrawDebugConfig DebugConfig;
 					DebugConfig.bDrawDebugShape = bFinalDrawDebugShape;
 					DebugConfig.Color = FColor::Orange;
 					DebugConfig.Duration = Tracing.TimeLeft;
 					DebugConfig.LineThickness = 0.f;
 
-					//if (!Tracing.TraceResult.IsValid()) Tracing.TraceResult = FSubjectHandle();
+					if (bFinalDrawDebugShape)
+					{
+						FDebugSectorConfig SectorConfig1;
+						SectorConfig1.Location = Located.Location;
+						SectorConfig1.Radius = FinalRange;
+						SectorConfig1.Height = FinalHeight;
+						SectorConfig1.Direction = Directed.Direction.GetSafeNormal2D();
+						SectorConfig1.Angle = FinalAngle;
+						SectorConfig1.Duration = DebugConfig.Duration;
+						SectorConfig1.Color = DebugConfig.Color;
+						SectorConfig1.LineThickness = 10;
+						SectorConfig1.DepthPriority = 0;
+
+						DebugSectorQueue.Enqueue(SectorConfig1);
+
+						FDebugSectorConfig SectorConfig2;
+						SectorConfig2.Location = Located.Location;
+						SectorConfig2.Radius = FinalRange;
+						SectorConfig2.Height = FinalHeight;
+						SectorConfig2.Direction = Directed.Direction.GetSafeNormal2D();
+						SectorConfig2.Angle = FinalAngle;
+						SectorConfig2.Duration = DebugConfig.Duration;
+						SectorConfig2.Color = DebugConfig.Color;
+						SectorConfig2.LineThickness = 0;
+						SectorConfig2.DepthPriority = 3;
+
+						DebugSectorQueue.Enqueue(SectorConfig2);
+					}
+
 					Tracing.TraceResult = FSubjectHandle();
 
 					// Do trace
 					switch (Trace.Mode)
 					{
-					case ETraceMode::TargetIsPlayer_0:
-					{
-						if (bPlayerIsValid)
+						case ETraceMode::TargetIsPlayer_0:
 						{
-							// 高度检查
-							float HeightDifference = PlayerLocation.Z - Located.Location.Z;
-
-							if (HeightDifference <= FinalHeight)
+							if (bPlayerIsValid)
 							{
-								// 计算目标半径和实际距离平方
-								float PlayerRadius = PlayerHandle.HasTrait<FCollider>() ? PlayerHandle.GetTrait<FCollider>().Radius : 0;
-								float CombinedRadiusSquared = FMath::Square(FinalRange);
-								float DistanceSquared = FVector::DistSquared(Located.Location, PlayerLocation);
+								// 高度检查
+								float HeightDifference = PlayerLocation.Z - Located.Location.Z;
 
-								// 距离检查 - 使用距离平方
-								if (DistanceSquared <= CombinedRadiusSquared)
+								if (HeightDifference <= FinalHeight)
 								{
-									// 角度检查
-									const FVector ToPlayerDir = (PlayerLocation - Located.Location).GetSafeNormal();
-									const float DotValue = FVector::DotProduct(Directed.Direction, ToPlayerDir);
-									const float AngleDiff = FMath::RadiansToDegrees(FMath::Acos(DotValue));
+									// 计算目标半径和实际距离平方
+									float PlayerRadius = PlayerHandle.HasTrait<FCollider>() ? PlayerHandle.GetTrait<FCollider>().Radius : 0;
+									float CombinedRadiusSquared = FMath::Square(FinalRange);
+									float DistanceSquared = FVector::DistSquared(Located.Location, PlayerLocation);
 
-									if (AngleDiff <= FinalAngle * 0.5f)
+									// 距离检查 - 使用距离平方
+									if (DistanceSquared <= CombinedRadiusSquared)
 									{
-										if (bFinalCheckVisibility && IsValid(Tracing.NeighborGrid))
+										// 角度检查
+										const FVector ToPlayerDir = (PlayerLocation - Located.Location).GetSafeNormal();
+										const float DotValue = FVector::DotProduct(Directed.Direction, ToPlayerDir);
+										const float AngleDiff = FMath::RadiansToDegrees(FMath::Acos(DotValue));
+
+										if (AngleDiff <= FinalAngle * 0.5f)
 										{
-											bool Hit = false;
-											FTraceResult Result;
+											if (bFinalCheckVisibility && IsValid(Tracing.NeighborGrid))
+											{
+												bool Hit = false;
+												FTraceResult Result;
 
-											Tracing.NeighborGrid->SphereSweepForObstacle(Located.Location, PlayerLocation, 1, DebugConfig, Hit, Result);
+												Tracing.NeighborGrid->SphereSweepForObstacle(Located.Location, PlayerLocation, 1, EmptyDebugConfig, Hit, Result);
 
-											if (!Hit)
+												if (!Hit)
+												{
+													Tracing.TraceResult = PlayerHandle;
+												}
+											}
+											else
 											{
 												Tracing.TraceResult = PlayerHandle;
 											}
 										}
-										else
-										{
-											Tracing.TraceResult = PlayerHandle;
-										}
 									}
 								}
 							}
+
+							break;
 						}
 
-						if (bFinalDrawDebugShape)
+						case ETraceMode::SectorTraceByTraits:
 						{
-							FDebugSectorConfig SectorConfig;
-							SectorConfig.Location = Located.Location;
-							SectorConfig.Radius = FinalRange;
-							SectorConfig.Height = FinalHeight;
-							SectorConfig.Direction = Directed.Direction.GetSafeNormal2D();
-							SectorConfig.Angle = FinalAngle;
-							SectorConfig.Duration = DebugConfig.Duration;
-							SectorConfig.Color = DebugConfig.Color;
-							SectorConfig.LineThickness = DebugConfig.LineThickness;
-
-							DebugSectorQueue.Enqueue(SectorConfig);
-							//UE_LOG(LogTemp, Log, TEXT("Enqueue"));
-						}
-
-						break;
-					}
-
-					case ETraceMode::SectorTraceByTraits:
-					{
-						if (LIKELY(IsValid(Tracing.NeighborGrid)))
-						{
-							FFilter TargetFilter;
-							bool Hit;
-							TArray<FTraceResult> Results;
-
-							TargetFilter.Include(Trace.IncludeTraits);
-							TargetFilter.Exclude(Trace.ExcludeTraits);
-
-							const FVector TraceDirection = Directed.Direction.GetSafeNormal2D();
-
-							// ignore self
-							FSubjectArray IgnoreList;
-							IgnoreList.Subjects.Add(FSubjectHandle(Subject));
-
-							Tracing.NeighborGrid->SectorTraceForSubjects
-							(
-								1,
-								Located.Location,   // 检测原点
-								FinalRange,         // 检测半径
-								FinalHeight,        // 检测高度
-								TraceDirection,     // 扇形方向
-								FinalAngle,         // 扇形角度
-								bFinalCheckVisibility,
-								Located.Location,
-								1,
-								ESortMode::NearToFar,
-								Located.Location,
-								IgnoreList,
-								TargetFilter,       // 过滤条件
-								DebugConfig,
-								Hit,
-								Results              // 输出结果
-							);
-
-							// 直接使用结果（扇形检测已包含角度验证）
-							if (Hit && Results[0].Subject.IsValid())
+							if (LIKELY(IsValid(Tracing.NeighborGrid)))
 							{
-								Tracing.TraceResult = Results[0].Subject;
+								FFilter TargetFilter;
+								bool Hit;
+								TArray<FTraceResult> Results;
+
+								TargetFilter.Include(Trace.IncludeTraits);
+								TargetFilter.Exclude(Trace.ExcludeTraits);
+
+								const FVector TraceDirection = Directed.Direction.GetSafeNormal2D();
+
+								// ignore self
+								FSubjectArray IgnoreList;
+								IgnoreList.Subjects.Add(FSubjectHandle(Subject));
+
+								Tracing.NeighborGrid->SectorTraceForSubjects
+								(
+									1,
+									Located.Location,   // 检测原点
+									FinalRange,         // 检测半径
+									FinalHeight,        // 检测高度
+									TraceDirection,     // 扇形方向
+									FinalAngle,         // 扇形角度
+									bFinalCheckVisibility,
+									Located.Location,
+									1,
+									ESortMode::NearToFar,
+									Located.Location,
+									IgnoreList,
+									TargetFilter,       // 过滤条件
+									EmptyDebugConfig,
+									Hit,
+									Results              // 输出结果
+								);
+
+								// 直接使用结果（扇形检测已包含角度验证）
+								if (Hit && Results[0].Subject.IsValid())
+								{
+									Tracing.TraceResult = Results[0].Subject;
+								}
 							}
+							break;
 						}
-						break;
-					}
 					}
 
 					bHasValidTraceResult = Tracing.TraceResult.IsValid();
@@ -991,27 +1007,27 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 				}
 
-				//---------------------------- 速度方向 ----------------------------//
+				//------------------------------ 寻路 ----------------------------//
 
 				FVector DesiredMoveDirection = FVector::ZeroVector;
 
-				if (Move.bEnable && !bIsAppearing)// Appearing不寻路
+				const bool bShouldPathfind = Move.bEnable && !bIsAppearing && !bIsSleeping && !bIsAttacking && !bIsDying;// 需要寻路的情况
+
+				if (bShouldPathfind)
 				{
 					auto PathfindToGoal = [&]()
 						{
 							if (Navigation.bUseAStar)
 							{
-								const bool bIsOnPath = GetSteeringDirection(SelfLocation, Moving.Goal, Navigating.PathPoints, Moving.CurrentVelocity.Size2D(), SelfRadius * 2, SelfRadius * 2, DesiredMoveDirection);
-
-								if (Navigating.TimeLeft <= 0 && !bIsOnPath)
+								// calculate path
+								if (Navigating.PreviousNavMode != ENavMode::AStar || Navigating.TimeLeft <= 0)
 								{
-									Navigating.TimeLeft = Navigation.AStarCoolDown;
-
-									// 调用A*算法
 									FindPathAStar(Navigating.FlowField, SelfLocation, Moving.Goal, Navigating.PathPoints);
+									Navigating.TimeLeft = Navigation.AStarCoolDown;
 								}
 
-								Navigating.TimeLeft = FMath::Clamp(Navigating.TimeLeft - SafeDeltaTime, 0, FLT_MAX);
+								// follow path
+								const bool bIsOnPath = GetSteeringDirection(SelfLocation, Moving.Goal, Navigating.PathPoints, Moving.CurrentVelocity.Size2D(), SelfRadius * 2, SelfRadius * 2, DesiredMoveDirection);
 
 								// Draw Path
 								if (Navigation.bDrawDebugShape && Navigating.PathPoints.Num() > 0)
@@ -1037,17 +1053,22 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 										PreviousPoint = Point;
 									}
 								}
+
+								Navigating.PreviousNavMode = ENavMode::AStar;
+								Navigating.TimeLeft = FMath::Clamp(Navigating.TimeLeft - SafeDeltaTime, 0, FLT_MAX);
 							}
-							else
+							else // approach directly
 							{
 								if (bIsTraceResultHasLocated)
 								{
 									Moving.Goal = Tracing.TraceResult.GetTrait<FLocated>().Location;
 									DesiredMoveDirection = (Moving.Goal - SelfLocation).GetSafeNormal2D();
+									Navigating.PreviousNavMode = ENavMode::ApproachDirectly;
 								}
 								else
 								{
 									Moving.MoveSpeedMult = 0;
+									Navigating.PreviousNavMode = ENavMode::None;
 								}
 							}
 						};
@@ -1064,11 +1085,14 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							{
 								Moving.Goal = Navigating.FlowField->CurrentCellsArray[Navigating.FlowField->CoordToIndex(Cell_BaseFF.goalCoord)].worldLoc;
 								DesiredMoveDirection = Cell_BaseFF.dir.GetSafeNormal2D();
+								Navigating.PreviousNavMode = ENavMode::FlowField;
 							}
 							else
 							{
 								Moving.MoveSpeedMult = 0;
+								Navigating.PreviousNavMode = ENavMode::None;
 							}
+
 						}
 						else
 						{
@@ -1096,6 +1120,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 									{
 										Moving.Goal = BindFlowField.FlowField->CurrentCellsArray[BindFlowField.FlowField->CoordToIndex(Cell_BaseFF.goalCoord)].worldLoc;
 										DesiredMoveDirection = Cell_TargetFF.dir.GetSafeNormal2D();
+										Navigating.PreviousNavMode = ENavMode::FlowField;
 									}
 									else
 									{
@@ -1245,7 +1270,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 					// 减速效果累加
 					Slowing.CombinedSlowMult = 1;
-					for (const auto& Slower : Slowing.Slowers) Slowing.CombinedSlowMult *= 1 - Slower.GetTraitRef<FSlower, EParadigm::Unsafe>().SlowStrength;
+					for (const auto& Slow : Slowing.Slows) Slowing.CombinedSlowMult *= 1 - Slow.GetTraitRef<FSlow, EParadigm::Unsafe>().SlowStrength;
 					Slowing.CombinedSlowMult = FMath::Lerp(Slowing.CombinedSlowMult, 1, Defence.SlowImmune);// 减速抗性
 
 					Moving.MoveSpeedMult *= Slowing.CombinedSlowMult;
@@ -1354,7 +1379,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 					if (UNLIKELY(bIsAiming)) // 如果是攻击状态瞄准阶段，就朝向攻击目标
 					{
-						if (Tracing.TraceResult.IsValid())
+						if (bIsValidTraceResult)
 						{
 							FVector TargetLocation = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
 							Directed.DesiredDirection = (TargetLocation - SelfLocation).GetSafeNormal2D();
@@ -1909,7 +1934,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FTrace& Trace,
 				FTracing& Tracing)
 			{
-				//TRACE_CPUPROFILER_EVENT_SCOPE_STR("Do AgentAttackMain");
 				if (!Attack.bEnable) return;
 
 				// Debug Draw Attack Range
@@ -1924,8 +1948,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				}
 
 				const bool bHasAttacking = Subject.HasTrait<FAttacking>();
+				const bool bCanNewAttack = bHasAttacking ? !Subject.GetTrait<FAttacking>().bEnable : true;
+				bool bShouldNewAttack = false;
 
-				if (!bHasAttacking)
+				if (bCanNewAttack)
 				{
 					const bool bHasValidTarget = Tracing.TraceResult.IsValid() && Tracing.TraceResult.HasTrait<FLocated>() && Tracing.TraceResult.HasTrait<FHealth>();
 
@@ -1944,7 +1970,16 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						// 触发攻击
 						if (DistSquared <= CombinedRadiusSquared && TargetHealth > 0)
 						{
-							Subject.SetTraitDeferred(FAttacking());
+							bShouldNewAttack = true;
+
+							if (bHasAttacking)
+							{
+								Subject.GetTraitRef<FAttacking>().Reset();
+							}
+							else
+							{
+								Subject.SetTraitDeferred(FAttacking());
+							}
 
 							// Attack Aim(Begin) Event
 							if (Subject.HasTrait<FIsSubjective>())
@@ -1957,6 +1992,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							}
 						}
 					}
+				}
+
+				if(!bShouldNewAttack && bHasAttacking && !Subject.GetTrait<FAttacking>().bEnable)
+				{
+					//UE_LOG(LogTemp, Warning, TEXT("Triggerred"));
+					Subject.RemoveTraitDeferred<FAttacking>();
 				}
 
 			}, ThreadsCount, BatchSize);
@@ -1993,7 +2034,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				{
 					if (!Tracing.TraceResult.IsValid() || !Tracing.TraceResult.HasTrait<FLocated>())
 					{
-						Subject.RemoveTraitDeferred<FAttacking>();// 移除攻击状态
+						//Subject.RemoveTraitDeferred<FAttacking>(); // 移除攻击状态
+						Attacking.bEnable = false;
 						Moving.LaunchVelSum = FVector::ZeroVector; // 击退力清零
 						if (!Tracing.TraceResult.IsValid()) Tracing.TimeLeft = 0; //可立即重新索敌
 
@@ -2025,6 +2067,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					{
 						// Animation
 						Animating.AnimState = EAnimState::Attacking;
+						Animating.bUpdateAnimState = true;
 
 						FVector SpawnLocation = Located.Location;
 						FQuat SpawnRotation = Directed.Direction.ToOrientationQuat();
@@ -2213,7 +2256,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						if (Attacking.State == EAttackState::PostCast) // First Execute
 						{
 							Attacking.State = EAttackState::Cooling;
+
 							Animating.AnimState = EAnimState::BS_IdleMove;
+							Animating.bUpdateAnimState = true;
 
 							// Attack Event Cooling 
 							if (Subject.HasTrait<FIsSubjective>())
@@ -2230,7 +2275,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					// 到达计时器时间，本轮攻击结束
 					else if (Attacking.Time >= Attack.DurationPerRound + Attack.CoolDown)
 					{
-						Subject.RemoveTraitDeferred<FAttacking>();// 移除攻击状态
+						Attacking.bEnable = false;
+						//Subject.RemoveTraitDeferred<FAttacking>(); // 移除攻击状态
 						Moving.LaunchVelSum = FVector::ZeroVector; // 击退力清零
 
 						// Can trace again next frame
@@ -2474,43 +2520,43 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	// 减速马甲 | Slower Ghost Subject
+	// 减速马甲 | Slow Ghost Subject
 	#pragma region
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("AgentSlowed");
 
-		auto Chain = Mechanism->EnchainSolid(SlowerFilter);
+		auto Chain = Mechanism->EnchainSolid(SlowFilter);
 		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
 
 		Chain->OperateConcurrently(
 			[&](FSolidSubjectHandle Subject, 
-				FSlower& Slower)
+				FSlow& Slow)
 			{
 				// 减速对象不存在时终止
-				if (!Slower.SlowTarget.IsValid())
+				if (!Slow.SlowTarget.IsValid())
 				{
 					Subject.DespawnDeferred();
 					return;
 				}
 
 				// 第一次运行时，登记到agent的减速马甲列表
-				if (Slower.bJustSpawned)
+				if (Slow.bJustSpawned)
 				{
-					auto& TargetSlowing = Slower.SlowTarget.GetTraitRef<FSlowing, EParadigm::Unsafe>();
+					auto& TargetSlowing = Slow.SlowTarget.GetTraitRef<FSlowing, EParadigm::Unsafe>();
 
 					TargetSlowing.Lock();
-					TargetSlowing.Slowers.Add(FSubjectHandle(Subject));
+					TargetSlowing.Slows.Add(FSubjectHandle(Subject));
 					TargetSlowing.Unlock();
 
-					const bool bHasAnimating = Slower.SlowTarget.HasTrait<FAnimating>();
+					const bool bHasAnimating = Slow.SlowTarget.HasTrait<FAnimating>();
 
 					// 开启材质特效
 					if (bHasAnimating)
 					{
-						auto& TargetAnimating = Slower.SlowTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
+						auto& TargetAnimating = Slow.SlowTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
 
 						TargetAnimating.Lock();
-						switch (Slower.DmgType)
+						switch (Slow.DmgType)
 						{
 							case EDmgType::Fire:
 								TargetAnimating.FireFx = 1;
@@ -2525,19 +2571,19 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						TargetAnimating.Unlock();
 					}
 
-					Slower.bJustSpawned = false;
+					Slow.bJustSpawned = false;
 				}
 
 				// 持续时间结束，解除减速
-				if (Slower.SlowTimeout <= 0)
+				if (Slow.SlowTimeout <= 0)
 				{
-					auto& TargetSlowing = Slower.SlowTarget.GetTraitRef<FSlowing, EParadigm::Unsafe>();
+					auto& TargetSlowing = Slow.SlowTarget.GetTraitRef<FSlowing, EParadigm::Unsafe>();
 
 					TargetSlowing.Lock();
-					TargetSlowing.Slowers.Remove(FSubjectHandle(Subject));
+					TargetSlowing.Slows.Remove(FSubjectHandle(Subject));
 					TargetSlowing.Unlock();
 
-					const bool bHasAnimating = Slower.SlowTarget.HasTrait<FAnimating>();
+					const bool bHasAnimating = Slow.SlowTarget.HasTrait<FAnimating>();
 
 					// 重置材质特效
 					if (bHasAnimating)
@@ -2546,9 +2592,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 						// 是否还存在同伤害类型的减速马甲
 						TargetSlowing.Lock();
-						for (const auto& OtherSlower : TargetSlowing.Slowers)
+						for (const auto& OtherSlow : TargetSlowing.Slows)
 						{
-							if (OtherSlower.GetTrait<FSlower>().DmgType == Slower.DmgType)
+							if (OtherSlow.GetTrait<FSlow>().DmgType == Slow.DmgType)
 							{
 								bHasSameDmgType = true;
 								break;
@@ -2557,12 +2603,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						TargetSlowing.Unlock();
 
 						// 是否还存在同伤害类型的延时伤害马甲
-						auto& TargetTemporalDamaging = Slower.SlowTarget.GetTraitRef<FTemporalDamaging, EParadigm::Unsafe>();
+						auto& TargetTemporalDamaging = Slow.SlowTarget.GetTraitRef<FTemporalDamaging, EParadigm::Unsafe>();
 
 						TargetTemporalDamaging.Lock();
-						for (const auto& OtherTemporalDamager : TargetTemporalDamaging.TemporalDamagers)
+						for (const auto& OtherTemporalDamage : TargetTemporalDamaging.TemporalDamages)
 						{
-							if (OtherTemporalDamager.GetTrait<FTemporalDamager>().DmgType == Slower.DmgType)
+							if (OtherTemporalDamage.GetTrait<FTemporalDamage>().DmgType == Slow.DmgType)
 							{
 								bHasSameDmgType = true;
 								break;
@@ -2573,10 +2619,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						// 如果没有同伤害类型的马甲，可以重置材质特效了
 						if (!bHasSameDmgType)
 						{
-							auto& TargetAnimating = Slower.SlowTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
+							auto& TargetAnimating = Slow.SlowTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
 
 							TargetAnimating.Lock();
-							switch (Slower.DmgType)
+							switch (Slow.DmgType)
 							{
 								case EDmgType::Fire:
 									TargetAnimating.FireFx = 0;
@@ -2597,7 +2643,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				}
 
 				// 更新计时器
-				Slower.SlowTimeout -= SafeDeltaTime;
+				Slow.SlowTimeout -= SafeDeltaTime;
 
 			}, ThreadsCount, BatchSize);
 	}
@@ -2608,37 +2654,37 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("AgentTemporalDamaging");
 
-		auto Chain = Mechanism->EnchainSolid(TemporalDamagerFilter);
+		auto Chain = Mechanism->EnchainSolid(TemporalDamageFilter);
 		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
 
 		Chain->OperateConcurrently(
 			[&](FSolidSubjectHandle Subject, 
-				FTemporalDamager& TemporalDamager)
+				FTemporalDamage& TemporalDamage)
 			{
 				// 伤害对象不存在时终止
-				if (!TemporalDamager.TemporalDamageTarget.IsValid())
+				if (!TemporalDamage.TemporalDamageTarget.IsValid())
 				{
 					Subject.DespawnDeferred();
 					return;
 				}
 
 				// 第一次运行时，登记到agent的持续伤害马甲列表
-				if (TemporalDamager.bJustSpawned)
+				if (TemporalDamage.bJustSpawned)
 				{
-					auto& TargetTemporalDamaging = TemporalDamager.TemporalDamageTarget.GetTraitRef<FTemporalDamaging, EParadigm::Unsafe>();
+					auto& TargetTemporalDamaging = TemporalDamage.TemporalDamageTarget.GetTraitRef<FTemporalDamaging, EParadigm::Unsafe>();
 
 					TargetTemporalDamaging.Lock();
-					TargetTemporalDamaging.TemporalDamagers.Add(FSubjectHandle(Subject));
+					TargetTemporalDamaging.TemporalDamages.Add(FSubjectHandle(Subject));
 					TargetTemporalDamaging.Unlock();
 
-					const bool bHasAnimating = TemporalDamager.TemporalDamageTarget.HasTrait<FAnimating>();
+					const bool bHasAnimating = TemporalDamage.TemporalDamageTarget.HasTrait<FAnimating>();
 
 					if (bHasAnimating)
 					{
-						auto& TargetAnimating = TemporalDamager.TemporalDamageTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
+						auto& TargetAnimating = TemporalDamage.TemporalDamageTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
 
 						TargetAnimating.Lock();
-						switch (TemporalDamager.DmgType)
+						switch (TemporalDamage.DmgType)
 						{
 							case EDmgType::Fire:
 								TargetAnimating.FireFx = 1;
@@ -2653,20 +2699,20 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						TargetAnimating.Unlock();
 					}
 
-					TemporalDamager.bJustSpawned = false;
+					TemporalDamage.bJustSpawned = false;
 				}
 
 				// 持续伤害结束时终止
-				if (TemporalDamager.RemainingTemporalDamage <= 0 || TemporalDamager.CurrentSegment >= TemporalDamager.TemporalDmgSegment)
+				if (TemporalDamage.RemainingTemporalDamage <= 0 || TemporalDamage.CurrentSegment >= TemporalDamage.TemporalDmgSegment)
 				{
-					auto& TargetTemporalDamaging = TemporalDamager.TemporalDamageTarget.GetTraitRef<FTemporalDamaging, EParadigm::Unsafe>();
+					auto& TargetTemporalDamaging = TemporalDamage.TemporalDamageTarget.GetTraitRef<FTemporalDamaging, EParadigm::Unsafe>();
 
 					// 从马甲列表移除
 					TargetTemporalDamaging.Lock();
-					TargetTemporalDamaging.TemporalDamagers.Remove(FSubjectHandle(Subject));
+					TargetTemporalDamaging.TemporalDamages.Remove(FSubjectHandle(Subject));
 					TargetTemporalDamaging.Unlock();
 
-					const bool bHasAnimating = TemporalDamager.TemporalDamageTarget.HasTrait<FAnimating>();
+					const bool bHasAnimating = TemporalDamage.TemporalDamageTarget.HasTrait<FAnimating>();
 
 					// 重置材质特效
 					if (bHasAnimating)
@@ -2675,9 +2721,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 						// 是否还存在同伤害类型的延时伤害马甲
 						TargetTemporalDamaging.Lock();
-						for (const auto& OtherTemporalDamager : TargetTemporalDamaging.TemporalDamagers)
+						for (const auto& OtherTemporalDamage : TargetTemporalDamaging.TemporalDamages)
 						{
-							if (OtherTemporalDamager.GetTrait<FTemporalDamager>().DmgType == TemporalDamager.DmgType)
+							if (OtherTemporalDamage.GetTrait<FTemporalDamage>().DmgType == TemporalDamage.DmgType)
 							{
 								bHasSameDmgType = true;
 								break;
@@ -2686,12 +2732,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						TargetTemporalDamaging.Unlock();
 
 						// 是否还存在同伤害类型的减速马甲
-						auto& TargetSlowing = TemporalDamager.TemporalDamageTarget.GetTraitRef<FSlowing, EParadigm::Unsafe>();
+						auto& TargetSlowing = TemporalDamage.TemporalDamageTarget.GetTraitRef<FSlowing, EParadigm::Unsafe>();
 
 						TargetSlowing.Lock();
-						for (const auto& OtherSlower : TargetSlowing.Slowers)
+						for (const auto& OtherSlow : TargetSlowing.Slows)
 						{
-							if (OtherSlower.GetTrait<FSlower>().DmgType == TemporalDamager.DmgType)
+							if (OtherSlow.GetTrait<FSlow>().DmgType == TemporalDamage.DmgType)
 							{
 								bHasSameDmgType = true;
 								break;
@@ -2702,10 +2748,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						// 如果没有同伤害类型的马甲，可以重置材质特效了
 						if (!bHasSameDmgType)
 						{
-							auto& TargetAnimating = TemporalDamager.TemporalDamageTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
+							auto& TargetAnimating = TemporalDamage.TemporalDamageTarget.GetTraitRef<FAnimating, EParadigm::Unsafe>();
 
 							TargetAnimating.Lock();
-							switch (TemporalDamager.DmgType)
+							switch (TemporalDamage.DmgType)
 							{
 								case EDmgType::Fire:
 									TargetAnimating.FireFx = 0;
@@ -2725,32 +2771,32 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					return;
 				}
 
-				TemporalDamager.TemporalDamageTimeout -= SafeDeltaTime;
+				TemporalDamage.TemporalDamageTimeout -= SafeDeltaTime;
 
 				// 倒计时结束，造成一次伤害
-				if (TemporalDamager.TemporalDamageTimeout <= 0)
+				if (TemporalDamage.TemporalDamageTimeout <= 0)
 				{
 					// 计算本次伤害值
 					float ThisSegmentDamage = 0.0f;
 
 					// 扣除目标生命值
-					if (TemporalDamager.TemporalDamageTarget.HasTrait<FHealth>())
+					if (TemporalDamage.TemporalDamageTarget.HasTrait<FHealth>())
 					{
-						auto& TargetHealth = TemporalDamager.TemporalDamageTarget.GetTraitRef<FHealth, EParadigm::Unsafe>();
+						auto& TargetHealth = TemporalDamage.TemporalDamageTarget.GetTraitRef<FHealth, EParadigm::Unsafe>();
 
 						if (TargetHealth.Current > 0)
 						{
 							// 计算本次伤害值
-							float DamagePerSegment = TemporalDamager.TotalTemporalDamage / TemporalDamager.TemporalDmgSegment;
+							float DamagePerSegment = TemporalDamage.TotalTemporalDamage / TemporalDamage.TemporalDmgSegment;
 
 							// 确保最后一段使用剩余伤害值
-							if (TemporalDamager.CurrentSegment == TemporalDamager.TemporalDmgSegment - 1)
+							if (TemporalDamage.CurrentSegment == TemporalDamage.TemporalDmgSegment - 1)
 							{
-								ThisSegmentDamage = TemporalDamager.RemainingTemporalDamage;
+								ThisSegmentDamage = TemporalDamage.RemainingTemporalDamage;
 							}
 							else
 							{
-								ThisSegmentDamage = FMath::Min(DamagePerSegment, TemporalDamager.RemainingTemporalDamage);
+								ThisSegmentDamage = FMath::Min(DamagePerSegment, TemporalDamage.RemainingTemporalDamage);
 							}
 
 							float ClampedDamage = FMath::Min(ThisSegmentDamage, TargetHealth.Current);
@@ -2759,16 +2805,16 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							TargetHealth.DamageToTake.Enqueue(ClampedDamage);
 
 							// 记录伤害施加者
-							TargetHealth.DamageInstigator.Enqueue(TemporalDamager.TemporalDamageInstigator);
+							TargetHealth.DamageInstigator.Enqueue(TemporalDamage.TemporalDamageInstigator);
 
 							TargetHealth.HitDirection.Enqueue(FVector(0,0,0.0001f));
 
 							//Temporal.TemporalDamageTarget.SetFlag(NeedSettleDmgFlag, true);
 
 							// 生成伤害数字
-							if (TemporalDamager.TemporalDamageTarget.HasTrait<FTextPopUp>())
+							if (TemporalDamage.TemporalDamageTarget.HasTrait<FTextPopUp>())
 							{
-								const auto& TextPopUp = TemporalDamager.TemporalDamageTarget.GetTraitRef<FTextPopUp, EParadigm::Unsafe>();
+								const auto& TextPopUp = TemporalDamage.TemporalDamageTarget.GetTraitRef<FTextPopUp, EParadigm::Unsafe>();
 
 								if (TextPopUp.Enable)
 								{
@@ -2787,23 +2833,23 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 										Style = 2;
 									}
 
-									float Radius = TemporalDamager.TemporalDamageTarget.HasTrait<FGridData>() ? TemporalDamager.TemporalDamageTarget.GetTraitRef<FGridData, EParadigm::Unsafe>().Radius : 0;
-									FVector Location = TemporalDamager.TemporalDamageTarget.HasTrait<FLocated>() ? TemporalDamager.TemporalDamageTarget.GetTraitRef<FLocated, EParadigm::Unsafe>().Location : FVector::ZeroVector;
+									float Radius = TemporalDamage.TemporalDamageTarget.HasTrait<FGridData>() ? TemporalDamage.TemporalDamageTarget.GetTraitRef<FGridData, EParadigm::Unsafe>().Radius : 0;
+									FVector Location = TemporalDamage.TemporalDamageTarget.HasTrait<FLocated>() ? TemporalDamage.TemporalDamageTarget.GetTraitRef<FLocated, EParadigm::Unsafe>().Location : FVector::ZeroVector;
 
-									QueueText(FTextPopConfig(TemporalDamager.TemporalDamageTarget, ClampedDamage, Style, TextPopUp.TextScale, Radius * 1.1, Location));
+									QueueText(FTextPopConfig(TemporalDamage.TemporalDamageTarget, ClampedDamage, Style, TextPopUp.TextScale, Radius * 1.1, Location));
 								}
 							}
 						}
 					}
 
 					// 更新伤害状态
-					TemporalDamager.RemainingTemporalDamage -= ThisSegmentDamage;
-					TemporalDamager.CurrentSegment++;
+					TemporalDamage.RemainingTemporalDamage -= ThisSegmentDamage;
+					TemporalDamage.CurrentSegment++;
 
 					// 重置倒计时（仅当还有剩余伤害段数时）
-					if (TemporalDamager.CurrentSegment < TemporalDamager.TemporalDmgSegment && TemporalDamager.RemainingTemporalDamage > 0)
+					if (TemporalDamage.CurrentSegment < TemporalDamage.TemporalDmgSegment && TemporalDamage.RemainingTemporalDamage > 0)
 					{
-						TemporalDamager.TemporalDamageTimeout = TemporalDamager.TemporalDmgInterval;
+						TemporalDamage.TemporalDamageTimeout = TemporalDamage.TemporalDmgInterval;
 					}
 				}
 
@@ -2967,6 +3013,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						if (Dying.DeathAnimTime == 0)
 						{
 							Animating.AnimState = EAnimState::Dying;
+							Animating.bUpdateAnimState = true;
 						}
 
 						Dying.DeathAnimTime += SafeDeltaTime;
@@ -2981,11 +3028,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-
-	//------------------ 投射物 | Projectile --------------------
+	//------------------- 投射物 | Projectile --------------------
 
 	// 投射物马甲 | Projectile Ghost Subject
-
 
 	//-------------------- 渲染 | Rendering ------------------------
 
@@ -3015,14 +3060,18 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				const bool bIsDying = Subject.HasTrait<FDying>();
 				const bool bIsMoving = !bIsAppearing && !bIsAttacking && !bIsDying;
 
-				if (bIsMoving) Animating.AnimState = EAnimState::BS_IdleMove;
+				if (bIsMoving && Animating.AnimState != EAnimState::BS_IdleMove)
+				{
+					Animating.AnimState = EAnimState::BS_IdleMove;
+					Animating.bUpdateAnimState = true;
+				}
 
 				// 动画状态机 | Anim State Machine
 				switch (Animating.AnimState) // i sampled vat 3 times in shader. the following code use them to simulate an idle-move-montage state machine with anim blending
 				{
 					case EAnimState::BS_IdleMove:
 					{
-						if (Animating.AnimState != Animating.PreviousAnimState)
+						if (Animating.bUpdateAnimState)
 						{
 							if (Animating.CurrentMontageSlot == 1)
 							{
@@ -3046,6 +3095,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							Animating.AnimLerp1 = 1;
 
 							Animating.PreviousAnimState = Animating.AnimState;
+							Animating.bUpdateAnimState = false;
 						}
 
 						// write blendspace ratio into AnimLerp0
@@ -3067,7 +3117,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 					case EAnimState::Appearing:
 					{
-						if (Animating.AnimState != Animating.PreviousAnimState)
+						if (Animating.bUpdateAnimState)
 						{
 							Animating.CurrentMontageSlot = 2;
 
@@ -3079,6 +3129,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							Animating.AnimLerp1 = 1;
 
 							Animating.PreviousAnimState = Animating.AnimState;
+							Animating.bUpdateAnimState = false;
 						}
 
 						break;
@@ -3086,7 +3137,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 					case EAnimState::Attacking:
 					{
-						if (Animating.AnimState != Animating.PreviousAnimState)
+						if (Animating.bUpdateAnimState)
 						{
 							if (Animating.PreviousAnimState == EAnimState::BS_IdleMove)
 							{
@@ -3119,6 +3170,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							}
 
 							Animating.PreviousAnimState = Animating.AnimState;
+							Animating.bUpdateAnimState = false;
 						}
 
 						if (Animating.CurrentMontageSlot == 1)
@@ -3149,7 +3201,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 					case EAnimState::Dying:
 					{
-						if (Animating.AnimState != Animating.PreviousAnimState)
+						if (Animating.bUpdateAnimState)
 						{
 							if (Animating.PreviousAnimState == EAnimState::BS_IdleMove)
 							{
@@ -3182,6 +3234,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							}
 
 							Animating.PreviousAnimState = Animating.AnimState;
+							Animating.bUpdateAnimState = false;
 						}
 
 						if (Animating.CurrentMontageSlot == 1)
@@ -3430,7 +3483,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 			});
 	}
 	#pragma endregion
-
 
 	//------------------游戏线程逻辑 | Game Thread Logic--------------------
 
@@ -4060,7 +4112,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				Config.Color, // 橙色扇形
 				false, // 非持久
 				Config.Duration, // 显示0.1秒
-				0, // 深度优先级
+				Config.DepthPriority, // 深度优先级
 				Config.LineThickness // 线宽
 			);
 
@@ -4104,20 +4156,23 @@ void ABattleFrameBattleControl::DefineFilters()
 	AgentStatFilter = FFilter::Make<FStatistics>();
 	AgentMayDieFilter = FFilter::Make<FMayDie>();
 	AgentAppeaFilter = FFilter::Make<FAgent, FRendering, FLocated, FDirected, FScaled, FAppear, FAppearing, FAnimation, FActivated>();
+
 	AgentTraceFilter = FFilter::Make<FAgent, FLocated, FDirected, FScaled, FCollider, FSleep, FPatrol, FTrace, FTracing, FMoving, FRendering, FActivated>().Exclude<FAppearing, FAttacking, FDying>();
+	AgentSleepFilter = FFilter::Make<FAgent, FLocated, FDirected, FScaled, FCollider, FSleep, FSleeping, FTrace, FTracing, FMove, FMoving, FRendering, FActivated>().Exclude<FAppearing, FAttacking, FDying>();
+	AgentPatrolFilter = FFilter::Make<FAgent, FLocated, FDirected, FScaled, FCollider, FPatrol, FPatrolling, FTrace, FTracing, FMove, FMoving, FRendering, FActivated>().Exclude<FAppearing, FSleeping, FAttacking, FDying>();
+
 	AgentAttackFilter = FFilter::Make<FAgent, FAttack, FRendering, FLocated, FDirected, FCollider, FScaled, FTrace, FActivated>().Exclude<FAppearing, FSleeping, FPatrolling, FDying>();
 	AgentAttackingFilter = FFilter::Make<FAgent, FAttack, FRendering, FLocated, FDirected, FScaled, FAnimation, FAttacking, FMove, FMoving, FTrace, FTracing, FDebuff, FDamage, FDefence, FSlowing, FActivated>().Exclude<FAppearing, FSleeping, FPatrolling, FDying>();
+	
 	AgentBeingHitFilter = FFilter::Make<FAgent, FScaled, FRendering, FHit, FBeingHit, FAnimation, FCurves, FActivated>();
 	AgentHealthBarFilter = FFilter::Make<FAgent, FRendering, FHealth, FHealthBar, FActivated>();
 	AgentDeathFilter = FFilter::Make<FAgent, FRendering, FDeath, FLocated, FDirected, FScaled, FDying, FTrace, FTracing, FMove, FMoving, FAnimating, FCurves, FActivated>();
-	AgentSleepFilter = FFilter::Make<FAgent, FLocated, FDirected, FScaled, FCollider, FSleep, FSleeping, FTrace, FTracing, FMove, FMoving, FRendering, FActivated>().Exclude<FAppearing, FAttacking, FDying>();
-	AgentPatrolFilter = FFilter::Make<FAgent, FLocated, FDirected, FScaled, FCollider, FPatrol, FPatrolling, FTrace, FTracing, FMove, FMoving, FRendering, FActivated>().Exclude<FAppearing, FSleeping, FAttacking, FDying>();
 	AgentMoveFilter = FFilter::Make<FAgent, FRendering, FAnimation, FMove, FMoving, FChase, FLocated, FDirected, FScaled, FCollider, FAttack, FTrace, FTracing, FNavigation, FNavigating, FAvoidance, FAvoiding, FDefence, FPatrol, FGridData, FSlowing, FActivated>();
 	AgentStateMachineFilter = FFilter::Make<FAgent, FAnimation, FRendering, FAppear, FAttack, FDeath, FMoving, FSlowing, FActivated>();
 	AgentRenderFilter = FFilter::Make<FAgent, FRendering, FLocated, FDirected, FScaled, FCollider, FAnimation, FHealth, FHealthBar, FPoppingText, FActivated>();
 
-	TemporalDamagerFilter = FFilter::Make<FTemporalDamager>();
-	SlowerFilter = FFilter::Make<FSlower>();
+	TemporalDamageFilter = FFilter::Make<FTemporalDamage>();
+	SlowFilter = FFilter::Make<FSlow>();
 
 	SpawnActorsFilter = FFilter::Make<FActorSpawnConfig_Final>();
 	SpawnFxFilter = FFilter::Make<FFxConfig_Final>();
@@ -4307,8 +4362,8 @@ void ABattleFrameBattleControl::ApplyDamageToSubjects(const FSubjectArray& Subje
 			// 持续伤害
 			if (Debuff.TemporalDmgParams.bDealTemporalDmg)
 			{
-				// Record for spawning of TemporalDamager
-				FTemporalDamager TemporalDamager;
+				// Record for spawning of TemporalDamage
+				FTemporalDamage TemporalDamage;
 
 				float TotalTemporalDmg = Debuff.TemporalDmgParams.TemporalDmg;
 
@@ -4328,27 +4383,27 @@ void ABattleFrameBattleControl::ApplyDamageToSubjects(const FSubjectArray& Subje
 						break;
 				}
 
-				TemporalDamager.TotalTemporalDamage = TotalTemporalDmg;
+				TemporalDamage.TotalTemporalDamage = TotalTemporalDmg;
 
-				if (TemporalDamager.TotalTemporalDamage > 0)
+				if (TemporalDamage.TotalTemporalDamage > 0)
 				{
-					TemporalDamager.TemporalDamageTarget = Overlapper;
-					TemporalDamager.RemainingTemporalDamage = TemporalDamager.TotalTemporalDamage;
+					TemporalDamage.TemporalDamageTarget = Overlapper;
+					TemporalDamage.RemainingTemporalDamage = TemporalDamage.TotalTemporalDamage;
 
 					if (DmgInstigator.IsValid())
 					{
-						TemporalDamager.TemporalDamageInstigator = DmgInstigator;
+						TemporalDamage.TemporalDamageInstigator = DmgInstigator;
 					}
 					else
 					{
-						TemporalDamager.TemporalDamageInstigator = FSubjectHandle();
+						TemporalDamage.TemporalDamageInstigator = FSubjectHandle();
 					}
 
-					TemporalDamager.TemporalDmgSegment = Debuff.TemporalDmgParams.TemporalDmgSegment;
-					TemporalDamager.TemporalDmgInterval = Debuff.TemporalDmgParams.TemporalDmgInterval;
-					TemporalDamager.DmgType = Damage.DmgType;
+					TemporalDamage.TemporalDmgSegment = Debuff.TemporalDmgParams.TemporalDmgSegment;
+					TemporalDamage.TemporalDmgInterval = Debuff.TemporalDmgParams.TemporalDmgInterval;
+					TemporalDamage.DmgType = Damage.DmgType;
 
-					Mechanism->SpawnSubject(TemporalDamager);
+					Mechanism->SpawnSubject(TemporalDamage);
 				}
 			}
 		}
@@ -4372,15 +4427,15 @@ void ABattleFrameBattleControl::ApplyDamageToSubjects(const FSubjectArray& Subje
 		// 减速
 		if (Debuff.SlowParams.bCanSlow && bHasSlowing)
 		{
-			// Record for spawning of Slower
-			FSlower Slower;
+			// Record for spawning of Slow
+			FSlow Slow;
 
-			Slower.SlowTarget = Overlapper;
-			Slower.SlowStrength = Debuff.SlowParams.SlowStrength;
-			Slower.SlowTimeout = Debuff.SlowParams.SlowTime;
-			Slower.DmgType = Damage.DmgType;
+			Slow.SlowTarget = Overlapper;
+			Slow.SlowStrength = Debuff.SlowParams.SlowStrength;
+			Slow.SlowTimeout = Debuff.SlowParams.SlowTime;
+			Slow.DmgType = Damage.DmgType;
 
-			Mechanism->SpawnSubject(Slower);
+			Mechanism->SpawnSubject(Slow);
 		}
 
 		//-----------其它效果------------
@@ -4661,8 +4716,8 @@ void ABattleFrameBattleControl::ApplyDamageToSubjectsDeferred(const FSubjectArra
 			// 持续伤害
 			if (Debuff.TemporalDmgParams.bDealTemporalDmg)
 			{
-				// Record for spawning of TemporalDamager
-				FTemporalDamager TemporalDamager;
+				// Record for spawning of TemporalDamage
+				FTemporalDamage TemporalDamage;
 
 				float TotalTemporalDmg = Debuff.TemporalDmgParams.TemporalDmg;
 
@@ -4682,27 +4737,27 @@ void ABattleFrameBattleControl::ApplyDamageToSubjectsDeferred(const FSubjectArra
 					break;
 				}
 
-				TemporalDamager.TotalTemporalDamage = TotalTemporalDmg;
+				TemporalDamage.TotalTemporalDamage = TotalTemporalDmg;
 
-				if (TemporalDamager.TotalTemporalDamage > 0)
+				if (TemporalDamage.TotalTemporalDamage > 0)
 				{
-					TemporalDamager.TemporalDamageTarget = Overlapper;
-					TemporalDamager.RemainingTemporalDamage = TemporalDamager.TotalTemporalDamage;
+					TemporalDamage.TemporalDamageTarget = Overlapper;
+					TemporalDamage.RemainingTemporalDamage = TemporalDamage.TotalTemporalDamage;
 
 					if (DmgInstigator.IsValid())
 					{
-						TemporalDamager.TemporalDamageInstigator = DmgInstigator;
+						TemporalDamage.TemporalDamageInstigator = DmgInstigator;
 					}
 					else
 					{
-						TemporalDamager.TemporalDamageInstigator = FSubjectHandle();
+						TemporalDamage.TemporalDamageInstigator = FSubjectHandle();
 					}
 
-					TemporalDamager.TemporalDmgSegment = Debuff.TemporalDmgParams.TemporalDmgSegment;
-					TemporalDamager.TemporalDmgInterval = Debuff.TemporalDmgParams.TemporalDmgInterval;
-					TemporalDamager.DmgType = Damage.DmgType;
+					TemporalDamage.TemporalDmgSegment = Debuff.TemporalDmgParams.TemporalDmgSegment;
+					TemporalDamage.TemporalDmgInterval = Debuff.TemporalDmgParams.TemporalDmgInterval;
+					TemporalDamage.DmgType = Damage.DmgType;
 
-					Mechanism->SpawnSubjectDeferred(TemporalDamager);
+					Mechanism->SpawnSubjectDeferred(TemporalDamage);
 				}
 			}
 		}
@@ -4728,15 +4783,15 @@ void ABattleFrameBattleControl::ApplyDamageToSubjectsDeferred(const FSubjectArra
 		// 减速
 		if (Debuff.SlowParams.bCanSlow && bHasSlowing)
 		{
-			// Record for deferred spawning of Slower
-			FSlower Slower;
+			// Record for deferred spawning of Slow
+			FSlow Slow;
 
-			Slower.SlowTarget = Overlapper;
-			Slower.SlowStrength = Debuff.SlowParams.SlowStrength;
-			Slower.SlowTimeout = Debuff.SlowParams.SlowTime;
-			Slower.DmgType = Damage.DmgType;
+			Slow.SlowTarget = Overlapper;
+			Slow.SlowStrength = Debuff.SlowParams.SlowStrength;
+			Slow.SlowTimeout = Debuff.SlowParams.SlowTime;
+			Slow.DmgType = Damage.DmgType;
 
-			Mechanism->SpawnSubjectDeferred(Slower);
+			Mechanism->SpawnSubjectDeferred(Slow);
 		}
 
 		//-----------其它效果------------

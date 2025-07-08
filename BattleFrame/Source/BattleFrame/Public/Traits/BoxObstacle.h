@@ -5,7 +5,7 @@
 #include "SubjectHandle.h"
 #include "BoxObstacle.generated.h"
 
-USTRUCT(BlueprintType, Category = "RVO")
+USTRUCT(BlueprintType)
 struct BATTLEFRAME_API FBoxObstacle
 {
     GENERATED_BODY()

@@ -9,15 +9,10 @@
 #include "HAL/Platform.h"
 #include "Traits/SubType.h"
 #include "Traits/Animation.h"
-#include "Traits/Animating.h"
 #include "Traits/RenderBatchData.h"
-#include "Traits/Located.h" 
 #include "Traits/Rendering.h"
-#include "Traits/Directed.h"
-#include "Traits/Scaled.h"
 #include "Traits/Collider.h"
 #include "Traits/HealthBar.h"
-#include "Traits/Agent.h"
 #include "BattleFrameBattleControl.h"
 
 

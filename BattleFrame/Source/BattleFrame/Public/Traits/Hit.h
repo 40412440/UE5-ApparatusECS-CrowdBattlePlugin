@@ -30,3 +30,25 @@ public:
     TArray<FSoundConfig> PlaySound;
 
 };
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FBeingHit
+{
+	GENERATED_BODY()
+
+public:
+
+	float GlowTime = 0.0f;
+	float JiggleTime = 0.0f;
+
+
+	FORCEINLINE void ResetGlow()
+	{
+		GlowTime = 0.0f;
+	}
+
+	FORCEINLINE void ResetJiggle()
+	{
+		JiggleTime = 0.0f;
+	}
+};

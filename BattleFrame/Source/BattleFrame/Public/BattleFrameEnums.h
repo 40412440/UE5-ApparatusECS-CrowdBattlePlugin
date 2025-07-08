@@ -72,6 +72,39 @@ enum class EMoveState : uint8
 	ArrivedAtLocation UMETA(DisplayName = "ArrivedAtLocation", ToolTip = "已抵达目标位置")
 };
 
+UENUM(BlueprintType)
+enum class EOrientMode : uint8
+{
+	ToPath UMETA(DisplayName = "ToPath"),
+	ToMovement UMETA(DisplayName = "ToMovement"),
+	ToMovementForwardAndBackward UMETA(DisplayName = "ToMovementForwardAndBackward")
+};
+
+UENUM(BlueprintType)
+enum class EGroundTraceMode : uint8
+{
+	FlowFieldAndSphereTrace	UMETA(DisplayName = "FlowFieldAndSphereTrace", Tooltip = "仅在地形边缘使用球形检测, 推荐"),
+	FlowField				UMETA(DisplayName = "FlowField", Tooltip = "使用流场采样高度，悬崖边缘可能不够精确"),
+	SphereTrace				UMETA(DisplayName = "SphereTrace", Tooltip = "使用球形扫描检测，很精确但非常贵")
+};
+
+UENUM(BlueprintType)
+enum class ETraceMode : uint8
+{
+	TargetIsPlayer_0 UMETA(DisplayName = "IsPlayer_0", Tooltip = "索敌目标为玩家0"),
+	SectorTraceByTraits UMETA(DisplayName = "ByTraits", Tooltip = "根据特征进行扇形索敌")
+};
+
+UENUM(BlueprintType)
+enum class ENavMode : uint8
+{
+	None UMETA(DisplayName = "Dirty", Tooltip = ""),
+	AStar UMETA(DisplayName = "AStar", Tooltip = ""),
+	FlowField UMETA(DisplayName = "FlowField", Tooltip = ""),
+	ApproachDirectly UMETA(DisplayName = "ApproachDirectly", Tooltip = "")
+};
+
+
 // Event State
 UENUM(BlueprintType)
 enum class EAppearEventState : uint8

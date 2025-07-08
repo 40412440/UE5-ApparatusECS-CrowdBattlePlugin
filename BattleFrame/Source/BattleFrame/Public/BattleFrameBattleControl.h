@@ -28,57 +28,32 @@
 #include "BattleFrameEnums.h"
 
 #include "Traits/Debuff.h"
-#include "Traits/DmgSphere.h"
 #include "Traits/Animation.h"
-#include "Traits/Animating.h"
 #include "Traits/Trace.h"
 #include "Traits/Damage.h"
-#include "Traits/PoppingText.h"
-#include "Traits/Scaled.h"
-#include "Traits/Located.h"
 #include "Traits/Avoidance.h"
-#include "Traits/Avoiding.h"
 #include "Traits/Collider.h"
 #include "Traits/SubType.h"
 #include "Traits/Move.h"
-#include "Traits/Moving.h"
 #include "Traits/Navigation.h"
-#include "Traits/Navigating.h"
 #include "Traits/Death.h"
-#include "Traits/Dying.h"
-#include "Traits/DeathAnim.h"
-#include "Traits/DeathDissolve.h"
 #include "Traits/Appear.h"
-#include "Traits/Appearing.h"
-#include "Traits/AppearAnim.h"
-#include "Traits/AppearDissolve.h"
 #include "Traits/Rendering.h"
 #include "Traits/RenderBatchData.h"
 #include "Traits/Attack.h"
-#include "Traits/Attacking.h"
-#include "Traits/TemporalDamager.h"
+#include "Traits/TemporalDamage.h"
 #include "Traits/Hit.h"
-#include "Traits/HitGlow.h"
-#include "Traits/Jiggle.h"
 #include "Traits/Health.h"
 #include "Traits/HealthBar.h"
 #include "Traits/TextPopUp.h"
-#include "Traits/Slowing.h"
-#include "Traits/Slower.h"
+#include "Traits/Slow.h"
 #include "Traits/SpawningFx.h"
 #include "Traits/Defence.h"
-#include "Traits/Agent.h"
 #include "Traits/SphereObstacle.h"
-#include "Traits/Directed.h"
 #include "Traits/Curves.h"
-#include "Traits/Corpse.h"
 #include "Traits/Statistics.h"
 #include "Traits/BindFlowField.h"
-#include "Traits/ValidSubjects.h"
 #include "Traits/Sleep.h"
-#include "Traits/Sleeping.h"
-#include "Traits/Patrolling.h"
-#include "Traits/TemporalDamaging.h"
 #include "Traits/ActorSpawnConfig.h"
 #include "Traits/SoundConfig.h"
 #include "Traits/FxConfig.h"
@@ -89,8 +64,8 @@
 #include "Traits/Patrol.h"
 #include "Traits/TextPopConfig.h"
 #include "Traits/MayDie.h"
-#include "Traits/Tracing.h"
-#include "Traits/BeingHit.h"
+#include "Traits/PrimaryType.h"
+#include "Traits/Transform.h"
 
 #include "BattleFrameBattleControl.generated.h"
 
@@ -105,7 +80,7 @@ class BATTLEFRAME_API ABattleFrameBattleControl : public AActor
 public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = BattleFrame)
-	int32 MaxThreadsAllowed = FMath::Clamp(FPlatformMisc::NumberOfWorkerThreadsToSpawn(), 1, 20);
+	int32 MaxThreadsAllowed = FMath::Clamp(FPlatformMisc::NumberOfWorkerThreadsToSpawn(), 1, FPlatformMisc::NumberOfCoresIncludingHyperthreads());
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = BattleFrame)
 	int32 MinBatchSizeAllowed = 100;
@@ -170,8 +145,8 @@ private:
 	FFilter AgentAttackFilter;
 	FFilter AgentAttackingFilter;
 	FFilter AgentBeingHitFilter;
-	FFilter TemporalDamagerFilter;
-	FFilter SlowerFilter;
+	FFilter TemporalDamageFilter;
+	FFilter SlowFilter;
 	FFilter DecideHealthFilter;
 	FFilter AgentHealthBarFilter;
 	FFilter AgentDeathFilter;

@@ -5,13 +5,7 @@
 #include "BattleFrameStructs.h"
 #include "Trace.generated.h"
 
-
-UENUM(BlueprintType)
-enum class ETraceMode : uint8
-{
-	TargetIsPlayer_0 UMETA(DisplayName = "IsPlayer_0", Tooltip = "索敌目标为玩家0"),
-	SectorTraceByTraits UMETA(DisplayName = "ByTraits", Tooltip = "根据特征进行扇形索敌")
-};
+class UNeighborGridComponent;
 
 USTRUCT(BlueprintType)
 struct BATTLEFRAME_API FSectorTraceShape
@@ -33,7 +27,6 @@ public:
 	FSectorTraceParamsSpecific Chase = FSectorTraceParamsSpecific{ false };
 
 };
-
 
 USTRUCT(BlueprintType)
 struct BATTLEFRAME_API FTrace
@@ -64,3 +57,59 @@ public:
 	TArray<UScriptStruct*> ExcludeTraits;
 
 };
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FTracing
+{
+	GENERATED_BODY()
+
+private:
+
+	mutable std::atomic<bool> LockFlag{ false };
+
+public:
+
+	void Lock() const
+	{
+		while (LockFlag.exchange(true, std::memory_order_acquire));
+	}
+
+	void Unlock() const
+	{
+		LockFlag.store(false, std::memory_order_release);
+	}
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "索敌结果"))
+	FSubjectHandle TraceResult = FSubjectHandle();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "位于的邻居网格"))
+	UNeighborGridComponent* NeighborGrid = nullptr;
+
+	float TimeLeft = 0.f;
+
+
+	FTracing() {};
+
+	FTracing(const FTracing& Tracing)
+	{
+		LockFlag.store(Tracing.LockFlag.load());
+
+		NeighborGrid = Tracing.NeighborGrid;
+		TraceResult = Tracing.TraceResult;
+		TimeLeft = Tracing.TimeLeft;
+	}
+
+	FTracing& operator=(const FTracing& Tracing)
+	{
+		LockFlag.store(Tracing.LockFlag.load());
+
+		NeighborGrid = Tracing.NeighborGrid;
+		TraceResult = Tracing.TraceResult;
+		TimeLeft = Tracing.TimeLeft;
+
+		return *this;
+	}
+};
+

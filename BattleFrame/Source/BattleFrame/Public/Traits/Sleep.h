@@ -21,3 +21,13 @@ public:
 	bool bWakeOnHit = true;
 
 };
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FSleeping
+{
+	GENERATED_BODY()
+
+public:
+
+
+};

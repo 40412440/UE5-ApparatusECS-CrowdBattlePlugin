@@ -38,6 +38,19 @@ public:
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
     TArray<FSoundConfig> PlaySound;
 
-    //bool bAppearStarted = false;
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FAppearing
+{
+    GENERATED_BODY()
+
+public:
+
+    bool bInitialized = false;
+    bool bStarted = false;
+    float Time = 0.0f;
+    float AnimTime = 0.0f;
+    float DissolveTime = 0.f;
 
 };

@@ -1,6 +1,6 @@
 #include "BattleFrameActor.h"
 #include "BattleFrameBattleControl.h"
-#include "Traits/Prop.h"
+
 
 ABattleFrameActor::ABattleFrameActor()
 {

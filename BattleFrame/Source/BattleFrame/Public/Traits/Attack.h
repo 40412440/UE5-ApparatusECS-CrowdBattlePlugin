@@ -68,3 +68,22 @@ public:
 	//add a random stream variable
 
 };
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FAttacking
+{
+	GENERATED_BODY()
+
+public:
+
+	float Time = 0.0f;
+	EAttackState State = EAttackState::Aim;
+	bool bEnable = true;
+
+	FORCEINLINE void Reset()
+	{
+		Time = 0.0f;
+		State = EAttackState::Aim;
+		bEnable = true;
+	}
+};

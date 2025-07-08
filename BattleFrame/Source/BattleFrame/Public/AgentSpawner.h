@@ -13,6 +13,8 @@
 #include "Math/Vector2D.h"
 #include "AgentConfigDataAsset.h"
 #include "BattleFrameStructs.h"
+#include "Traits/PrimaryType.h"
+#include "Traits/Transform.h"
 #include "AgentSpawner.generated.h"
 
 class ABattleFrameBattleControl;
