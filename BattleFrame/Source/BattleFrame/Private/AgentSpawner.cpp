@@ -43,15 +43,16 @@ void AAgentSpawner::BeginPlay()
 
 TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsRectangular
 (
-    int32 ConfigIndex,
-    int32 Quantity,
-    int32 Team,
-    FVector Origin,
-    FVector2D Region,
-    FVector2D LaunchVelocity,
-    EInitialDirection InitialDirection,
-    FVector2D CustomDirection,
-    FSpawnerMult Multipliers
+    const bool bAutoActivate,
+    const int32 ConfigIndex,
+    const int32 Quantity,
+    const int32 Team,
+    const FVector Origin,
+    const FVector2D Region,
+    const FVector2D LaunchVelocity,
+    const EInitialDirection InitialDirection,
+    const FVector2D CustomDirection,
+    const FSpawnerMult Multipliers
 )
 {
     TRACE_CPUPROFILER_EVENT_SCOPE_STR("SpawnAgentsRectangular");
@@ -78,6 +79,10 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsRectangular
         }
     }
 
+    if (!AgentConfigAssets.IsValidIndex(ConfigIndex))
+    {
+        return SpawnedAgents;
+    }
     if (!BattleControl)
     {
         BattleControl = Cast<ABattleFrameBattleControl>(UGameplayStatics::GetActorOfClass(CurrentWorld, ABattleFrameBattleControl::StaticClass()));
@@ -88,10 +93,6 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsRectangular
         }
     }
 
-    if (!AgentConfigAssets.IsValidIndex(ConfigIndex))
-    {
-        return SpawnedAgents;
-    }
 
     UAgentConfigDataAsset* DataAsset = AgentConfigAssets[ConfigIndex].LoadSynchronous();
 
@@ -231,7 +232,7 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsRectangular
         // Spawn using the modified record
         const auto Agent = Mechanism->SpawnSubject(Config);
 
-        ActivateAgent(Agent);
+        if(bAutoActivate) ActivateAgent(Agent);
 
         SpawnedAgents.Add(Agent);
     }
@@ -241,6 +242,7 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsRectangular
 
 TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsByConfigRectangular
 (
+    const bool bAutoActivate,
     const TSoftObjectPtr<UAgentConfigDataAsset> DataAsset,
     const int32 Quantity,
     const int32 Team,
@@ -424,7 +426,7 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsByConfigRectangular
         // Spawn using the modified record
         const auto Agent = Mechanism->SpawnSubject(Config);
 
-        ActivateAgent(Agent);
+        if (bAutoActivate) ActivateAgent(Agent);
 
         SpawnedAgents.Add(Agent);
     }

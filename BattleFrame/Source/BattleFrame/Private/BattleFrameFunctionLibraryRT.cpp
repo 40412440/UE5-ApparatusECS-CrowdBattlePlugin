@@ -15,6 +15,7 @@
 TArray<FSubjectHandle> UBattleFrameFunctionLibraryRT::SpawnAgentsByConfigRectangular
 (
 	AAgentSpawner* AgentSpawner,
+	bool bAutoActivate,
 	TSoftObjectPtr<UAgentConfigDataAsset> DataAsset,
 	int32 Quantity,
 	int32 Team,
@@ -44,7 +45,7 @@ TArray<FSubjectHandle> UBattleFrameFunctionLibraryRT::SpawnAgentsByConfigRectang
 		return EmptyResult;
 	}
 
-	return AgentSpawner->SpawnAgentsByConfigRectangular(DataAsset, Quantity, Team, Origin, Region, LaunchVelocity, InitialDirection, CustomDirection, Multipliers);
+	return AgentSpawner->SpawnAgentsByConfigRectangular(bAutoActivate, DataAsset, Quantity, Team, Origin, Region, LaunchVelocity, InitialDirection, CustomDirection, Multipliers);
 }
 
 void UBattleFrameFunctionLibraryRT::SphereTraceForSubjects

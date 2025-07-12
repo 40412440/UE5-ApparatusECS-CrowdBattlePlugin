@@ -35,6 +35,7 @@ public:
     static TArray<FSubjectHandle> SpawnAgentsByConfigRectangular
     (
         AAgentSpawner* AgentSpawner = nullptr,
+        bool bAutoActivate = true,
         TSoftObjectPtr<UAgentConfigDataAsset> DataAsset = nullptr,
         int32 Quantity = 1, 
         int32 Team = 0, 

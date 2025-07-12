@@ -13,10 +13,11 @@ class BATTLEFRAME_API UBFSubjectiveAgentComponent : public USubjectiveActorCompo
     GENERATED_BODY()
 
 public:
+
     UBFSubjectiveAgentComponent();
 
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | SubjectiveAgent", meta = (DisplayName = "Initialize With Data Asset"))
-    void InitializeTraits(AActor* OwnerActor);
+    void InitializeSubjectTraits(AActor* OwnerActor);
 
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | SubjectiveAgent", meta = (DisplayName = "Activate Agent"))
     void ActivateAgent(FSubjectHandle Agent);

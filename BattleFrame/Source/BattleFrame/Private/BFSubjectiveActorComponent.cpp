@@ -5,6 +5,8 @@
 #include "Traits/BindFlowField.h"
 #include "Traits/Activated.h"
 #include "Traits/IsSubjective.h"
+#include "Traits/Slow.h"
+#include "Traits/TemporalDamage.h"
 
 UBFSubjectiveActorComponent::UBFSubjectiveActorComponent()
 {
@@ -23,7 +25,7 @@ void UBFSubjectiveActorComponent::BeginPlay()
 {
     Super::BeginPlay();
 
-    InitializeTraits(GetOwner());
+    InitializeSubjectTraits(GetOwner());
 }
 
 void UBFSubjectiveActorComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -33,7 +35,7 @@ void UBFSubjectiveActorComponent::TickComponent(float DeltaTime, ELevelTick Tick
     SyncTransformActorToSubject(GetOwner());
 }
 
-void UBFSubjectiveActorComponent::InitializeTraits(AActor* OwnerActor)
+void UBFSubjectiveActorComponent::InitializeSubjectTraits(AActor* OwnerActor)
 {
     if (!OwnerActor) return;
 

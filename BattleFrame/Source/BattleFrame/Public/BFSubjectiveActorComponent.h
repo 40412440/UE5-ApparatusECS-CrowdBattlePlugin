@@ -15,7 +15,7 @@ public:
     UBFSubjectiveActorComponent();
 
     // Initialize all required traits
-    void InitializeTraits(AActor* OwnerActor);
+    void InitializeSubjectTraits(AActor* OwnerActor);
 
 protected:
     virtual void BeginPlay() override;

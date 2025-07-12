@@ -26,7 +26,7 @@ void UBFSubjectiveAgentComponent::BeginPlay()
 {
     Super::BeginPlay();
 
-    if(bAutoInitWithDataAsset) InitializeTraits(GetOwner());
+    if(bAutoInitWithDataAsset) InitializeSubjectTraits(GetOwner());
 }
 
 void UBFSubjectiveAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -36,7 +36,7 @@ void UBFSubjectiveAgentComponent::TickComponent(float DeltaTime, ELevelTick Tick
     if (bSyncTransformSubjectToActor) SyncTransformSubjectToActor(GetOwner());
 }
 
-void UBFSubjectiveAgentComponent::InitializeTraits(AActor* OwnerActor)
+void UBFSubjectiveAgentComponent::InitializeSubjectTraits(AActor* OwnerActor)
 {
     if (!OwnerActor) return;
 
@@ -155,7 +155,7 @@ void UBFSubjectiveAgentComponent::InitializeTraits(AActor* OwnerActor)
     this->GetHandle()->RemoveAllTraits();
     this->GetHandle()->SetTraits(AgentConfig);
 
-    ActivateAgent(this->GetHandle());
+    if (bAutoActivate) ActivateAgent(this->GetHandle());
 }
 
 void UBFSubjectiveAgentComponent::ActivateAgent(FSubjectHandle Agent)// strange apparatus bug : don't use get ref or the value may expire later when use
@@ -277,7 +277,6 @@ void UBFSubjectiveAgentComponent::ActivateAgent(FSubjectHandle Agent)// strange 
         }
     }
 }
-
 
 void UBFSubjectiveAgentComponent::SyncTransformSubjectToActor(AActor* OwnerActor)
 {
