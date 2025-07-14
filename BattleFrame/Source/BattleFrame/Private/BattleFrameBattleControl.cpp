@@ -2287,21 +2287,17 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	// 受击效果 | Hit Effect
 	#pragma region
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("AgentBeingHit");
-
-		auto Chain = Mechanism->EnchainSolid(AgentBeingHitFilter);// it processes hero and prop type too
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("SubjectBeingHit");
+		 
+		auto Chain = Mechanism->EnchainSolid(SubjectBeingHitFilter);// it processes hero and prop type too
 		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
 
 		Chain->OperateConcurrently(
 			[&](FSolidSubjectHandle Subject,
-				FHealth& Health,
 				FLocated& Located,
 				FScaled& Scaled,
-				FHit& Hit,
-				FBeingHit& BeingHit,
-				FCurves& Curves,
-				FAnimating& Animating,
-				FHealthBar& HealthBar)
+				FHealth& Health,
+				FBeingHit& BeingHit)
 			{
 				bool bCanRemoveBeingHit = true;
 
@@ -2376,113 +2372,131 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				}
 
 				// 更新血条
-				if (HealthBar.bShowHealthBar)
+				const bool bHasHealthBar = Subject.HasTrait<FHealthBar>();
+
+				if(bHasHealthBar)
 				{
-					HealthBar.TargetRatio = FMath::Clamp(Health.Current / Health.Maximum, 0, 1);
-					HealthBar.CurrentRatio = FMath::FInterpConstantTo(HealthBar.CurrentRatio, HealthBar.TargetRatio, SafeDeltaTime, HealthBar.InterpSpeed * 0.1);
+					auto& HealthBar = Subject.GetTraitRef<FHealthBar>();
 
-					if (HealthBar.TargetRatio - HealthBar.CurrentRatio != 0)
+					if (HealthBar.bShowHealthBar)
 					{
-						bCanRemoveBeingHit = false;
-					}
+						HealthBar.TargetRatio = FMath::Clamp(Health.Current / Health.Maximum, 0, 1);
+						HealthBar.CurrentRatio = FMath::FInterpConstantTo(HealthBar.CurrentRatio, HealthBar.TargetRatio, SafeDeltaTime, HealthBar.InterpSpeed * 0.1);
 
-					if (HealthBar.HideOnFullHealth)
-					{
-						if (Health.Current == Health.Maximum)
+						if (HealthBar.TargetRatio - HealthBar.CurrentRatio != 0)
 						{
-							HealthBar.Opacity = 0;
+							bCanRemoveBeingHit = false;
+						}
+
+						if (HealthBar.HideOnFullHealth)
+						{
+							if (Health.Current == Health.Maximum)
+							{
+								HealthBar.Opacity = 0;
+							}
+							else
+							{
+								HealthBar.Opacity = 1;
+							}
 						}
 						else
 						{
 							HealthBar.Opacity = 1;
 						}
+
+						if (HealthBar.HideOnEmptyHealth && Health.Current <= 0)
+						{
+							HealthBar.Opacity = 0;
+						}
 					}
 					else
-					{
-						HealthBar.Opacity = 1;
-					}
-
-					if (HealthBar.HideOnEmptyHealth && Health.Current <= 0)
 					{
 						HealthBar.Opacity = 0;
 					}
 				}
-				else
+
+				const bool bHasHit = Subject.HasTrait<FHit>();
+				const bool bHasCurves = Subject.HasTrait<FCurves>();
+				const bool bHasAnimating = Subject.HasTrait<FAnimating>();
+
+				if(bHasHit && bHasCurves && bHasAnimating)
 				{
-					HealthBar.Opacity = 0;
-				}
+					auto& Hit = Subject.GetTraitRef<FHit>();
+					auto& Curves = Subject.GetTraitRef<FCurves>();
+					auto& Animating = Subject.GetTraitRef<FAnimating>();
 
-				//------------------------ 受击发光 | Hit Glow -------------------------
+					//------------------------ 受击发光 | Hit Glow -------------------------
 
-				const bool bIsGlowing = Subject.HasFlag(HitGlowFlag);
+					const bool bIsGlowing = Subject.HasFlag(HitGlowFlag);
 
-				if (bIsGlowing)
-				{
-					// 获取曲线
-					auto GlowCurve = Curves.HitEmission.GetRichCurve();
-
-					// 检查曲线是否有关键帧
-					if (!GlowCurve || GlowCurve->GetNumKeys() == 0) return;
-
-					// 获取曲线的最后一个关键帧的时间
-					const auto GlowEndTime = GlowCurve->GetLastKey().Time;
-
-					// 受击发光
-					Animating.HitGlow = GlowCurve->Eval(BeingHit.GlowTime);
-
-					// 更新发光时间
-					if (BeingHit.GlowTime < GlowEndTime)
+					if (bIsGlowing)
 					{
-						BeingHit.GlowTime += SafeDeltaTime;
+						// 获取曲线
+						auto GlowCurve = Curves.HitEmission.GetRichCurve();
+
+						// 检查曲线是否有关键帧
+						if (!GlowCurve || GlowCurve->GetNumKeys() == 0) return;
+
+						// 获取曲线的最后一个关键帧的时间
+						const auto GlowEndTime = GlowCurve->GetLastKey().Time;
+
+						// 受击发光
+						Animating.HitGlow = GlowCurve->Eval(BeingHit.GlowTime);
+
+						// 更新发光时间
+						if (BeingHit.GlowTime < GlowEndTime)
+						{
+							BeingHit.GlowTime += SafeDeltaTime;
+						}
+
+						// 计时器完成后删除 Trait
+						if (BeingHit.GlowTime >= GlowEndTime)
+						{
+							Animating.HitGlow = 0; // 重置发光值
+							Subject.SetFlag(HitGlowFlag, false);
+						}
+						else
+						{
+							bCanRemoveBeingHit = false;
+						}
 					}
 
-					// 计时器完成后删除 Trait
-					if (BeingHit.GlowTime >= GlowEndTime)
+					//------------------------ 受击形变 | Hit Jiggle -------------------------
+
+					const bool bIsJiggling = Subject.HasFlag(HitJiggleFlag);
+
+					if (bIsJiggling)
 					{
-						Animating.HitGlow = 0; // 重置发光值
-						Subject.SetFlag(HitGlowFlag, false);
-					}
-					else
-					{
-						bCanRemoveBeingHit = false;
-					}
-				}
+						// 获取曲线
+						auto JiggleCurve = Curves.HitJiggle.GetRichCurve();
 
-				//------------------------ 受击形变 | Hit Jiggle -------------------------
+						// 检查曲线是否有关键帧
+						if (!JiggleCurve || JiggleCurve->GetNumKeys() == 0) return;
 
-				const bool bIsJiggling = Subject.HasFlag(HitJiggleFlag);
+						// 获取曲线的最后一个关键帧的时间
+						const auto JiggleEndTime = JiggleCurve->GetLastKey().Time;
 
-				if (bIsJiggling)
-				{
-					// 获取曲线
-					auto JiggleCurve = Curves.HitJiggle.GetRichCurve();
+						// 受击变形
+						Scaled.RenderScale.X = FMath::Lerp(Scaled.Scale, Scaled.Scale * JiggleCurve->Eval(BeingHit.JiggleTime), Hit.JiggleStr);
+						Scaled.RenderScale.Y = FMath::Lerp(Scaled.Scale, Scaled.Scale * JiggleCurve->Eval(BeingHit.JiggleTime), Hit.JiggleStr);
+						Scaled.RenderScale.Z = FMath::Lerp(Scaled.Scale, Scaled.Scale * (2.f - JiggleCurve->Eval(BeingHit.JiggleTime)), Hit.JiggleStr);
 
-					// 检查曲线是否有关键帧
-					if (!JiggleCurve || JiggleCurve->GetNumKeys() == 0) return;
+						// 更新形变时间
+						if (BeingHit.JiggleTime < JiggleEndTime)
+						{
+							BeingHit.JiggleTime += SafeDeltaTime;
+						}
 
-					// 获取曲线的最后一个关键帧的时间
-					const auto JiggleEndTime = JiggleCurve->GetLastKey().Time;
-
-					// 受击变形
-					Scaled.RenderScale.X = FMath::Lerp(Scaled.Scale, Scaled.Scale * JiggleCurve->Eval(BeingHit.JiggleTime), Hit.JiggleStr);
-					Scaled.RenderScale.Y = FMath::Lerp(Scaled.Scale, Scaled.Scale * JiggleCurve->Eval(BeingHit.JiggleTime), Hit.JiggleStr);
-					Scaled.RenderScale.Z = FMath::Lerp(Scaled.Scale, Scaled.Scale * (2.f - JiggleCurve->Eval(BeingHit.JiggleTime)), Hit.JiggleStr);
-
-					// 更新形变时间
-					if (BeingHit.JiggleTime < JiggleEndTime)
-					{
-						BeingHit.JiggleTime += SafeDeltaTime;
-					}
-
-					// 计时器完成后删除 Trait
-					if (BeingHit.JiggleTime >= JiggleEndTime)
-					{
-						Scaled.RenderScale = FVector(Scaled.Scale); // 恢复原始比例
-						Subject.SetFlag(HitJiggleFlag, false);
-					}
-					else
-					{
-						bCanRemoveBeingHit = false;
+						// 计时器完成后删除 Trait
+						if (BeingHit.JiggleTime >= JiggleEndTime)
+						{
+							Scaled.RenderScale = FVector(Scaled.Scale); // 恢复原始比例
+							Subject.SetFlag(HitJiggleFlag, false);
+						}
+						else
+						{
+							bCanRemoveBeingHit = false;
+						}
 					}
 				}
 
@@ -4120,8 +4134,7 @@ void ABattleFrameBattleControl::DefineFilters()
 	AgentAttackFilter = FFilter::Make<FAgent, FAttack, FRendering, FLocated, FDirected, FCollider, FScaled, FTrace, FActivated>().Exclude<FAppearing, FSleeping, FPatrolling, FDying>();
 	AgentAttackingFilter = FFilter::Make<FAgent, FAttack, FRendering, FLocated, FDirected, FScaled, FAnimation, FAttacking, FMove, FMoving, FTrace, FTracing, FDebuff, FDamage, FDefence, FSlowing, FActivated>().Exclude<FAppearing, FSleeping, FPatrolling, FDying>();
 
-	AgentBeingHitFilter = FFilter::Make<FAgent, FScaled, FRendering, FHit, FBeingHit, FAnimation, FCurves, FHealthBar, FActivated>();
-	AgentHealthBarFilter = FFilter::Make<FAgent, FRendering, FHealth, FHealthBar, FActivated>();
+	SubjectBeingHitFilter = FFilter::Make<FLocated, FScaled, FHealth, FBeingHit, FActivated>();
 	AgentDeathFilter = FFilter::Make<FAgent, FRendering, FDeath, FLocated, FDirected, FScaled, FDying, FTrace, FTracing, FMove, FMoving, FAnimating, FCurves, FActivated>();
 	AgentMoveFilter = FFilter::Make<FAgent, FRendering, FAnimation, FMove, FMoving, FChase, FLocated, FDirected, FScaled, FCollider, FAttack, FTrace, FTracing, FNavigation, FNavigating, FAvoidance, FAvoiding, FDefence, FPatrol, FGridData, FSlowing, FActivated>();
 	AgentStateMachineFilter = FFilter::Make<FAgent, FAnimation, FRendering, FAppear, FAttack, FDeath, FMoving, FSlowing, FActivated>();
@@ -4636,7 +4649,6 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuff(const FSubjectArray& S
 
 			// 记录伤害施加者
 			Health.DamageInstigator.Enqueue(DmgInstigator);
-			Health.DamageInstigator.Enqueue(DmgCauser);
 			DmgResult.InstigatorSubject = DmgInstigator;
 			DmgResult.CauserSubject = DmgCauser;
 
@@ -4846,6 +4858,7 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuff(const FSubjectArray& S
 			FHitData HitData;
 			HitData.SelfSubject = DmgResult.DamagedSubject;
 			HitData.InstigatorSubject = DmgResult.InstigatorSubject;
+			HitData.CauserSubject = DmgResult.CauserSubject;
 			HitData.IsCritical = DmgResult.IsCritical;
 			HitData.IsKill = DmgResult.IsKill;
 			HitData.DmgDealt = DmgResult.DmgDealt;
@@ -4979,7 +4992,6 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuffDeferred(const FSubject
 
 			// 记录伤害施加者
 			Health.DamageInstigator.Enqueue(DmgInstigator);
-			Health.DamageInstigator.Enqueue(DmgCauser);
 			DmgResult.InstigatorSubject = DmgInstigator;
 			DmgResult.CauserSubject = DmgCauser;
 
@@ -5190,6 +5202,7 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuffDeferred(const FSubject
 			FHitData HitData;
 			HitData.SelfSubject = DmgResult.DamagedSubject;
 			HitData.InstigatorSubject = DmgResult.InstigatorSubject;
+			HitData.CauserSubject = DmgResult.CauserSubject;
 			HitData.IsCritical = DmgResult.IsCritical;
 			HitData.IsKill = DmgResult.IsKill;
 			HitData.DmgDealt = DmgResult.DmgDealt;
@@ -5338,7 +5351,6 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(const FVector& Origin
 
 			// 记录伤害施加者
 			Health.DamageInstigator.Enqueue(DmgInstigator);
-			Health.DamageInstigator.Enqueue(DmgCauser);
 			DmgResult.InstigatorSubject = DmgInstigator;
 			DmgResult.CauserSubject = DmgCauser;
 
@@ -5548,6 +5560,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(const FVector& Origin
 			FHitData HitData;
 			HitData.SelfSubject = DmgResult.DamagedSubject;
 			HitData.InstigatorSubject = DmgResult.InstigatorSubject;
+			HitData.CauserSubject = DmgResult.CauserSubject;
 			HitData.IsCritical = DmgResult.IsCritical;
 			HitData.IsKill = DmgResult.IsKill;
 			HitData.DmgDealt = DmgResult.DmgDealt;
@@ -5696,7 +5709,6 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuffDeferred(const FVector
 
 			// 记录伤害施加者
 			Health.DamageInstigator.Enqueue(DmgInstigator);
-			Health.DamageInstigator.Enqueue(DmgCauser);
 			DmgResult.InstigatorSubject = DmgInstigator;
 			DmgResult.CauserSubject = DmgCauser;
 
@@ -5905,6 +5917,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuffDeferred(const FVector
 			FHitData HitData;
 			HitData.SelfSubject = DmgResult.DamagedSubject;
 			HitData.InstigatorSubject = DmgResult.InstigatorSubject;
+			HitData.CauserSubject = DmgResult.CauserSubject;
 			HitData.IsCritical = DmgResult.IsCritical;
 			HitData.IsKill = DmgResult.IsKill;
 			HitData.DmgDealt = DmgResult.DmgDealt;
@@ -6048,7 +6061,6 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(const FVector& StartLoc
 
 			// 记录伤害施加者
 			Health.DamageInstigator.Enqueue(DmgInstigator);
-			Health.DamageInstigator.Enqueue(DmgCauser);
 			DmgResult.InstigatorSubject = DmgInstigator;
 			DmgResult.CauserSubject = DmgCauser;
 
@@ -6257,6 +6269,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(const FVector& StartLoc
 			FHitData HitData;
 			HitData.SelfSubject = DmgResult.DamagedSubject;
 			HitData.InstigatorSubject = DmgResult.InstigatorSubject;
+			HitData.CauserSubject = DmgResult.CauserSubject;
 			HitData.IsCritical = DmgResult.IsCritical;
 			HitData.IsKill = DmgResult.IsKill;
 			HitData.DmgDealt = DmgResult.DmgDealt;
@@ -6400,7 +6413,6 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(const FVector& 
 
 			// 记录伤害施加者
 			Health.DamageInstigator.Enqueue(DmgInstigator);
-			Health.DamageInstigator.Enqueue(DmgCauser);
 			DmgResult.InstigatorSubject = DmgInstigator;
 			DmgResult.CauserSubject = DmgCauser;
 
@@ -6609,6 +6621,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(const FVector& 
 			FHitData HitData;
 			HitData.SelfSubject = DmgResult.DamagedSubject;
 			HitData.InstigatorSubject = DmgResult.InstigatorSubject;
+			HitData.CauserSubject = DmgResult.CauserSubject;
 			HitData.IsCritical = DmgResult.IsCritical;
 			HitData.IsKill = DmgResult.IsKill;
 			HitData.DmgDealt = DmgResult.DmgDealt;

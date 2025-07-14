@@ -144,7 +144,7 @@ private:
 	FFilter AgentTraceFilter;
 	FFilter AgentAttackFilter;
 	FFilter AgentAttackingFilter;
-	FFilter AgentBeingHitFilter;
+	FFilter SubjectBeingHitFilter;
 	FFilter TemporalDamageFilter;
 	FFilter SlowFilter;
 	FFilter DecideHealthFilter;
