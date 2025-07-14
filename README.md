@@ -77,3 +77,83 @@ In progress:
 7. RTS demo map
 
 ## Leave a star if you find this project useful ;)
+
+# UE5-ApparatusECS-群体战斗框架插件
+
+[![加入Discord](https://img.shields.io/badge/Discord-加入聊天-blue?logo=discord)](https://discord.gg/8AUMxq3SgV)  
+[![QQ群](https://img.shields.io/badge/QQ群-916358710-blue?logo=tencentqq)](https://jq.qq.com/?_wv=1027&k=5R5X5wX)
+
+## 版本说明
+仓库版本为当前开发进度版  
+如编译失败请使用发布版本
+
+## 依赖项
+
+本插件开源但依赖以下付费插件：
+
+- **Apparatus ECS框架** (FAB平台付费)  
+  https://www.fab.com/listings/23ddc9c0-a218-44ed-8c0c-ebef362f08d5
+
+- **流场画布** (寻路插件)  
+  由于FFC是我的插件，已附带免费精简版  
+  完整版购买链接：  
+  https://www.fab.com/listings/e306cd3d-9855-45bf-a978-d9ac6ae2ee33
+
+- **动画转贴图** (官方虚幻引擎插件)  
+  引擎自带
+
+## 技术参数
+
+- **状态**：测试版(频繁修改中可能存在bug)
+- **测试平台**：  
+  - Windows  
+  - UE5.3/UE5.4/UE5.5
+- **性能表现**：  
+  - 3万单位60帧  
+  - 6万单位30帧  
+  (AMD Ryzen 5900X + RTX 4080S，CPU瓶颈。Shipping包)
+- **技术栈**：  
+  - ECS逻辑架构  
+  - Niagara+VAT渲染方案  
+  - RVO2避障系统  
+  - 邻居网格碰撞检测  
+  - 流场+A*导航
+
+## 功能特性
+
+完整的群体战斗系统。演示地图包含在插件内容目录中。
+
+- **AI行为**：  
+  - 出生/休眠/巡逻/追击/攻击/受击/死亡，各含丰富参数  
+  - 击飞/减速/持续伤害等Debuff效果，附带材质特效  
+  - 2.5D移动支持飞行/坠落/崎岖地形移动  
+  - 导航避障支持球体和方体障碍物
+- **AI感知**：  
+  - 视觉系统支持，可追踪视野内目标
+- **蓝图工作流**：  
+  - 通过数据资产生成单位  
+  - 将单位绑定到Actor  
+  - 运行时设置特性值控制行为  
+  - 追踪单位并施加伤害/减益  
+  - 在出生/攻击/受击/死亡时生成特效和音效  
+  - 调试图形绘制
+- **Niagara GPU粒子VAT**：  
+  - 基础待机-移动-蒙太奇动画状态机混合  
+  - 编辑器工具一键配置VAT
+- **Niagara GPU粒子UI**：  
+  - 血条/文字弹出/地面光环
+- **Niagara CPU批量发射器**：  
+  - 批量粒子爆发/拖尾效果
+
+## 开发路线
+
+进行中：  
+1. 塔防演示地图  
+2. ECS投射物系统  
+3. 二维渲染支持  
+5. MassEntity分支  
+5. 基于TurboSequence的GPU蒙皮支持  
+6. 网络同步功能  
+7. RTS演示地图  
+
+## 如果觉得项目有用请点个star ;)
