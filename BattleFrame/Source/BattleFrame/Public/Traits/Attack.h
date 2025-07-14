@@ -5,6 +5,7 @@
 #include "ActorSpawnConfig.h"
 #include "SoundConfig.h"
 #include "FxConfig.h"
+#include "ProjectileConfig.h"
 #include "Attack.generated.h"
 
 UENUM(BlueprintType)
@@ -55,6 +56,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否播放攻击动画"))
 	bool bCanPlayAnim = true;
+
+	//UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
+	//TArray<FProjectileConfig_Ballistic> SpawnProjectile;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
 	TArray<FActorSpawnConfig_Attack> SpawnActor;

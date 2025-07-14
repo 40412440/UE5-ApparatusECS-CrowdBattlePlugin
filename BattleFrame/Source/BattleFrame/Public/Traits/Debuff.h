@@ -75,4 +75,108 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "减速"))
 	FSlowParams SlowParams = FSlowParams();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "是否启用距离衰减，目前为线性衰减"))
+	bool bUseFalloff = false;
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FDebuff_Point
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否启用减益"))
+	bool bEnable = true;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "击退"))
+	FLaunchParams LaunchParams = FLaunchParams();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "延时伤害"))
+	FTemporalDmgParams TemporalDmgParams = FTemporalDmgParams();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "减速"))
+	FSlowParams SlowParams = FSlowParams();
+
+	// 默认构造函数
+	FDebuff_Point() = default;
+
+	// 从FDebuff构造
+	FDebuff_Point(const FDebuff& InDebuff)
+	{
+		bEnable = InDebuff.bEnable;
+		LaunchParams = InDebuff.LaunchParams;
+		TemporalDmgParams = InDebuff.TemporalDmgParams;
+		SlowParams = InDebuff.SlowParams;
+		// 注意：FDebuff_Point没有bUseFalloff属性，所以不复制
+	}
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FDebuff_Radial
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否启用减益"))
+	bool bEnable = true;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "击退"))
+	FLaunchParams LaunchParams = FLaunchParams();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "延时伤害"))
+	FTemporalDmgParams TemporalDmgParams = FTemporalDmgParams();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "减速"))
+	FSlowParams SlowParams = FSlowParams();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "是否启用距离衰减，目前为线性衰减"))
+	bool bUseFalloff = false;
+
+	// 默认构造函数
+	FDebuff_Radial() = default;
+
+	// 从FDebuff构造
+	FDebuff_Radial(const FDebuff& InDebuff)
+	{
+		bEnable = InDebuff.bEnable;
+		LaunchParams = InDebuff.LaunchParams;
+		TemporalDmgParams = InDebuff.TemporalDmgParams;
+		SlowParams = InDebuff.SlowParams;
+		bUseFalloff = InDebuff.bUseFalloff;  // 复制范围衰减属性
+	}
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FDebuff_Beam
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否启用减益"))
+	bool bEnable = true;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "击退"))
+	FLaunchParams LaunchParams = FLaunchParams();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "延时伤害"))
+	FTemporalDmgParams TemporalDmgParams = FTemporalDmgParams();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "减速"))
+	FSlowParams SlowParams = FSlowParams();
+
+	// 默认构造函数
+	FDebuff_Beam() = default;
+
+	// 从FDebuff构造
+	FDebuff_Beam(const FDebuff& InDebuff)
+	{
+		bEnable = InDebuff.bEnable;
+		LaunchParams = InDebuff.LaunchParams;
+		TemporalDmgParams = InDebuff.TemporalDmgParams;
+		SlowParams = InDebuff.SlowParams;
+	}
 };

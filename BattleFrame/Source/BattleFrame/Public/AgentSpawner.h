@@ -32,29 +32,23 @@ public:
 
 	AAgentSpawner();
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	TArray<TSoftObjectPtr<UAgentConfigDataAsset>> AgentConfigAssets;
+	//UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	//TArray<TSoftObjectPtr<UAgentConfigDataAsset>> AgentConfigAssets;
 
 	UWorld* CurrentWorld = nullptr;
 	AMechanism* Mechanism = nullptr;
 	ABattleFrameBattleControl* BattleControl = nullptr;
 
-	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::M;
-
-	UFUNCTION(BlueprintCallable, Category = "BattleFrame | AgentSpawner", meta = (DisplayName = "Spawn Agents By Config Index(Legacy)"))
-	TArray<FSubjectHandle> SpawnAgentsRectangular
-	(
-		const bool bAutoActivate = true,
-		const int32 ConfigIndex = 0,
-		const int32 Quantity = 1,
-		const int32 Team = 0,
-		const FVector Origin = FVector::ZeroVector,
-		const FVector2D Region = FVector2D::ZeroVector,
-		const FVector2D LaunchVelocity = FVector2D::ZeroVector,
-		const EInitialDirection InitialDirection = EInitialDirection::FacePlayer,
-		const FVector2D CustomDirection = FVector2D(1, 0),
-		const FSpawnerMult Multipliers = FSpawnerMult()
-	);
+	EFlagmarkBit AppearAnimFlag = EFlagmarkBit::A;
+	EFlagmarkBit AppearDissolveFlag = EFlagmarkBit::B;
+	EFlagmarkBit HitGlowFlag = EFlagmarkBit::C;
+	EFlagmarkBit HitJiggleFlag = EFlagmarkBit::D;
+	EFlagmarkBit HitPoppingTextFlag = EFlagmarkBit::E;
+	EFlagmarkBit HitDecideHealthFlag = EFlagmarkBit::F;
+	EFlagmarkBit DeathAnimFlag = EFlagmarkBit::G;
+	EFlagmarkBit DeathDissolveFlag = EFlagmarkBit::H;
+	EFlagmarkBit DeathDisableCollisionFlag = EFlagmarkBit::I;
+	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::J;
 
 	TArray<FSubjectHandle> SpawnAgentsByConfigRectangular
 	(

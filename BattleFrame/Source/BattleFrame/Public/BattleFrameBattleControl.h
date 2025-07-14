@@ -188,6 +188,8 @@ public:
 		Super::EndPlay(EndPlayReason);
 	}
 
+	//---------------------------------------------Helpers------------------------------------------------------------------
+
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	static ABattleFrameBattleControl* GetInstance()
 	{
@@ -196,20 +198,13 @@ public:
 
 	void DefineFilters();
 
-	void ApplyDamageToSubjects(const FSubjectArray& Subjects, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FVector& HitFromLocation, const FDamage& FDamage, const FDebuff& Debuff, TArray<FDmgResult>& DamageResults);
-
-	void ApplyDamageToSubjectsDeferred(const FSubjectArray& Subjects, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FVector& HitFromLocation, const FDamage& FDamage, const FDebuff& Debuff, TArray<FDmgResult>& DamageResults);
-
 	static FVector FindNewPatrolGoalLocation(const FPatrol Patrol, const FCollider Collider, const FTrace Trace, const FTracing Tracing, const FLocated Located, const FScaled Scaled, int32 MaxAttempts);
+
+	static bool GetInterpedWorldLocation(AFlowField* flowField, const FVector& location, const float angleThreshold, FVector& outInterpolatedWorldLoc);
 
 	static void DrawDebugSector(UWorld* World, const FVector& Center, const FVector& Direction, float Radius, float AngleDegrees, float Height, const FColor& Color, bool bPersistentLines, float LifeTime, uint8 DepthPriority, float Thickness);
 
-	static bool GetInterpolatedWorldLoc(AFlowField* flowField, const FVector& location, const float angleThreshold, FVector& outInterpolatedWorldLoc);
-
-	static void CopyAnimData(FAnimating& Animating, int32 From, int32 To);
-
-
-	//----------------------------------------Helper Functions------------------------------------------------------------------
+	static void CopyPasteAnimData(FAnimating& Animating, int32 From, int32 To);
 
 	FORCEINLINE std::pair<bool, float> ProcessCritDamage(float BaseDamage, float damageMult, float Probability)
 	{
@@ -277,6 +272,24 @@ public:
 		}
 	};
 
+	
+	//---------------------------------------------Damager------------------------------------------------------------------
+
+	void ApplyPointDamageAndDebuff(const FSubjectArray& Subjects, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Point& Damage, const FDebuff_Point& Debuff, TArray<FDmgResult>& DamageResults);
+
+	void ApplyPointDamageAndDebuffDeferred(const FSubjectArray& Subjects, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Point& Damage, const FDebuff_Point& Debuff, TArray<FDmgResult>& DamageResults);
+
+	void ApplyRadialDamageAndDebuff(const FVector& Origin, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Radial& Damage, const FDebuff_Radial& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults);
+
+	void ApplyRadialDamageAndDebuffDeferred(const FVector& Origin, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Radial& Damage, const FDebuff_Radial& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults);
+
+	void ApplyBeamDamageAndDebuff(const FVector& StartLocation, const FVector& EndLocation, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Beam& Damage, const FDebuff_Beam& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults);
+
+	void ApplyBeamDamageAndDebuffDeferred(const FVector& StartLocation, const FVector& EndLocation, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Beam& Damage, const FDebuff_Beam& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults);
+
+	
+	//-------------------------------------------Pack Data------------------------------------------------------------------
+	
 	// PackData ：三个AnimIndex,整数,各分配10位
 	FORCEINLINE static float EncodeAnimationIndices(int AnimIndex0, int AnimIndex1, int AnimIndex2)
 	{

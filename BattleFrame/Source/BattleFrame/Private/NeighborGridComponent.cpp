@@ -450,7 +450,7 @@ void UNeighborGridComponent::SphereSweepForSubjects
 		// 处理零距离情况（使用默认旋转）
 		FRotator ShapeRot = FRotator::ZeroRotator;
 
-		if (TotalDistance > KINDA_SMALL_NUMBER)
+		if (TotalDistance > 0)
 		{
 			Direction /= TotalDistance;
 			ShapeRot = FRotationMatrix::MakeFromZ(Direction).Rotator();
@@ -1047,7 +1047,7 @@ void UNeighborGridComponent::SphereSweepForObstacle
 		// 处理零距离情况（使用默认旋转）
 		FRotator ShapeRot = FRotator::ZeroRotator;
 
-		if (TotalDistance > KINDA_SMALL_NUMBER)
+		if (TotalDistance > 0)
 		{
 			Direction /= TotalDistance;
 			ShapeRot = FRotationMatrix::MakeFromZ(Direction).Rotator();

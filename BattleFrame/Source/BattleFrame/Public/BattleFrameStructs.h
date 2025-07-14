@@ -38,6 +38,9 @@ public:
 	FSubjectHandle InstigatorSubject = FSubjectHandle();
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FSubjectHandle CauserSubject = FSubjectHandle();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool IsCritical = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
@@ -395,6 +398,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	FSubjectHandle InstigatorSubject = FSubjectHandle();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FSubjectHandle CauserSubject = FSubjectHandle();
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool IsCritical = false;

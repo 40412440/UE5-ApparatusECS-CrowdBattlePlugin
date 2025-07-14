@@ -10,7 +10,7 @@
 #include "Async/Async.h"
 #include "Engine/Engine.h"
 
-//-------------------------------Sync Traces-------------------------------
+//---------------------------------Spawning-------------------------------
 
 TArray<FSubjectHandle> UBattleFrameFunctionLibraryRT::SpawnAgentsByConfigRectangular
 (
@@ -48,204 +48,16 @@ TArray<FSubjectHandle> UBattleFrameFunctionLibraryRT::SpawnAgentsByConfigRectang
 	return AgentSpawner->SpawnAgentsByConfigRectangular(bAutoActivate, DataAsset, Quantity, Team, Origin, Region, LaunchVelocity, InitialDirection, CustomDirection, Multipliers);
 }
 
-void UBattleFrameFunctionLibraryRT::SphereTraceForSubjects
-(
-	bool& Hit,
-	TArray<FTraceResult>& TraceResults,
-	ANeighborGridActor* NeighborGridActor,
-	int32 KeepCount,
-	UPARAM(ref) const FVector& Origin,
-	float Radius,
-	bool bCheckVisibility,
-	UPARAM(ref) const FVector& CheckOrigin,
-	float CheckRadius,
-	ESortMode SortMode,
-	UPARAM(ref) const FVector& SortOrigin,
-	UPARAM(ref) const FSubjectArray& IgnoreSubjects,
-	UPARAM(ref) const FFilter& Filter,
-	UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig
-)
-{
-	TraceResults.Reset();
 
-	if (!IsValid(NeighborGridActor))
-	{
-		if (UWorld* World = GEngine->GetCurrentPlayWorld())
-		{
-			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
-			{
-				NeighborGridActor = *It;
-				break;
-			}
-		}
-	}
+//-----------------------------------Misc-------------------------------
 
-	if (!IsValid(NeighborGridActor)) return;
-
-	UNeighborGridComponent* NeighborGrid = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
-
-	NeighborGrid->SphereTraceForSubjects(KeepCount, Origin, Radius, bCheckVisibility, CheckOrigin, CheckRadius, SortMode, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig, Hit, TraceResults);
-}
-
-void UBattleFrameFunctionLibraryRT::SphereSweepForSubjects
-(
-	bool& Hit,
-	TArray<FTraceResult>& TraceResults,
-	ANeighborGridActor* NeighborGridActor,
-	int32 KeepCount,
-	UPARAM(ref) const FVector& Start,
-	UPARAM(ref) const FVector& End,
-	float Radius,
-	bool bCheckVisibility,
-	UPARAM(ref) const FVector& CheckOrigin,
-	float CheckRadius,
-	ESortMode SortMode,
-	UPARAM(ref) const FVector& SortOrigin,
-	UPARAM(ref) const FSubjectArray& IgnoreSubjects,
-	UPARAM(ref) const FFilter& Filter,
-	UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig
-)
-{
-	TraceResults.Reset();
-
-	if (!IsValid(NeighborGridActor))
-	{
-		if (UWorld* World = GEngine->GetCurrentPlayWorld())
-		{
-			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
-			{
-				NeighborGridActor = *It;
-				break;
-			}
-		}
-	}
-
-	if (!IsValid(NeighborGridActor)) return;
-
-	UNeighborGridComponent* NeighborGrid = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
-
-	NeighborGrid->SphereSweepForSubjects(KeepCount, Start, End, Radius, bCheckVisibility, CheckOrigin, CheckRadius, SortMode, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig, Hit, TraceResults);
-}
-
-void UBattleFrameFunctionLibraryRT::SectorTraceForSubjects
-(
-	bool& Hit,
-	TArray<FTraceResult>& TraceResults,
-	ANeighborGridActor* NeighborGridActor,
-	int32 KeepCount,
-	UPARAM(ref) const FVector& Origin,
-	float Radius,
-	float Height,
-	UPARAM(ref) const FVector& ForwardVector,
-	float Angle,
-	bool bCheckVisibility,
-	UPARAM(ref) const FVector& CheckOrigin,
-	float CheckRadius,
-	ESortMode SortMode,
-	UPARAM(ref) const FVector& SortOrigin,
-	UPARAM(ref) const FSubjectArray& IgnoreSubjects,
-	UPARAM(ref) const FFilter& Filter,
-	UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig
-)
-{
-	if (!IsValid(NeighborGridActor))
-	{
-		if (UWorld* World = GEngine->GetCurrentPlayWorld())
-		{
-			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
-			{
-				NeighborGridActor = *It;
-				break;
-			}
-		}
-	}
-
-	if (!IsValid(NeighborGridActor)) return;
-
-	UNeighborGridComponent* NeighborGrid = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
-
-	NeighborGrid->SectorTraceForSubjects(KeepCount, Origin, Radius, Height, ForwardVector, Angle, bCheckVisibility, CheckOrigin, CheckRadius, SortMode, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig, Hit, TraceResults);
-}
-
-void UBattleFrameFunctionLibraryRT::SphereSweepForObstacle
-(
-	bool& Hit,
-	FTraceResult& TraceResult,
-	ANeighborGridActor* NeighborGridActor,
-	UPARAM(ref) const FVector& Start,
-	UPARAM(ref) const FVector& End,
-	float Radius,
-	UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig
-)
-{
-	if (!IsValid(NeighborGridActor))
-	{
-		if (UWorld* World = GEngine->GetCurrentPlayWorld())
-		{
-			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
-			{
-				NeighborGridActor = *It;
-				break;
-			}
-		}
-	}
-
-	if (!IsValid(NeighborGridActor)) return;
-
-	UNeighborGridComponent* NeighborGrid = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
-
-	NeighborGrid->SphereSweepForObstacle(Start, End, Radius, DrawDebugConfig, Hit, TraceResult);
-}
-
-
-void UBattleFrameFunctionLibraryRT::ApplyDamageAndDebuff
-(
-	TArray<FDmgResult>& DamageResults,
-	ABattleFrameBattleControl* BattleControl,
-	UPARAM(ref) const FSubjectArray& Subjects,
-	UPARAM(ref) const FSubjectArray& IgnoreSubjects,
-	UPARAM(ref) const FSubjectHandle DmgInstigator,
-	UPARAM(ref) const FVector& HitFromLocation,
-	UPARAM(ref) const FDamage& Damage,
-	UPARAM(ref) const FDebuff& Debuff
-)
-{
-	DamageResults.Reset();
-
-	// 如果 BattleControl 无效，尝试从 World 查找
-	if (!IsValid(BattleControl))
-	{
-		UWorld* World = GEngine ? GEngine->GetCurrentPlayWorld() : nullptr;
-
-		if (World)
-		{
-			for (TActorIterator<ABattleFrameBattleControl> It(World); It; ++It)
-			{
-				BattleControl = *It;
-				break; // 只取第一个
-			}
-		}
-	}
-
-	// 仍然无效则返回空结果
-	if (!IsValid(BattleControl)) return;
-
-	// 直接填充 DamageResults
-	BattleControl->ApplyDamageToSubjects(Subjects, IgnoreSubjects, DmgInstigator, HitFromLocation, Damage, Debuff, DamageResults);
-}
-
-void UBattleFrameFunctionLibraryRT::SortSubjectsByDistance
-(
-	UPARAM(ref) TArray<FTraceResult>& TraceResults,
-	const FVector& SortOrigin,
-	ESortMode SortMode
-)
+void UBattleFrameFunctionLibraryRT::SortSubjectsByDistance(UPARAM(ref) TArray<FTraceResult>& TraceResults,const FVector& SortOrigin,ESortMode SortMode)
 {
 	// 1. 首先移除所有无效的Subject
 	TraceResults.RemoveAll([](const FTraceResult& TraceResult)
-	{
-		return !TraceResult.Subject.IsValid();
-	});
+		{
+			return !TraceResult.Subject.IsValid();
+		});
 
 	// 2. 检查剩余元素数量
 	if (TraceResults.Num() <= 1)
@@ -261,240 +73,176 @@ void UBattleFrameFunctionLibraryRT::SortSubjectsByDistance
 
 	// 4. 根据模式排序
 	TraceResults.Sort([SortMode](const FTraceResult& A, const FTraceResult& B)
+		{
+			if (SortMode == ESortMode::NearToFar)
+			{
+				return A.CachedDistSq < B.CachedDistSq;  // 从近到远
+			}
+			else
+			{
+				return A.CachedDistSq > B.CachedDistSq;  // 从远到近
+			}
+		});
+}
+
+void UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(int32 IterableNum, int32 MaxThreadsAllowed, int32 MinBatchSizeAllowed, int32& ThreadsCount, int32& BatchSize)
+{
+	// 计算最大可能线程数（考虑最小批次限制）
+	const int32 MaxPossibleThreads = FMath::Clamp(IterableNum / FMath::Max(1, MinBatchSizeAllowed), 1, MaxThreadsAllowed);
+
+	// 最终确定使用的线程数
+	ThreadsCount = FMath::Clamp(MaxPossibleThreads, 1, MaxThreadsAllowed);
+
+	// 计算批次大小（使用向上取整算法解决余数问题）
+	BatchSize = IterableNum / ThreadsCount;
+
+	if (IterableNum % ThreadsCount != 0)
 	{
-		if (SortMode == ESortMode::NearToFar)
-		{
-			return A.CachedDistSq < B.CachedDistSq;  // 从近到远
-		}
-		else
-		{
-			return A.CachedDistSq > B.CachedDistSq;  // 从远到近
-		}
-	});
+		BatchSize += 1;
+	}
+
+	// 最终限制批次大小范围
+	BatchSize = FMath::Clamp(BatchSize, 1, FLT_MAX);
 }
 
 
-//-------------------------------Async Trace-------------------------------
+//-------------------------------Apply Dmg and Debuff-------------------------------
 
-USphereSweepForSubjectsAsyncAction* USphereSweepForSubjectsAsyncAction::SphereSweepForSubjectsAsync
+void UBattleFrameFunctionLibraryRT::ApplyPointDamageAndDebuff
 (
-	const UObject* WorldContextObject,
-	ANeighborGridActor* NeighborGridActor,
-	int32 KeepCount,
-	const FVector Start,
-	const FVector End,
-	float Radius,
-	bool bCheckVisibility,
-	const FVector CheckOrigin,
-	float CheckRadius,
-	ESortMode SortMode,
-	const FVector SortOrigin,
-	const FSubjectArray IgnoreSubjects,
-	const FFilter Filter,
-	const FTraceDrawDebugConfig DrawDebugConfig
+	TArray<FDmgResult>& DamageResults,
+	ABattleFrameBattleControl* BattleControl,
+	UPARAM(ref) const FSubjectArray& Subjects,
+	UPARAM(ref) const FSubjectArray& IgnoreSubjects,
+	UPARAM(ref) const FSubjectHandle DmgInstigator,
+	UPARAM(ref) const FSubjectHandle DmgCauser,
+	UPARAM(ref) const FVector& HitFromLocation,
+	UPARAM(ref) const FDamage_Point& Damage,
+	UPARAM(ref) const FDebuff_Point& Debuff
 )
 {
-	USphereSweepForSubjectsAsyncAction* AsyncAction = NewObject<USphereSweepForSubjectsAsyncAction>();
-	AsyncAction->RegisterWithGameInstance(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	DamageResults.Reset();
 
-	if (!IsValid(NeighborGridActor))
+	// 如果 BattleControl 无效，尝试从 World 查找
+	if (!IsValid(BattleControl))
 	{
-		if (UWorld* World = WorldContextObject->GetWorld())
+		if (UWorld* World = GEngine->GetCurrentPlayWorld())
+		{
+			for (TActorIterator<ABattleFrameBattleControl> It(World); It; ++It)
+			{
+				BattleControl = *It;
+				break; // 只取第一个
+			}
+		}
+
+		if (!IsValid(BattleControl)) return;
+	}
+
+	// 直接填充 DamageResults
+	BattleControl->ApplyPointDamageAndDebuff(Subjects, IgnoreSubjects, DmgInstigator, DmgCauser, HitFromLocation, Damage, Debuff, DamageResults);
+}
+
+void UBattleFrameFunctionLibraryRT::ApplyRadialDamageAndDebuff
+(
+	TArray<FDmgResult>& DamageResults,
+	ABattleFrameBattleControl* BattleControl,
+	UNeighborGridComponent* NeighborGridComponent,
+	UPARAM(ref) const FVector& Origin,
+	UPARAM(ref) const FSubjectArray& IgnoreSubjects,
+	UPARAM(ref) const FSubjectHandle DmgInstigator,
+	UPARAM(ref) const FSubjectHandle DmgCauser,
+	UPARAM(ref) const FVector& HitFromLocation,
+	UPARAM(ref) const FDamage_Radial& Damage,
+	UPARAM(ref) const FDebuff_Radial& Debuff,
+	UPARAM(ref) const FFilter& Filter
+)
+{
+	DamageResults.Reset();
+
+	// 如果 BattleControl 无效，尝试从 World 查找
+	if (!IsValid(BattleControl))
+	{
+		if (UWorld* World = GEngine->GetCurrentPlayWorld())
+		{
+			for (TActorIterator<ABattleFrameBattleControl> It(World); It; ++It)
+			{
+				BattleControl = *It;
+				break; // 只取第一个
+			}
+		}
+
+		if (!IsValid(BattleControl)) return;
+	}
+
+	if (!IsValid(NeighborGridComponent))
+	{
+		if (UWorld* World = GEngine->GetCurrentPlayWorld())
 		{
 			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
 			{
-				NeighborGridActor = *It;
+				ANeighborGridActor* NeighborGridActor = *It;
+				NeighborGridComponent = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
 				break;
 			}
 		}
+
+		if (!IsValid(NeighborGridComponent)) return;
 	}
 
-	AsyncAction->NeighborGridActor = NeighborGridActor;
-	AsyncAction->NeighborGrid = NeighborGridActor->FindComponentByClass<UNeighborGridComponent>();
-	AsyncAction->KeepCount = KeepCount;
-	AsyncAction->Start = Start;
-	AsyncAction->End = End;
-	AsyncAction->Radius = Radius;
-	AsyncAction->bCheckVisibility = bCheckVisibility;
-	AsyncAction->CheckOrigin = CheckOrigin;
-	AsyncAction->CheckRadius = CheckRadius;
-	AsyncAction->SortMode = SortMode;
-	AsyncAction->SortOrigin = SortOrigin;
-	AsyncAction->IgnoreSubjects = IgnoreSubjects;
-	AsyncAction->Filter = Filter;
-	AsyncAction->DrawDebugConfig = DrawDebugConfig;
-
-	return AsyncAction;
+	BattleControl->ApplyRadialDamageAndDebuff(Origin, IgnoreSubjects, DmgInstigator, DmgCauser, HitFromLocation, Damage, Debuff, Filter, NeighborGridComponent, DamageResults);
 }
 
-void USphereSweepForSubjectsAsyncAction::Activate()
+void UBattleFrameFunctionLibraryRT::ApplyBeamDamageAndDebuff
+(
+	TArray<FDmgResult>& DamageResults, 
+	ABattleFrameBattleControl* BattleControl, 
+	UNeighborGridComponent* NeighborGridComponent, 
+	UPARAM(ref) const FVector& StartLocation, 
+	UPARAM(ref) const FVector& EndLocation, 
+	UPARAM(ref) const FSubjectArray& IgnoreSubjects, 
+	UPARAM(ref) const FSubjectHandle DmgInstigator, 
+	UPARAM(ref) const FSubjectHandle DmgCauser, 
+	UPARAM(ref) const FVector& HitFromLocation, 
+	UPARAM(ref) const FDamage_Beam& Damage,
+	UPARAM(ref) const FDebuff_Beam& Debuff,
+	UPARAM(ref) const FFilter& Filter
+)
 {
-	if (!IsValid(NeighborGridActor.Get()))
+	DamageResults.Reset();
+
+	// 如果 BattleControl 无效，尝试从 World 查找
+	if (!IsValid(BattleControl))
 	{
-		Hit = false;
-		Completed.Broadcast(Hit, Results);
-		SetReadyToDestroy();
-	}
-	else
-	{
-		AsyncTask(ENamedThreads::GameThread, [this]()
+		if (UWorld* World = GEngine->GetCurrentPlayWorld())
 		{
-			TArray<FIntVector> CellCoords = NeighborGrid->SphereSweepForCells(Start, End, Radius);
-
-			for (const FIntVector& CellCoord : CellCoords)
+			for (TActorIterator<ABattleFrameBattleControl> It(World); It; ++It)
 			{
-				ValidCells.Add(NeighborGrid->GetCellAt(NeighborGrid->SubjectCells, CellCoord));
+				BattleControl = *It;
+				break; // 只取第一个
 			}
+		}
 
-			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this]()
-			{
-				const FVector TraceDir = (End - Start).GetSafeNormal();
-				const float TraceLength = FVector::Distance(Start, End);
-
-				// 创建忽略列表的哈希集合以便快速查找
-				TSet<FSubjectHandle> IgnoreSet;
-
-				for (const FSubjectHandle Subject : IgnoreSubjects.Subjects)
-				{
-					IgnoreSet.Add(Subject);
-				}
-
-				// 检查每个单元中的subject
-				for (const auto& CageCell : ValidCells)
-				{
-					for (const FGridData& Data : CageCell.Subjects)
-					{
-						const FSubjectHandle Subject = Data.SubjectHandle;
-
-						// 检查是否在忽略列表中
-						if (IgnoreSet.Contains(Subject)) continue;
-
-						const FVector SubjectPos = FVector(Data.Location);
-						float SubjectRadius = Data.Radius;
-
-						// 距离计算
-						const FVector ToSubject = SubjectPos - Start;
-						const float ProjOnTrace = FVector::DotProduct(ToSubject, TraceDir);
-
-						// 初步筛选
-						const float ProjThreshold = SubjectRadius + Radius;
-						if (ProjOnTrace < -ProjThreshold || ProjOnTrace > TraceLength + ProjThreshold) continue;
-
-						// 精确距离检查
-						const float ClampedProj = FMath::Clamp(ProjOnTrace, 0.0f, TraceLength);
-						const FVector NearestPoint = Start + ClampedProj * TraceDir;
-						const float CombinedRadSq = FMath::Square(Radius + SubjectRadius);
-
-						if (FVector::DistSquared(NearestPoint, SubjectPos) >= CombinedRadSq) continue;
-
-						// 可见性检查
-						if (bCheckVisibility)
-						{
-							bool HitObstacle = false;
-							FTraceResult TraceResult;
-							NeighborGrid->SphereSweepForObstacle(Start, SubjectPos, CheckRadius, DrawDebugConfig, HitObstacle, TraceResult);
-
-							if (HitObstacle) continue; // 路径被阻挡，跳过该目标
-						}
-
-						// 创建FTraceResult并添加到结果数组
-						FTraceResult Result{ Subject ,SubjectPos ,FVector::DistSquared(SortOrigin, SubjectPos) };
-						TempResults.Add(Result);
-					}
-				}
-
-				// 排序逻辑
-				if (SortMode != ESortMode::None)
-				{
-					TempResults.Sort([this](const FTraceResult& A, const FTraceResult& B)
-					{
-						if (SortMode == ESortMode::NearToFar)
-						{
-							return A.CachedDistSq < B.CachedDistSq;
-						}
-						else // FarToNear
-						{
-							return A.CachedDistSq > B.CachedDistSq;
-						}
-					});
-				}
-
-				AsyncTask(ENamedThreads::GameThread, [this]()
-				{
-					Results.Reset();
-
-					int32 ValidCount = 0;
-					const bool bRequireLimit = (KeepCount > 0);
-
-					// 按预排序顺序遍历，遇到有效项立即收集
-					for (const FTraceResult& TempResult : TempResults)
-					{
-						if (!TempResult.Subject.Matches(Filter)) continue;// this can only run on gamethread
-
-						Results.Add(TempResult);
-						ValidCount++;
-
-						// 达到数量限制立即终止
-						if (bRequireLimit && ValidCount >= KeepCount) break;
-					}
-
-					Hit = !Results.IsEmpty();
-
-					if (DrawDebugConfig.bDrawDebugShape)
-					{
-						// 计算起点到终点的向量
-						FVector Direction = End - Start;
-						float TotalDistance = Direction.Size();
-
-						// 处理零距离情况（使用默认旋转）
-						FRotator ShapeRot = FRotator::ZeroRotator;
-
-						if (TotalDistance > KINDA_SMALL_NUMBER)
-						{
-							Direction /= TotalDistance;
-							ShapeRot = FRotationMatrix::MakeFromZ(Direction).Rotator();
-						}
-
-						// 计算圆柱部分高度（总高度减去两端的半球）
-						float CylinderHeight = FMath::Max(0.0f, TotalDistance - 2.0f * Radius);
-
-						// 计算胶囊体中心位置（两点中点）
-						FVector ShapeLoc = (Start + End) * 0.5f;
-
-						// 配置调试胶囊体参数
-						FDebugCapsuleConfig CapsuleConfig;
-						CapsuleConfig.Color = DrawDebugConfig.Color;
-						CapsuleConfig.Location = ShapeLoc;
-						CapsuleConfig.Rotation = ShapeRot;  // 修正后的旋转
-						CapsuleConfig.Radius = Radius;
-						CapsuleConfig.Height = CylinderHeight;  // 圆柱部分高度
-						CapsuleConfig.LineThickness = DrawDebugConfig.LineThickness;
-						CapsuleConfig.Duration = DrawDebugConfig.Duration;
-
-						// 加入调试队列
-						ABattleFrameBattleControl::GetInstance()->DebugCapsuleQueue.Enqueue(CapsuleConfig);
-
-						// hit points
-						for (const auto& Result : Results)
-						{
-							FVector OtherLocation = Result.Subject.GetTrait<FLocated>().Location;
-							FDebugSphereConfig SphereConfig;
-							SphereConfig.Color = DrawDebugConfig.Color;
-							SphereConfig.Location = Result.Subject.GetTrait<FLocated>().Location;
-							SphereConfig.Radius = Result.Subject.GetTrait<FGridData>().Radius;
-							SphereConfig.Duration = DrawDebugConfig.Duration;
-							SphereConfig.LineThickness = DrawDebugConfig.LineThickness;
-							ABattleFrameBattleControl::GetInstance()->DebugSphereQueue.Enqueue(SphereConfig);
-						}
-					}
-
-					Completed.Broadcast(Hit, Results);
-					SetReadyToDestroy();
-				});
-			});
-		});
+		if (!IsValid(BattleControl)) return;
 	}
+
+	if (!IsValid(NeighborGridComponent))
+	{
+		if (UWorld* World = GEngine->GetCurrentPlayWorld())
+		{
+			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
+			{
+				ANeighborGridActor* NeighborGridActor = *It;
+				NeighborGridComponent = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
+				break;
+			}
+		}
+
+		if (!IsValid(NeighborGridComponent)) return;
+	}
+
+	BattleControl->ApplyBeamDamageAndDebuff(StartLocation, EndLocation, IgnoreSubjects, DmgInstigator, DmgCauser, HitFromLocation, Damage, Debuff, Filter, NeighborGridComponent, DamageResults);
 }
+
 
 //-------------------------------Trait Setters-------------------------------
 
@@ -2114,26 +1862,6 @@ void UBattleFrameFunctionLibraryRT::IncludeSubTypeTraitByIndex(int32 Index, FFil
 	}
 }
 
-void UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(int32 IterableNum, int32 MaxThreadsAllowed, int32 MinBatchSizeAllowed, int32& ThreadsCount, int32& BatchSize)
-{
-	// 计算最大可能线程数（考虑最小批次限制）
-	const int32 MaxPossibleThreads = FMath::Clamp(IterableNum / FMath::Max(1, MinBatchSizeAllowed), 1, MaxThreadsAllowed);
-
-	// 最终确定使用的线程数
-	ThreadsCount = FMath::Clamp(MaxPossibleThreads, 1, MaxThreadsAllowed);
-
-	// 计算批次大小（使用向上取整算法解决余数问题）
-	BatchSize = IterableNum / ThreadsCount;
-
-	if (IterableNum % ThreadsCount != 0) 
-	{
-		BatchSize += 1;
-	}
-
-	// 最终限制批次大小范围
-	BatchSize = FMath::Clamp(BatchSize, 1, FLT_MAX);
-}
-
 
 //-------------------------------Connector Nodes-------------------------------
 
@@ -2205,8 +1933,512 @@ FSubjectArray UBattleFrameFunctionLibraryRT::ConvertSubjectHandlesToSubjectArray
 }
 
 
+//------------------------------Projectile Solver------------------------------
 
+// 解决抛射物发射速度（静态目标）
+FVector UBattleFrameFunctionLibraryRT::SolveProjectile
+(
+	FVector FromPoint, 
+	FVector ToPoint, 
+	float Gravity, 
+	float PitchAngle
+)
+{
+	const float aRadians = FMath::DegreesToRadians(PitchAngle);
 
+	// 计算2D距离和高度差
+	const float distance2D = FVector::DistXY(FromPoint, ToPoint);
+	const float deltaZ = ToPoint.Z - FromPoint.Z;
 
+	// 弹道方程分母
+	const float sin2a = FMath::Sin(2 * aRadians);
+	const float cos2a = FMath::Cos(aRadians) * FMath::Cos(aRadians);
+	const float denominator = (distance2D * sin2a) - (2 * deltaZ * cos2a);
 
+	// 浮点安全检查
+	if (FMath::Abs(denominator) < 0)
+	{
+		return FVector::ZeroVector;
+	}
 
+	// 计算初速度平方（检查物理有效性）
+	const float v0Sq = (distance2D * distance2D * Gravity) / denominator;
+
+	if (v0Sq < 0) // 无实数解
+	{
+		return FVector::ZeroVector;
+	}
+
+	const float initialSpeed = FMath::Sqrt(v0Sq);
+
+	// 构建速度向量
+	FRotator lookAtRotation = FRotationMatrix::MakeFromX(ToPoint - FromPoint).Rotator();
+	lookAtRotation.Pitch = PitchAngle;
+	return lookAtRotation.Vector() * initialSpeed;
+}
+
+// 解决抛射物发射速度（带移动预测）
+FVector UBattleFrameFunctionLibraryRT::SolveProjectileWithPrediction
+(
+	FVector FromPoint,
+	FVector ToPoint,
+	FVector Velocity,
+	int32 Iterations,
+	float Gravity,
+	float PitchAngle
+)
+{
+	const float aRadians = FMath::DegreesToRadians(PitchAngle);
+	FVector predictedPosition = ToPoint;  // 使用临时变量
+	FVector resultVelocity = FVector::ZeroVector;
+
+	for (int32 i = 0; i < Iterations; ++i)
+	{
+		// 计算当前预测位置的距离
+		const float distance2D = FVector::DistXY(FromPoint, predictedPosition);
+		const float deltaZ = predictedPosition.Z - FromPoint.Z;
+
+		// 弹道方程分母
+		const float sin2a = FMath::Sin(2 * aRadians);
+		const float cos2a = FMath::Cos(aRadians) * FMath::Cos(aRadians);
+		const float denominator = (distance2D * sin2a) - (2 * deltaZ * cos2a);
+
+		// 浮点安全检查
+		if (FMath::Abs(denominator) < 0)
+		{
+			return FVector::ZeroVector;
+		}
+
+		// 计算初速度平方
+		const float v0Sq = (distance2D * distance2D * Gravity) / denominator;
+
+		if (v0Sq < 0)
+		{
+			return FVector::ZeroVector;
+		}
+
+		const float initialSpeed = FMath::Sqrt(v0Sq);
+
+		// 计算飞行时间 (使用完整分母)
+		const float time = distance2D / (FMath::Cos(aRadians) * initialSpeed);
+
+		// 计算下一帧预测位置（保持原始目标位置不变）
+		const FVector newPredictedPosition = ToPoint + Velocity * time;
+
+		// 构建当前迭代速度向量
+		FRotator lookAtRotation = FRotationMatrix::MakeFromX(predictedPosition - FromPoint).Rotator();
+		lookAtRotation.Pitch = PitchAngle;
+		resultVelocity = lookAtRotation.Vector() * initialSpeed;
+
+		// 更新下次迭代的预测位置
+		predictedPosition = newPredictedPosition;
+	}
+
+	return resultVelocity;
+}
+
+// 计算抛射体在指定时间的位置
+FVector UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime
+(
+	FVector FromPoint,
+	FVector ToPoint,
+	float InitialTime,
+	float CurrentTime,
+	float Gravity,
+	FVector InitialVelocity
+)
+{
+	// 计算经过的时间
+	float DeltaTime = CurrentTime - InitialTime;
+
+	// 弹道运动方程:
+	// x = x0 + vx * t
+	// y = y0 + vy * t
+	// z = z0 + vz * t + 0.5 * g * t²
+
+	FVector Displacement = InitialVelocity * DeltaTime;
+	Displacement.Z += 0.5f * Gravity * FMath::Square(DeltaTime);
+
+	return FromPoint + Displacement;
+}
+
+//-------------------------------Sync Traces-------------------------------
+
+void UBattleFrameFunctionLibraryRT::SphereTraceForSubjects
+(
+	bool& Hit,
+	TArray<FTraceResult>& TraceResults,
+	UNeighborGridComponent* NeighborGridComponent,
+	int32 KeepCount,
+	UPARAM(ref) const FVector& Origin,
+	float Radius,
+	bool bCheckVisibility,
+	UPARAM(ref) const FVector& CheckOrigin,
+	float CheckRadius,
+	ESortMode SortMode,
+	UPARAM(ref) const FVector& SortOrigin,
+	UPARAM(ref) const FSubjectArray& IgnoreSubjects,
+	UPARAM(ref) const FFilter& Filter,
+	UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig
+)
+{
+	TraceResults.Reset();
+
+	if (!IsValid(NeighborGridComponent))
+	{
+		if (UWorld* World = GEngine->GetCurrentPlayWorld())
+		{
+			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
+			{
+				ANeighborGridActor* NeighborGridActor = *It;
+				NeighborGridComponent = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
+				break;
+			}
+		}
+
+		if (!IsValid(NeighborGridComponent)) return;
+	}
+
+	NeighborGridComponent->SphereTraceForSubjects(KeepCount, Origin, Radius, bCheckVisibility, CheckOrigin, CheckRadius, SortMode, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig, Hit, TraceResults);
+}
+
+void UBattleFrameFunctionLibraryRT::SphereSweepForSubjects
+(
+	bool& Hit,
+	TArray<FTraceResult>& TraceResults,
+	UNeighborGridComponent* NeighborGridComponent,
+	int32 KeepCount,
+	UPARAM(ref) const FVector& Start,
+	UPARAM(ref) const FVector& End,
+	float Radius,
+	bool bCheckVisibility,
+	UPARAM(ref) const FVector& CheckOrigin,
+	float CheckRadius,
+	ESortMode SortMode,
+	UPARAM(ref) const FVector& SortOrigin,
+	UPARAM(ref) const FSubjectArray& IgnoreSubjects,
+	UPARAM(ref) const FFilter& Filter,
+	UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig
+)
+{
+	TraceResults.Reset();
+
+	if (!IsValid(NeighborGridComponent))
+	{
+		if (UWorld* World = GEngine->GetCurrentPlayWorld())
+		{
+			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
+			{
+				ANeighborGridActor* NeighborGridActor = *It;
+				NeighborGridComponent = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
+				break;
+			}
+		}
+
+		if (!IsValid(NeighborGridComponent)) return;
+	}
+
+	NeighborGridComponent->SphereSweepForSubjects(KeepCount, Start, End, Radius, bCheckVisibility, CheckOrigin, CheckRadius, SortMode, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig, Hit, TraceResults);
+}
+
+void UBattleFrameFunctionLibraryRT::SectorTraceForSubjects
+(
+	bool& Hit,
+	TArray<FTraceResult>& TraceResults,
+	UNeighborGridComponent* NeighborGridComponent,
+	int32 KeepCount,
+	UPARAM(ref) const FVector& Origin,
+	float Radius,
+	float Height,
+	UPARAM(ref) const FVector& ForwardVector,
+	float Angle,
+	bool bCheckVisibility,
+	UPARAM(ref) const FVector& CheckOrigin,
+	float CheckRadius,
+	ESortMode SortMode,
+	UPARAM(ref) const FVector& SortOrigin,
+	UPARAM(ref) const FSubjectArray& IgnoreSubjects,
+	UPARAM(ref) const FFilter& Filter,
+	UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig
+)
+{
+	TraceResults.Reset();
+
+	if (!IsValid(NeighborGridComponent))
+	{
+		if (UWorld* World = GEngine->GetCurrentPlayWorld())
+		{
+			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
+			{
+				ANeighborGridActor* NeighborGridActor = *It;
+				NeighborGridComponent = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
+				break;
+			}
+		}
+
+		if (!IsValid(NeighborGridComponent)) return;
+	}
+
+	NeighborGridComponent->SectorTraceForSubjects(KeepCount, Origin, Radius, Height, ForwardVector, Angle, bCheckVisibility, CheckOrigin, CheckRadius, SortMode, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig, Hit, TraceResults);
+}
+
+void UBattleFrameFunctionLibraryRT::SphereSweepForObstacle
+(
+	bool& Hit,
+	FTraceResult& TraceResult,
+	UNeighborGridComponent* NeighborGridComponent,
+	UPARAM(ref) const FVector& Start,
+	UPARAM(ref) const FVector& End,
+	float Radius,
+	UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig
+)
+{
+	if (!IsValid(NeighborGridComponent))
+	{
+		if (UWorld* World = GEngine->GetCurrentPlayWorld())
+		{
+			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
+			{
+				ANeighborGridActor* NeighborGridActor = *It;
+				NeighborGridComponent = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
+				break;
+			}
+		}
+
+		if (!IsValid(NeighborGridComponent)) return;
+	}
+
+	NeighborGridComponent->SphereSweepForObstacle(Start, End, Radius, DrawDebugConfig, Hit, TraceResult);
+}
+
+//-------------------------------Async Trace-------------------------------
+
+USphereSweepForSubjectsAsyncAction* USphereSweepForSubjectsAsyncAction::SphereSweepForSubjectsAsync
+(
+	const UObject* WorldContextObject,
+	UNeighborGridComponent* NeighborGridComponent,
+	int32 KeepCount,
+	const FVector Start,
+	const FVector End,
+	float Radius,
+	bool bCheckVisibility,
+	const FVector CheckOrigin,
+	float CheckRadius,
+	ESortMode SortMode,
+	const FVector SortOrigin,
+	const FSubjectArray IgnoreSubjects,
+	const FFilter Filter,
+	const FTraceDrawDebugConfig DrawDebugConfig
+)
+{
+	USphereSweepForSubjectsAsyncAction* AsyncAction = NewObject<USphereSweepForSubjectsAsyncAction>();
+	AsyncAction->RegisterWithGameInstance(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+
+	bool bHasValidNeighborGrid = false;
+
+	if (!IsValid(NeighborGridComponent))
+	{
+		if (UWorld* World = GEngine->GetCurrentPlayWorld())
+		{
+			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
+			{
+				if (*It)
+				{
+					ANeighborGridActor* NeighborGridActor = *It;
+					NeighborGridComponent = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
+
+					if (NeighborGridComponent)
+					{
+						bHasValidNeighborGrid = true;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	AsyncAction->NeighborGrid = NeighborGridComponent;
+	AsyncAction->KeepCount = KeepCount;
+	AsyncAction->Start = Start;
+	AsyncAction->End = End;
+	AsyncAction->Radius = Radius;
+	AsyncAction->bCheckVisibility = bCheckVisibility;
+	AsyncAction->CheckOrigin = CheckOrigin;
+	AsyncAction->CheckRadius = CheckRadius;
+	AsyncAction->SortMode = SortMode;
+	AsyncAction->SortOrigin = SortOrigin;
+	AsyncAction->IgnoreSubjects = IgnoreSubjects;
+	AsyncAction->Filter = Filter;
+	AsyncAction->DrawDebugConfig = DrawDebugConfig;
+
+	return AsyncAction;
+}
+
+void USphereSweepForSubjectsAsyncAction::Activate()
+{
+	if (!IsValid(NeighborGrid.Get()))
+	{
+		Hit = false;
+		Completed.Broadcast(Hit, Results);
+		SetReadyToDestroy();
+	}
+	else
+	{
+		AsyncTask(ENamedThreads::GameThread, [this]()
+			{
+				TArray<FIntVector> CellCoords = NeighborGrid->SphereSweepForCells(Start, End, Radius);
+
+				for (const FIntVector& CellCoord : CellCoords)
+				{
+					ValidCells.Add(NeighborGrid->GetCellAt(NeighborGrid->SubjectCells, CellCoord));
+				}
+
+				AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this]()
+					{
+						const FVector TraceDir = (End - Start).GetSafeNormal();
+						const float TraceLength = FVector::Distance(Start, End);
+
+						// 创建忽略列表的哈希集合以便快速查找
+						TSet<FSubjectHandle> IgnoreSet;
+
+						for (const FSubjectHandle Subject : IgnoreSubjects.Subjects)
+						{
+							IgnoreSet.Add(Subject);
+						}
+
+						// 检查每个单元中的subject
+						for (const auto& CageCell : ValidCells)
+						{
+							for (const FGridData& Data : CageCell.Subjects)
+							{
+								const FSubjectHandle Subject = Data.SubjectHandle;
+
+								// 检查是否在忽略列表中
+								if (IgnoreSet.Contains(Subject)) continue;
+
+								const FVector SubjectPos = FVector(Data.Location);
+								float SubjectRadius = Data.Radius;
+
+								// 距离计算
+								const FVector ToSubject = SubjectPos - Start;
+								const float ProjOnTrace = FVector::DotProduct(ToSubject, TraceDir);
+
+								// 初步筛选
+								const float ProjThreshold = SubjectRadius + Radius;
+								if (ProjOnTrace < -ProjThreshold || ProjOnTrace > TraceLength + ProjThreshold) continue;
+
+								// 精确距离检查
+								const float ClampedProj = FMath::Clamp(ProjOnTrace, 0.0f, TraceLength);
+								const FVector NearestPoint = Start + ClampedProj * TraceDir;
+								const float CombinedRadSq = FMath::Square(Radius + SubjectRadius);
+
+								if (FVector::DistSquared(NearestPoint, SubjectPos) >= CombinedRadSq) continue;
+
+								// 可见性检查
+								if (bCheckVisibility)
+								{
+									bool HitObstacle = false;
+									FTraceResult TraceResult;
+									NeighborGrid->SphereSweepForObstacle(Start, SubjectPos, CheckRadius, DrawDebugConfig, HitObstacle, TraceResult);
+
+									if (HitObstacle) continue; // 路径被阻挡，跳过该目标
+								}
+
+								// 创建FTraceResult并添加到结果数组
+								FTraceResult Result{ Subject ,SubjectPos ,FVector::DistSquared(SortOrigin, SubjectPos) };
+								TempResults.Add(Result);
+							}
+						}
+
+						// 排序逻辑
+						if (SortMode != ESortMode::None)
+						{
+							TempResults.Sort([this](const FTraceResult& A, const FTraceResult& B)
+								{
+									if (SortMode == ESortMode::NearToFar)
+									{
+										return A.CachedDistSq < B.CachedDistSq;
+									}
+									else // FarToNear
+									{
+										return A.CachedDistSq > B.CachedDistSq;
+									}
+								});
+						}
+
+						AsyncTask(ENamedThreads::GameThread, [this]()
+							{
+								Results.Reset();
+
+								int32 ValidCount = 0;
+								const bool bRequireLimit = (KeepCount > 0);
+
+								// 按预排序顺序遍历，遇到有效项立即收集
+								for (const FTraceResult& TempResult : TempResults)
+								{
+									if (!TempResult.Subject.Matches(Filter)) continue;// this can only run on gamethread
+
+									Results.Add(TempResult);
+									ValidCount++;
+
+									// 达到数量限制立即终止
+									if (bRequireLimit && ValidCount >= KeepCount) break;
+								}
+
+								Hit = !Results.IsEmpty();
+
+								if (DrawDebugConfig.bDrawDebugShape)
+								{
+									// 计算起点到终点的向量
+									FVector Direction = End - Start;
+									float TotalDistance = Direction.Size();
+
+									// 处理零距离情况（使用默认旋转）
+									FRotator ShapeRot = FRotator::ZeroRotator;
+
+									if (TotalDistance > 0)
+									{
+										Direction /= TotalDistance;
+										ShapeRot = FRotationMatrix::MakeFromZ(Direction).Rotator();
+									}
+
+									// 计算圆柱部分高度（总高度减去两端的半球）
+									float CylinderHeight = FMath::Max(0.0f, TotalDistance - 2.0f * Radius);
+
+									// 计算胶囊体中心位置（两点中点）
+									FVector ShapeLoc = (Start + End) * 0.5f;
+
+									// 配置调试胶囊体参数
+									FDebugCapsuleConfig CapsuleConfig;
+									CapsuleConfig.Color = DrawDebugConfig.Color;
+									CapsuleConfig.Location = ShapeLoc;
+									CapsuleConfig.Rotation = ShapeRot;  // 修正后的旋转
+									CapsuleConfig.Radius = Radius;
+									CapsuleConfig.Height = CylinderHeight;  // 圆柱部分高度
+									CapsuleConfig.LineThickness = DrawDebugConfig.LineThickness;
+									CapsuleConfig.Duration = DrawDebugConfig.Duration;
+
+									// 加入调试队列
+									ABattleFrameBattleControl::GetInstance()->DebugCapsuleQueue.Enqueue(CapsuleConfig);
+
+									// hit points
+									for (const auto& Result : Results)
+									{
+										FVector OtherLocation = Result.Subject.GetTrait<FLocated>().Location;
+										FDebugSphereConfig SphereConfig;
+										SphereConfig.Color = DrawDebugConfig.Color;
+										SphereConfig.Location = Result.Subject.GetTrait<FLocated>().Location;
+										SphereConfig.Radius = Result.Subject.GetTrait<FGridData>().Radius;
+										SphereConfig.Duration = DrawDebugConfig.Duration;
+										SphereConfig.LineThickness = DrawDebugConfig.LineThickness;
+										ABattleFrameBattleControl::GetInstance()->DebugSphereQueue.Enqueue(SphereConfig);
+									}
+								}
+
+								Completed.Broadcast(Hit, Results);
+								SetReadyToDestroy();
+							});
+					});
+			});
+	}
+}

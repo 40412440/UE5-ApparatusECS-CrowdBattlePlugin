@@ -31,6 +31,8 @@ class BATTLEFRAME_API UBattleFrameFunctionLibraryRT : public UBlueprintFunctionL
 	
 public:
 
+    //---------------------------------Spawning-------------------------------
+
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | Spawning", meta = (AutoCreateRefTerm = "Origin,Region,LaunchVelocity,CustomDirection,Multipliers", DisplayName = "SpawnAgentsByDataAsset", Keywords = "Spawn Agents By Data Asset"))
     static TArray<FSubjectHandle> SpawnAgentsByConfigRectangular
     (
@@ -47,100 +49,63 @@ public:
         UPARAM(ref) const  FSpawnerMult& Multipliers = FSpawnerMult()
     );
 
+    //-------------------------------Apply Dmg and Debuff-------------------------------
 
-    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Tracing", meta = (AutoCreateRefTerm = "Origin, CheckOrigin, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig"))
-    static void SphereTraceForSubjects
-    (
-        bool& Hit,
-        TArray<FTraceResult>& TraceResults,
-        ANeighborGridActor* NeighborGridActor = nullptr,
-        int32 KeepCount = -1,
-        UPARAM(ref) const FVector& Origin = FVector(0, 0, 0),
-        float Radius = 0.f,
-        bool bCheckVisibility = false,
-        UPARAM(ref) const FVector& CheckOrigin = FVector(0, 0, 0),
-        float CheckRadius = 0.f,
-        ESortMode SortMode = ESortMode::None,
-        UPARAM(ref) const FVector& SortOrigin = FVector(0, 0, 0),
-        UPARAM(ref) const FSubjectArray& IgnoreSubjects = FSubjectArray(),
-        UPARAM(ref) const FFilter& Filter = FFilter(),
-        UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig = FTraceDrawDebugConfig()
-    );
-
-    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Tracing", meta = (AutoCreateRefTerm = "Start, End, CheckOrigin, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig"))
-    static void SphereSweepForSubjects
-    (
-        bool& Hit,
-        TArray<FTraceResult>& TraceResults,
-        ANeighborGridActor* NeighborGridActor = nullptr,
-        int32 KeepCount = -1,
-        UPARAM(ref) const FVector& Start = FVector(0, 0, 0),
-        UPARAM(ref) const FVector& End = FVector(0, 0, 0),
-        float Radius = 0.f,
-        bool bCheckVisibility = false, 
-        UPARAM(ref) const FVector& CheckOrigin = FVector(0, 0, 0),
-        float CheckRadius = 0.f,
-        ESortMode SortMode = ESortMode::None,
-        UPARAM(ref) const FVector& SortOrigin = FVector(0, 0, 0),
-        UPARAM(ref) const FSubjectArray& IgnoreSubjects = FSubjectArray(),
-        UPARAM(ref) const FFilter& Filter = FFilter(),
-        UPARAM(ref) const FTraceDrawDebugConfig & DrawDebugConfig = FTraceDrawDebugConfig()
-    );
-
-    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Tracing", meta = (AutoCreateRefTerm = "Origin, ForwardVector, CheckOrigin, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig"))
-    static void SectorTraceForSubjects
-    (
-        bool& Hit,
-        TArray<FTraceResult>& TraceResults,
-        ANeighborGridActor* NeighborGridActor = nullptr,
-        int32 KeepCount = -1,
-        UPARAM(ref) const FVector& Origin = FVector(0, 0, 0),
-        float Radius = 300.f,
-        float Height = 100.f,
-        UPARAM(ref) const FVector& ForwardVector = FVector(1, 0, 0),
-        float Angle = 360.f,
-        bool bCheckVisibility = false, 
-        UPARAM(ref) const FVector& CheckOrigin = FVector(0, 0, 0),
-        float CheckRadius = 0.f,
-        ESortMode SortMode = ESortMode::None,
-        UPARAM(ref) const FVector& SortOrigin = FVector(0, 0, 0),
-        UPARAM(ref) const FSubjectArray& IgnoreSubjects = FSubjectArray(),
-        UPARAM(ref) const FFilter& Filter = FFilter(),
-        UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig = FTraceDrawDebugConfig()
-    );
-
-    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Tracing", meta = (AutoCreateRefTerm = "Start, End, DrawDebugConfig"))
-    static void SphereSweepForObstacle
-    (
-        bool& Hit,
-        FTraceResult& TraceResult,
-        ANeighborGridActor* NeighborGridActor = nullptr,
-        UPARAM(ref) const FVector& Start = FVector(0, 0, 0),
-        UPARAM(ref) const FVector& End = FVector(0, 0, 0),
-        float Radius = 0.f,
-        UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig = FTraceDrawDebugConfig()
-    );
-
-    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Misc", meta = (AutoCreateRefTerm = "Subjects, IgnoreSubjects, DmgInstigator, HitFromLocation, Damage, Debuff", Keywords = "Apply Damage"))
-    static void ApplyDamageAndDebuff
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Damage and Debuff", meta = (AutoCreateRefTerm = "Subjects, IgnoreSubjects, DmgInstigator, DmgCauser, HitFromLocation, Damage, Debuff", Keywords = "Apply Point Damage Debuff", DisplayName = "ApplyPointDamageAndDebuff"))
+    static void ApplyPointDamageAndDebuff
     (
         TArray<FDmgResult>& DamageResults,
         ABattleFrameBattleControl* BattleControl = nullptr,
         UPARAM(ref) const FSubjectArray& Subjects = FSubjectArray(),
         UPARAM(ref) const FSubjectArray& IgnoreSubjects = FSubjectArray(),
         UPARAM(ref) const FSubjectHandle DmgInstigator = FSubjectHandle(),
+        UPARAM(ref) const FSubjectHandle DmgCauser = FSubjectHandle(),
         UPARAM(ref) const FVector& HitFromLocation = FVector(0, 0, 0),
-        UPARAM(ref) const FDamage& Damage = FDamage(),
-        UPARAM(ref) const FDebuff& Debuff = FDebuff()
+        UPARAM(ref) const FDamage_Point& Damage = FDamage_Point(),
+        UPARAM(ref) const FDebuff_Point& Debuff = FDebuff_Point()
     );
 
-    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Misc", meta = (DisplayName = "Sort Subjects By Distance", Keywords = "Sort Distance Subject", AutoCreateRefTerm = "TraceResults"))
-    static void SortSubjectsByDistance
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Damage and Debuff", meta = (AutoCreateRefTerm = "Origin, IgnoreSubjects, DmgInstigator, DmgCauser, HitFromLocation, Damage, Debuff, Filter", Keywords = "Apply Radial Damage Debuff"))
+    static void ApplyRadialDamageAndDebuff
     (
-        UPARAM(ref) TArray<FTraceResult>& TraceResults,
-        const FVector& SortOrigin,
-        const ESortMode SortMode = ESortMode::NearToFar
+        TArray<FDmgResult>& DamageResults,
+        ABattleFrameBattleControl* BattleControl,
+        UNeighborGridComponent* NeighborGridComponent,
+        UPARAM(ref) const FVector& Origin,
+        UPARAM(ref) const FSubjectArray& IgnoreSubjects,
+        UPARAM(ref) const FSubjectHandle DmgInstigator,
+        UPARAM(ref) const FSubjectHandle DmgCauser,
+        UPARAM(ref) const FVector& HitFromLocation,
+        UPARAM(ref) const FDamage_Radial& Damage,
+        UPARAM(ref) const FDebuff_Radial& Debuff,
+        UPARAM(ref) const FFilter& Filter
     );
+
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Damage and Debuff", meta = (AutoCreateRefTerm = "StartLocation, EndLocation, IgnoreSubjects, DmgInstigator, DmgCauser, HitFromLocation, Damage, Debuff, Filter", Keywords = "Apply Beam Damage Debuff"))
+    static void ApplyBeamDamageAndDebuff
+    (
+        TArray<FDmgResult>& DamageResults,
+        ABattleFrameBattleControl* BattleControl,
+        UNeighborGridComponent* NeighborGridComponent,
+        UPARAM(ref) const FVector& StartLocation,
+        UPARAM(ref) const FVector& EndLocation,
+        UPARAM(ref) const FSubjectArray& IgnoreSubjects,
+        UPARAM(ref) const FSubjectHandle DmgInstigator,
+        UPARAM(ref) const FSubjectHandle DmgCauser,
+        UPARAM(ref) const FVector& HitFromLocation,
+        UPARAM(ref) const FDamage_Beam& Damage,
+        UPARAM(ref) const FDebuff_Beam& Debuff,
+        UPARAM(ref) const FFilter& Filter
+    );
+
+    //-----------------------------------Misc-------------------------------
+
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Misc", meta = (DisplayName = "Sort Subjects By Distance", Keywords = "Sort Distance Subject", AutoCreateRefTerm = "TraceResults"))
+    static void SortSubjectsByDistance(UPARAM(ref) TArray<FTraceResult>& TraceResults,const FVector& SortOrigin,const ESortMode SortMode = ESortMode::NearToFar);
+
+    static void CalculateThreadsCountAndBatchSize(int32 IterableNum, int32 MaxThreadsAllowed, int32 MinBatchSizeAllowed, int32& ThreadsCount, int32& BatchSize);
+
+    //-------------------------------Connector Nodes-------------------------------
 
     UFUNCTION(BlueprintCallable, BlueprintPure, meta = (DisplayName = "Convert to SubjectHandles", CompactNodeTitle = "->", BlueprintAutocast), Category = "BattleFrame | Adapters")
     static TArray<FSubjectHandle> ConvertDmgResultsToSubjectHandles(const TArray<FDmgResult>& DmgResults);
@@ -157,7 +122,20 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, meta = (DisplayName = "Convert to SubjectArray", CompactNodeTitle = "->", BlueprintAutocast), Category = "BattleFrame | Adapters")
     static FSubjectArray ConvertSubjectHandlesToSubjectArray(const TArray<FSubjectHandle>& SubjectHandles);
 
-    static void CalculateThreadsCountAndBatchSize(int32 IterableNum, int32 MaxThreadsAllowed, int32 MinBatchSizeAllowed, int32& ThreadsCount, int32& BatchSize);
+    //------------------------------Projectile Solver------------------------------
+
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Projectile", meta = (Keywords = "Projectile"))
+    FVector SolveProjectile(FVector FromPoint, FVector ToPoint, float Gravity, float PitchAngle);
+
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Projectile", meta = (Keywords = "Projectile"))
+    FVector SolveProjectileWithPrediction(FVector FromPoint, FVector ToPoint, FVector Velocity, int32 Iterations, float Gravity, float PitchAngle);
+
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Projectile", meta = (Keywords = "Projectile"))
+    FVector GetProjectilePositionAtTime(FVector FromPoint, FVector ToPoint, float InitialTime, float CurrentTime, float Gravity, FVector InitialVelocity);
+
+
+    //-------------------------------Trait Setters-------------------------------
+
     static void SetRecordSubTypeTraitByIndex(int32 Index, FSubjectRecord& SubjectRecord);
     static void SetRecordSubTypeTraitByEnum(EESubType SubType, FSubjectRecord& SubjectRecord);
     static void RemoveSubjectSubTypeTraitByIndex(int32 Index, FSubjectHandle SubjectHandle);
@@ -495,6 +473,83 @@ public:
                 break;
         }
     };
+
+
+    //-------------------------------Sync Trace-------------------------------
+
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Tracing", meta = (AutoCreateRefTerm = "Origin, CheckOrigin, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig"))
+    static void SphereTraceForSubjects
+    (
+        bool& Hit,
+        TArray<FTraceResult>& TraceResults,
+        UNeighborGridComponent* NeighborGridComponent = nullptr,
+        int32 KeepCount = -1,
+        UPARAM(ref) const FVector& Origin = FVector(0, 0, 0),
+        float Radius = 0.f,
+        bool bCheckVisibility = false,
+        UPARAM(ref) const FVector& CheckOrigin = FVector(0, 0, 0),
+        float CheckRadius = 0.f,
+        ESortMode SortMode = ESortMode::None,
+        UPARAM(ref) const FVector& SortOrigin = FVector(0, 0, 0),
+        UPARAM(ref) const FSubjectArray& IgnoreSubjects = FSubjectArray(),
+        UPARAM(ref) const FFilter& Filter = FFilter(),
+        UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig = FTraceDrawDebugConfig()
+    );
+
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Tracing", meta = (AutoCreateRefTerm = "Start, End, CheckOrigin, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig"))
+    static void SphereSweepForSubjects
+    (
+        bool& Hit,
+        TArray<FTraceResult>& TraceResults,
+        UNeighborGridComponent* NeighborGridComponent = nullptr,
+        int32 KeepCount = -1,
+        UPARAM(ref) const FVector& Start = FVector(0, 0, 0),
+        UPARAM(ref) const FVector& End = FVector(0, 0, 0),
+        float Radius = 0.f,
+        bool bCheckVisibility = false,
+        UPARAM(ref) const FVector& CheckOrigin = FVector(0, 0, 0),
+        float CheckRadius = 0.f,
+        ESortMode SortMode = ESortMode::None,
+        UPARAM(ref) const FVector& SortOrigin = FVector(0, 0, 0),
+        UPARAM(ref) const FSubjectArray& IgnoreSubjects = FSubjectArray(),
+        UPARAM(ref) const FFilter& Filter = FFilter(),
+        UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig = FTraceDrawDebugConfig()
+    );
+
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Tracing", meta = (AutoCreateRefTerm = "Origin, ForwardVector, CheckOrigin, SortOrigin, IgnoreSubjects, Filter, DrawDebugConfig"))
+    static void SectorTraceForSubjects
+    (
+        bool& Hit,
+        TArray<FTraceResult>& TraceResults,
+        UNeighborGridComponent* NeighborGridComponent = nullptr,
+        int32 KeepCount = -1,
+        UPARAM(ref) const FVector& Origin = FVector(0, 0, 0),
+        float Radius = 300.f,
+        float Height = 100.f,
+        UPARAM(ref) const FVector& ForwardVector = FVector(1, 0, 0),
+        float Angle = 360.f,
+        bool bCheckVisibility = false,
+        UPARAM(ref) const FVector& CheckOrigin = FVector(0, 0, 0),
+        float CheckRadius = 0.f,
+        ESortMode SortMode = ESortMode::None,
+        UPARAM(ref) const FVector& SortOrigin = FVector(0, 0, 0),
+        UPARAM(ref) const FSubjectArray& IgnoreSubjects = FSubjectArray(),
+        UPARAM(ref) const FFilter& Filter = FFilter(),
+        UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig = FTraceDrawDebugConfig()
+    );
+
+    UFUNCTION(BlueprintCallable, Category = "BattleFrame | Tracing", meta = (AutoCreateRefTerm = "Start, End, DrawDebugConfig"))
+    static void SphereSweepForObstacle
+    (
+        bool& Hit,
+        FTraceResult& TraceResult,
+        UNeighborGridComponent* NeighborGridComponent = nullptr,
+        UPARAM(ref) const FVector& Start = FVector(0, 0, 0),
+        UPARAM(ref) const FVector& End = FVector(0, 0, 0),
+        float Radius = 0.f,
+        UPARAM(ref) const FTraceDrawDebugConfig& DrawDebugConfig = FTraceDrawDebugConfig()
+    );
+
 };
 
 //-------------------------------Async Trace-------------------------------
@@ -511,7 +566,7 @@ public:
     UPROPERTY(BlueprintAssignable)
     FAsyncTraceOutput Completed;
 
-    TWeakObjectPtr<ANeighborGridActor> NeighborGridActor;
+    //TWeakObjectPtr<ANeighborGridActor> NeighborGridActor;
     TWeakObjectPtr<UNeighborGridComponent> NeighborGrid;
     TArray<FNeighborGridCell> ValidCells;
 
@@ -535,7 +590,7 @@ public:
     static USphereSweepForSubjectsAsyncAction* SphereSweepForSubjectsAsync
     (
         const UObject* WorldContextObject = nullptr,
-        ANeighborGridActor* NeighborGridActor = nullptr,
+        UNeighborGridComponent* NeighborGridComponent = nullptr,
         int32 KeepCount = -1,
         const FVector Start = FVector(0, 0, 0),
         const FVector End = FVector(0, 0, 0),

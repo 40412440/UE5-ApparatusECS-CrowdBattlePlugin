@@ -17,7 +17,7 @@ public:
     UBFSubjectiveAgentComponent();
 
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | SubjectiveAgent", meta = (DisplayName = "Initialize With Data Asset"))
-    void InitializeSubjectTraits(AActor* OwnerActor);
+    void InitializeSubjectTraits(bool bAutoActivation = true, AActor* OwnerActor = nullptr);
 
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | SubjectiveAgent", meta = (DisplayName = "Activate Agent"))
     void ActivateAgent(FSubjectHandle Agent);
