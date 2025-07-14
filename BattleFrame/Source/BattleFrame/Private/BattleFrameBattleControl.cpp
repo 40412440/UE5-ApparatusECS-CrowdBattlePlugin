@@ -1940,12 +1940,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 							if (bHasAttacking)
 							{
-								UE_LOG(LogTemp, Warning, TEXT("FAttacking Reset"));
+								//UE_LOG(LogTemp, Warning, TEXT("FAttacking Reset"));
 								Subject.GetTraitRef<FAttacking>().Reset();
 							}
 							else
 							{
-								UE_LOG(LogTemp, Warning, TEXT("SetTraitDeferred(FAttacking())"));
+								//UE_LOG(LogTemp, Warning, TEXT("SetTraitDeferred(FAttacking())"));
 								Subject.SetTraitDeferred(FAttacking());
 							}
 
@@ -1964,7 +1964,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 				if(!bShouldNewAttack && bHasAttacking && !Subject.GetTrait<FAttacking>().bEnable)
 				{
-					UE_LOG(LogTemp, Warning, TEXT("RemoveTraitDeferred<FAttacking>()"));
+					//UE_LOG(LogTemp, Warning, TEXT("RemoveTraitDeferred<FAttacking>()"));
 					Subject.RemoveTraitDeferred<FAttacking>();
 				}
 
