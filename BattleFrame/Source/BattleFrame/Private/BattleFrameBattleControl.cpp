@@ -304,6 +304,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FTracing& Tracing,
 				FPatrol& Patrol,
 				FPatrolling& Patrolling,
+				FNavigation& Navigation,
+				FNavigating& Navigating,
 				FMove& Move,
 				FMoving& Moving)
 			{
@@ -329,6 +331,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					{
 						ResetPatrol(Patrol, Patrolling, Located);
 						Moving.Goal = FindNewPatrolGoalLocation(Patrol, Collider, Trace, Tracing, Located, Scaled, 3);
+						Navigating.TimeLeft = 0;
 					}
 					else
 					{
@@ -342,6 +345,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					{
 						ResetPatrol(Patrol, Patrolling, Located);
 						Moving.Goal = FindNewPatrolGoalLocation(Patrol, Collider, Trace, Tracing, Located, Scaled, 3);
+						Navigating.TimeLeft = 0;
 					}
 					else
 					{
@@ -523,14 +527,23 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							if (Navigation.bUseAStar)
 							{
 								// follow path
-								const bool bIsOnPath = GetSteeringDirection(SelfLocation, Moving.Goal, Navigating.PathPoints, Moving.CurrentVelocity.Size2D(), SelfRadius * 2, SelfRadius * 2, DesiredMoveDirection);
+								const bool bIsOnPath = GetSteeringDirection(SelfLocation, Moving.Goal, Navigating.PathPoints, Moving.CurrentVelocity.Size2D(), SelfRadius * 2, SelfRadius, Patrol.AcceptanceRadius, DesiredMoveDirection);
 
-								// calculate path
-								if ((Navigating.PreviousNavMode != ENavMode::AStar || Navigating.TimeLeft <= 0) && !bIsOnPath)
+								// re-calculate path
+								bool bIsValidPath = false;
+
+								if (!bIsOnPath && Navigating.TimeLeft <= 0)
 								{
-									FindPathAStar(Navigating.FlowField, SelfLocation, Moving.Goal, Navigating.PathPoints);
+									bIsValidPath = FindPathAStar(Navigating.FlowField, SelfLocation, Moving.Goal, Navigating.PathPoints);
 									Navigating.TimeLeft = Navigation.AStarCoolDown;
+									//UE_LOG(LogTemp, Warning, TEXT("FindPathAStar"));
 								}
+
+								//UE_LOG(LogTemp, Warning, TEXT("TimeLeft: %f"), Navigating.TimeLeft);
+								//UE_LOG(LogTemp, Log, TEXT("bIsOnPath: %s"),bIsOnPath ? TEXT("true") : TEXT("false"));
+
+								Navigating.PreviousNavMode = ENavMode::AStar;
+								Navigating.TimeLeft = FMath::Clamp(Navigating.TimeLeft - SafeDeltaTime, 0, FLT_MAX);
 
 								// Draw Path
 								if (Navigation.bDrawDebugShape && Navigating.PathPoints.Num() > 0)
@@ -556,9 +569,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 										PreviousPoint = Point;
 									}
 								}
-
-								Navigating.PreviousNavMode = ENavMode::AStar;
-								Navigating.TimeLeft = FMath::Clamp(Navigating.TimeLeft - SafeDeltaTime, 0, FLT_MAX);
 							}
 							else // approach directly
 							{
@@ -1238,7 +1248,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						}
 					}
 				}
-
 
 				//----------------------- Final New Location -----------------------------
 				
@@ -3108,7 +3117,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						// write blendspace ratio into AnimLerp0
 						const TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
 						const TRange<float> OutputRange(0, 1);
-						float Input = FMath::Max(Moving.CurrentVelocity.Size2D(), FMath::Abs(Moving.CurrentAngularVelocity));
+						float Input = Moving.CurrentVelocity.Size2D();
+						//float Input = FMath::Max(Moving.CurrentVelocity.Size2D(), FMath::Abs(Moving.CurrentAngularVelocity));
 						Animating.AnimLerp0 = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
 						//UE_LOG(LogTemp, Warning, TEXT("CurrentAngularVelocity: %f"), Moving.CurrentAngularVelocity);
 
@@ -6684,6 +6694,8 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(const FVector& 
 bool ABattleFrameBattleControl::FindPathAStar(AFlowField* FlowField, const FVector& StartLocation, const FVector& GoalLocation, TArray<FVector>& OutPath)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE_STR("FindPathAStar");
+	if (FlowField->bIsBeginPlay) return false;
+
 	OutPath.Empty();
 
 	// 验证坐标有效性
@@ -6880,7 +6892,7 @@ bool ABattleFrameBattleControl::FindPathAStar(AFlowField* FlowField, const FVect
 	return false; // 未找到路径
 }
 
-bool ABattleFrameBattleControl::GetSteeringDirection(const FVector& CurrentLocation, const FVector& GoalLocation, const TArray<FVector>& PathPoints, float MoveSpeed, float LookAheadDistance, float PathRadius, FVector& SteeringDirection)
+bool ABattleFrameBattleControl::GetSteeringDirection(const FVector& CurrentLocation, const FVector& GoalLocation, const TArray<FVector>& PathPoints, float MoveSpeed, float LookAheadDistance, float PathRadius, float AcceptanceRadius, FVector& SteeringDirection)
 {
 	// 1. 验证路径有效性
 	if (PathPoints.Num() < 2)
@@ -6912,7 +6924,7 @@ bool ABattleFrameBattleControl::GetSteeringDirection(const FVector& CurrentLocat
 
 	// 3. 验证位置条件
 	const bool bIsCurrentNearPath = FVector::DistSquared2D(CurrentLocation, ClosestPointOnPath) < FMath::Square(PathRadius);
-	const bool bIsGoalNearEnd = FVector::DistSquared2D(GoalLocation, PathPoints.Last()) < FMath::Square(PathRadius);
+	const bool bIsGoalNearEnd = FVector::DistSquared2D(GoalLocation, PathPoints.Last()) < FMath::Square(AcceptanceRadius);
 	const bool bPathValid = bIsCurrentNearPath && bIsGoalNearEnd;
 
 	// 4. 计算预测目标点（支持跨越多线段）

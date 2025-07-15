@@ -27,24 +27,6 @@ TArray<FSubjectHandle> UBattleFrameFunctionLibraryRT::SpawnAgentsByConfigRectang
 	UPARAM(ref) const FSpawnerMult& Multipliers
 )
 {
-	if (!IsValid(AgentSpawner))
-	{
-		if (UWorld* World = GEngine->GetCurrentPlayWorld())
-		{
-			for (TActorIterator<AAgentSpawner> It(World); It; ++It)
-			{
-				AgentSpawner = *It;
-				break;
-			}
-		}
-	}
-
-	if (!IsValid(AgentSpawner))
-	{
-		TArray<FSubjectHandle> EmptyResult;
-		return EmptyResult;
-	}
-
 	return AgentSpawner->SpawnAgentsByConfigRectangular(bAutoActivate, DataAsset, Quantity, Team, Origin, Region, LaunchVelocity, InitialDirection, CustomDirection, Multipliers);
 }
 
