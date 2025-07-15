@@ -124,7 +124,8 @@ public:
 
     //-----------------------------------------------------------
 
-    float Team = 0;// wip
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
+    float Team = 0;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
     float HitGlow = 0;

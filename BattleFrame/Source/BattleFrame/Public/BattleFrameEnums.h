@@ -22,32 +22,23 @@ UENUM(BlueprintType)
 enum class EPlaySoundOrigin : uint8
 {
     PlaySound2D UMETA(DisplayName = "PlaySound2D", Tooltip = "不使用空间音效"),
-    PlaySound3D UMETA(DisplayName = "AtSelf", Tooltip = "使用空间音效"),
+    PlaySound3D UMETA(DisplayName = "PlaySound3D_AtSelf", Tooltip = "使用空间音效"),
 };
 
 UENUM(BlueprintType)
 enum class EPlaySoundOrigin_Attack : uint8
 {
     PlaySound2D UMETA(DisplayName = "PlaySound2D", Tooltip = "不使用空间音效"),
-    PlaySound3D_AtSelf UMETA(DisplayName = "AtSelf", Tooltip = "在自身位置"),
-    PlaySound3D_AtTarget UMETA(DisplayName = "AtTarget", Tooltip = "在攻击目标位置")
+    PlaySound3D_AtSelf UMETA(DisplayName = "PlaySound3D_AtSelf", Tooltip = "在自身位置"),
+    PlaySound3D_AtTarget UMETA(DisplayName = "PlaySound3D_AtTarget", Tooltip = "在攻击目标位置")
 };
 
 UENUM(BlueprintType)
 enum class EInitialDirection : uint8
 {
-	FacePlayer UMETA(
-		DisplayName = "FacingPlayer0",
-		Tooltip = "生成时面朝玩家0的方向"
-	),
-		FaceForward UMETA(
-			DisplayName = "SpawnerForwardVector",
-			Tooltip = "使用生成器的前向向量作为朝向"
-		),
-		CustomDirection UMETA(
-			DisplayName = "CustomDirection",
-			Tooltip = "自定义朝向"
-		)
+	FacePlayer UMETA(DisplayName = "FacingPlayer0",Tooltip = "生成时面朝玩家0的方向"),
+	FaceForward UMETA(DisplayName = "SpawnerForwardVector",Tooltip = "使用生成器的前向向量作为朝向"),
+	CustomDirection UMETA(DisplayName = "CustomDirection",Tooltip = "自定义朝向")
 };
 
 UENUM(BlueprintType)
@@ -75,17 +66,17 @@ enum class EMoveState : uint8
 UENUM(BlueprintType)
 enum class EOrientMode : uint8
 {
-	ToPath UMETA(DisplayName = "ToPath"),
-	ToMovement UMETA(DisplayName = "ToMovement"),
-	ToMovementForwardAndBackward UMETA(DisplayName = "ToMovementForwardAndBackward")
+	ToPath UMETA(DisplayName = "ToPath", Tooltip = "面朝移动路径"),
+	ToMovement UMETA(DisplayName = "ToMovement", Tooltip = "面朝实际运动方向"),
+	ToMovementForwardAndBackward UMETA(DisplayName = "ToMovementForwardAndBackward", Tooltip = "面朝或背对实际运动方向")
 };
 
 UENUM(BlueprintType)
 enum class EGroundTraceMode : uint8
 {
-	FlowFieldAndSphereTrace	UMETA(DisplayName = "FlowFieldAndSphereTrace", Tooltip = "仅在地形边缘使用球形检测, 推荐"),
-	FlowField				UMETA(DisplayName = "FlowField", Tooltip = "使用流场采样高度，悬崖边缘可能不够精确"),
-	SphereTrace				UMETA(DisplayName = "SphereTrace", Tooltip = "使用球形扫描检测，很精确但非常贵")
+	FlowFieldAndSphereTrace	UMETA(DisplayName = "FlowFieldAndSphereTrace", Tooltip = "在陡坡使用球形检测, 否则使用流场"),
+	FlowField				UMETA(DisplayName = "FlowField", Tooltip = "仅使用流场高度，可能不够精确"),
+	SphereTrace				UMETA(DisplayName = "SphereTrace", Tooltip = "仅使用球形扫描，很精确但性能消耗大")
 };
 
 UENUM(BlueprintType)
@@ -142,6 +133,7 @@ enum class EAttackEventState : uint8
 	Hit UMETA(DisplayName = "Hit", ToolTip = "击中"),
 	Cooling UMETA(DisplayName = "Cooling", ToolTip = "冷却"),
 	End_Reason_InvalidTarget UMETA(DisplayName = "End_Reason:InvalidTarget", ToolTip = "攻击目标失效"),
+	End_Reason_NotInATKRange UMETA(DisplayName = "End_Reason:NotInATKRange", ToolTip = "不在攻击范围内"),
 	End_Reason_Complete UMETA(DisplayName = "End_Reason:Complete", ToolTip = "完成")
 };
 

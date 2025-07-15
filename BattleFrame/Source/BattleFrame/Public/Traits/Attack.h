@@ -33,6 +33,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "每轮攻击的持续时长"))
 	float DurationPerRound = 1.f;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "最短瞄准时间"))
+	float MinAimTime = 0;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "施加伤害的时刻"))
 	float TimeOfHit = 0.35f;
 
@@ -51,7 +54,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "夹角小于该值可以击中", DisplayName = "Hit Angle"))
 	float AngleToleranceHit = 180.f;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "施加伤害的时刻的行为"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "击中时刻的行为"))
 	EAttackMode TimeOfHitAction = EAttackMode::ApplyDMG;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否播放攻击动画"))
@@ -80,13 +83,15 @@ struct BATTLEFRAME_API FAttacking
 
 public:
 
-	float Time = 0.0f;
+	float AimTime = 0.0f;
+	float ATKTime = 0.0f;
 	EAttackState State = EAttackState::Aim;
 	bool bEnable = true;
 
 	FORCEINLINE void Reset()
 	{
-		Time = 0.0f;
+		AimTime = 0.0f;
+		ATKTime = 0.0f;
 		State = EAttackState::Aim;
 		bEnable = true;
 	}

@@ -20,7 +20,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0", Tooltip = "转向角加速度"))
 	float TurnAcceleration = 1000;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0", Tooltip = "转向角加速度"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0", Tooltip = "转向模式"))
 	EOrientMode TurnMode = EOrientMode::ToMovementForwardAndBackward;
 
 };
