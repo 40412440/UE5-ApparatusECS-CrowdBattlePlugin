@@ -527,20 +527,14 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							if (Navigation.bUseAStar)
 							{
 								// follow path
-								const bool bIsOnPath = GetSteeringDirection(SelfLocation, Moving.Goal, Navigating.PathPoints, Moving.CurrentVelocity.Size2D(), SelfRadius * 2, SelfRadius, Patrol.AcceptanceRadius, DesiredMoveDirection);
+								const bool bIsOnPath = GetSteeringDirection(SelfLocation, Moving.Goal, Navigating.PathPoints, Moving.CurrentVelocity.Size2D(), SelfRadius * 2, SelfRadius * 2, Patrol.AcceptanceRadius, DesiredMoveDirection);
 
 								// re-calculate path
-								bool bIsValidPath = false;
-
 								if (!bIsOnPath && Navigating.TimeLeft <= 0)
 								{
-									bIsValidPath = FindPathAStar(Navigating.FlowField, SelfLocation, Moving.Goal, Navigating.PathPoints);
+									FindPathAStar(Navigating.FlowField, SelfLocation, Moving.Goal, Navigating.PathPoints);
 									Navigating.TimeLeft = Navigation.AStarCoolDown;
-									//UE_LOG(LogTemp, Warning, TEXT("FindPathAStar"));
 								}
-
-								//UE_LOG(LogTemp, Warning, TEXT("TimeLeft: %f"), Navigating.TimeLeft);
-								//UE_LOG(LogTemp, Log, TEXT("bIsOnPath: %s"),bIsOnPath ? TEXT("true") : TEXT("false"));
 
 								Navigating.PreviousNavMode = ENavMode::AStar;
 								Navigating.TimeLeft = FMath::Clamp(Navigating.TimeLeft - SafeDeltaTime, 0, FLT_MAX);
@@ -655,18 +649,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 				//-------------------------- Desired Speed XY ----------------------------
 
-				Moving.MoveSpeedMult = 0;
-
-				// Stop when attacking and not cooling
-				const bool bIsAttackingNotColling = bIsAttacking ? Subject.GetTrait<FAttacking>().State != EAttackState::Cooling : false;
-
-				// Decide current move state
+				// Move State Machine
 				float DistanceToGoal = 0;;
 				float FinalAcceptenceRadius = 0;
 				bool bIsInAcceptanceRadius = false;
 
-				// 休眠状态
-				if (bIsSleeping) 
+				if (bIsSleeping) // Sleeping
 				{
 					if (Moving.MoveState != EMoveState::Sleeping)
 					{
@@ -684,9 +672,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							OnMoveQueue.Enqueue(MoveData);
 						}
 					}
-				}
-				// 巡逻状态
-				else if (bIsPatrolling) 
+				}				
+				else if (bIsPatrolling) // Patrolling
 				{
 					DistanceToGoal = FVector::Dist2D(SelfLocation, Moving.Goal);
 					bIsInAcceptanceRadius = DistanceToGoal <= Patrol.AcceptanceRadius;
@@ -710,17 +697,13 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							OnMoveQueue.Enqueue(MoveData);
 						}
 					}
-				}
-				// 追击目标
-				else if(Chase.bEnable && bIsValidTraceResult)
+				}			
+				else if(bIsChasing) // Chasing
 				{
 					float OtherRadius = Tracing.TraceResult.HasTrait<FGridData>() ? Tracing.TraceResult.GetTraitRef<FGridData, EParadigm::Unsafe>().Radius : 0;
 					DistanceToGoal = FMath::Clamp(FVector::Dist2D(SelfLocation, Moving.Goal) - SelfRadius - OtherRadius, 0, FLT_MAX);
 					bIsInAcceptanceRadius = DistanceToGoal <= Chase.AcceptanceRadius;
 					FinalAcceptenceRadius = Chase.AcceptanceRadius + OtherRadius;
-
-					// 超出距离丢失仇恨
-					//if (DistanceToGoal > Chase.MaxDistance) Tracing.TraceResult = FSubjectHandle();
 
 					EMoveState NewMoveState = bIsInAcceptanceRadius ? EMoveState::ReachedTarget : EMoveState::ChasingTarget;
 
@@ -740,9 +723,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							OnMoveQueue.Enqueue(MoveData);
 						}
 					}
-				}
-				// 移动到位置
-				else 
+				}				
+				else // Approaching
 				{
 					DistanceToGoal = FVector::Dist2D(SelfLocation, Moving.Goal);
 					bIsInAcceptanceRadius = DistanceToGoal <= Move.XY.AcceptanceRadius;
@@ -769,10 +751,17 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				}
 
 				// Should stop moving under these circumstances
-				const bool bShouldStopMoving = !Move.bEnable || Moving.bLaunching || Moving.bPushedBack || bIsAppearing || bIsSleeping || bIsDying || bIsAttackingNotColling || bIsInAcceptanceRadius;
+				const bool bIsAttackingNotColling = bIsAttacking ? Subject.GetTrait<FAttacking>().State != EAttackState::Cooling : false; // Stop when attacking and not cooling
+				const bool bIsTimeToBrake = DistanceToGoal < (FMath::Square(Moving.CurrentVelocity.Size2D())) / (2.0f * Move.XY.MoveDeceleration); // 计算最小距离: S_min = V^2 / (2A)
+				const bool bShouldStopMoving = !Move.bEnable || Moving.bLaunching || Moving.bPushedBack || bIsTimeToBrake || bIsInAcceptanceRadius || bIsAppearing || bIsSleeping || bIsAttackingNotColling || bIsDying ;
 
-				// Cases that need to move faster or slower
-				if (!bShouldStopMoving)
+				if (bShouldStopMoving)
+				{
+					Moving.MoveSpeedMult = 0;
+				}
+				
+				// Adjust move speed
+				else
 				{
 					// adjust speed during patrol
 					Moving.MoveSpeedMult = bIsPatrolling ? Patrol.MoveSpeedMult : 1;
@@ -797,12 +786,22 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 					Moving.MoveSpeedMult *= FMath::GetMappedRangeValueClamped(TurnInputRange, TurnOutputRange, AngleDegrees);
 
-					// 速度-与目标距离 插值
-					const TRange<float> MoveInputRange(Move.XY.MoveSpeedRangeMapByDist.X, Move.XY.MoveSpeedRangeMapByDist.Z);
-					const TRange<float> MoveOutputRange(Move.XY.MoveSpeedRangeMapByDist.Y, Move.XY.MoveSpeedRangeMapByDist.W);
+					// 速度-与目标距离二次方插值，离目标越近变化率越大
+					const float MinDist = Move.XY.MoveSpeedRangeMapByDist.X;
+					const float MaxDist = Move.XY.MoveSpeedRangeMapByDist.Z;
+					const float OutputAtMin = Move.XY.MoveSpeedRangeMapByDist.Y;
+					const float OutputAtMax = Move.XY.MoveSpeedRangeMapByDist.W;
 
-					Moving.MoveSpeedMult *= FMath::GetMappedRangeValueClamped(MoveInputRange, MoveOutputRange, DistanceToGoal);
-				}				
+					// 计算归一化因子并钳制到[0,1]范围
+					float NormalizedFactor = (MaxDist - DistanceToGoal) / (MaxDist - MinDist);
+					NormalizedFactor = FMath::Clamp(NormalizedFactor, 0.0f, 1.0f);
+
+					// 使用二次方函数计算插值
+					float FactorSquared = FMath::Square(NormalizedFactor);
+					float MappedValue = OutputAtMax + (OutputAtMin - OutputAtMax) * FactorSquared;
+
+					Moving.MoveSpeedMult *= MappedValue;
+				}
 
 				//----------------------- Desired Velocity XY ----------------------------
 
@@ -995,7 +994,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					// apply velocity
 					if (LIKELY(!Moving.bFalling && !Moving.bLaunching && !Moving.bPushedBack))
 					{
-						InterpedVelocity = FMath::VInterpConstantTo(CurrentVelocity, AvoidingVelocity, DeltaTime, Move.XY.MoveAcceleration);
+						const bool bIsAccelerating = AvoidingVelocity.SizeSquared2D() > CurrentVelocity.SizeSquared2D();
+						InterpedVelocity = FMath::VInterpConstantTo(CurrentVelocity, AvoidingVelocity, DeltaTime, bIsAccelerating ? Move.XY.MoveAcceleration : Move.XY.MoveDeceleration);
 					}
 					else if (Moving.bFalling)
 					{
@@ -1109,7 +1109,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 				Moving.TimeLeft -= SafeDeltaTime;
 
-				//------------------------ Final Velocity Z -----------------------------
+				//------------------------- Final Velocity Z -----------------------------
 
 				// 定义球体追踪lambda函数
 				auto PerformSphereTrace = [&](FVector& OutLocation) -> bool
@@ -1249,13 +1249,13 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 				}
 
-				//----------------------- Final New Location -----------------------------
+				//------------------------ Final New Location -----------------------------
 				
 				// 执行最终位移
 				Located.PreLocation = Located.Location;
 				Located.Location += Moving.CurrentVelocity * SafeDeltaTime;
 
-				//----------------------------- Yaw --------------------------------------
+				//------------------------------- Yaw --------------------------------------
 
 				Moving.TurnSpeedMult = 0;
 
@@ -3096,13 +3096,13 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							}
 
 							// write idle anim to slot 0
-							Animating.AnimCurrentTime0 = GetGameTimeSinceCreation();
+							//Animating.AnimCurrentTime0 = GetGameTimeSinceCreation();
 							Animating.AnimIndex0 = Animation.IndexOfIdleAnim;
 							Animating.AnimPauseFrame0 = 0;
 							Animating.AnimOffsetTime0 = FMath::RandRange(Animation.IdleRandomTimeOffset.X, Animation.IdleRandomTimeOffset.Y);
 
 							// write move anim to slot 1
-							Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
+							//Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
 							Animating.AnimIndex1 = Animation.IndexOfMoveAnim;
 							Animating.AnimPauseFrame1 = 0;
 							Animating.AnimOffsetTime1 = FMath::RandRange(Animation.MoveRandomTimeOffset.X, Animation.MoveRandomTimeOffset.Y);
@@ -3118,9 +3118,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						const TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
 						const TRange<float> OutputRange(0, 1);
 						float Input = Moving.CurrentVelocity.Size2D();
-						//float Input = FMath::Max(Moving.CurrentVelocity.Size2D(), FMath::Abs(Moving.CurrentAngularVelocity));
-						Animating.AnimLerp0 = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
-						//UE_LOG(LogTemp, Warning, TEXT("CurrentAngularVelocity: %f"), Moving.CurrentAngularVelocity);
+						float TargetLerp = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
+						Animating.AnimLerp0 = FMath::FInterpConstantTo(Animating.AnimLerp0, TargetLerp, SafeDeltaTime, Animation.LerpSpeed);
+						//UE_LOG(LogTemp, Warning, TEXT("CurrentAngularVelocity: %f"), Animating.AnimLerp0);
 
 						// transit from slot 2 to slot 0 - 1 using AnimLerp1
 						Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 - SafeDeltaTime * Animation.LerpSpeed, 0, 1);
@@ -3204,7 +3204,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							const TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
 							const TRange<float> OutputRange(0, 1);
 							float Input = FMath::Max(Moving.CurrentVelocity.Size2D(), FMath::Abs(Moving.CurrentAngularVelocity));
-							Animating.AnimLerp0 = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
+							float TargetLerp = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
+							Animating.AnimLerp0 = FMath::FInterpConstantTo(Animating.AnimLerp0, TargetLerp, SafeDeltaTime, Animation.LerpSpeed);
+							//UE_LOG(LogTemp, Warning, TEXT("CurrentAngularVelocity: %f"), Animating.AnimLerp0);
 
 							// transit from slot 0 - 1 to slot 2 using AnimLerp1
 							Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
@@ -3267,7 +3269,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							const TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
 							const TRange<float> OutputRange(0, 1);
 							float Input = FMath::Max(Moving.CurrentVelocity.Size2D(), FMath::Abs(Moving.CurrentAngularVelocity));
-							Animating.AnimLerp0 = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
+							float TargetLerp = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
+							Animating.AnimLerp0 = FMath::FInterpConstantTo(Animating.AnimLerp0, TargetLerp, SafeDeltaTime, Animation.LerpSpeed);
+							//UE_LOG(LogTemp, Warning, TEXT("CurrentAngularVelocity: %f"), Animating.AnimLerp0);
 
 							// transit from slot 0 - 1 to slot 2 using AnimLerp1
 							Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
@@ -6923,9 +6927,11 @@ bool ABattleFrameBattleControl::GetSteeringDirection(const FVector& CurrentLocat
 	}
 
 	// 3. 验证位置条件
-	const bool bIsCurrentNearPath = FVector::DistSquared2D(CurrentLocation, ClosestPointOnPath) < FMath::Square(PathRadius);
-	const bool bIsGoalNearEnd = FVector::DistSquared2D(GoalLocation, PathPoints.Last()) < FMath::Square(AcceptanceRadius);
+	const bool bIsCurrentNearPath = FVector::DistSquared2D(CurrentLocation, ClosestPointOnPath) <= FMath::Square(PathRadius);
+	const bool bIsGoalNearEnd = FVector::DistSquared2D(GoalLocation, PathPoints.Last()) <= FMath::Square(AcceptanceRadius);
 	const bool bPathValid = bIsCurrentNearPath && bIsGoalNearEnd;
+	//UE_LOG(LogTemp, Log, TEXT("bIsCurrentNearPath: %d"), bIsCurrentNearPath);
+	//UE_LOG(LogTemp, Log, TEXT("bIsGoalNearEnd: %d"), bIsGoalNearEnd);
 
 	// 4. 计算预测目标点（支持跨越多线段）
 	const float PredictDistance = FMath::Max(LookAheadDistance, MoveSpeed * 0.5f);
@@ -6955,7 +6961,7 @@ bool ABattleFrameBattleControl::GetSteeringDirection(const FVector& CurrentLocat
 	}
 
 	// 5. 计算最终方向
-	SteeringDirection = (TargetPoint - CurrentLocation).GetSafeNormal();
+	SteeringDirection = (TargetPoint - CurrentLocation).GetSafeNormal2D();
 
 	// 6. 返回验证结果
 	return bPathValid;
