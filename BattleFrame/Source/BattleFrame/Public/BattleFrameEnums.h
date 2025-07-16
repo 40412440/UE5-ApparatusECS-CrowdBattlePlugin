@@ -49,7 +49,8 @@ enum class EAttackState : uint8
 	PreCast_FirstExec UMETA(DisplayName = "PreCast_FirstExec", ToolTip = "前摇"),
 	PreCast UMETA(DisplayName = "Begin", ToolTip = "前摇"),
 	PostCast UMETA(DisplayName = "Hit", ToolTip = "后摇"),
-	Cooling UMETA(DisplayName = "Cooling", ToolTip = "冷却")
+	Cooling UMETA(DisplayName = "Cooling", ToolTip = "冷却"),
+	Completed UMETA(DisplayName = "Completed", ToolTip = "完成")
 };
 
 UENUM(BlueprintType)

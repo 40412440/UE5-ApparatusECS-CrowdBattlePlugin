@@ -83,7 +83,6 @@ struct BATTLEFRAME_API FAttacking
 
 public:
 
-	bool bEnable = true;
 	float AimTime = 0.0f;
 	float ATKTime = 0.0f;
 	float CoolTime = 0.0f;
@@ -91,7 +90,6 @@ public:
 
 	FORCEINLINE void Reset()
 	{
-		bEnable = true;
 		AimTime = 0.0f;
 		ATKTime = 0.0f;
 		CoolTime = 0.0f;

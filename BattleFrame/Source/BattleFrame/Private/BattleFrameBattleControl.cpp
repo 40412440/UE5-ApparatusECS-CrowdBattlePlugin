@@ -658,10 +658,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				{
 					if (Moving.MoveState != EMoveState::Sleeping)
 					{
-						Moving.MoveState = EMoveState::Sleeping;
-
 						// Can trace again next frame
-						Tracing.TimeLeft = Trace.SectorTrace.Sleep.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
+						Tracing.TimeLeft = 0;
 
 						// Move Event Sleeping
 						if (Subject.HasTrait<FIsSubjective>())
@@ -671,6 +669,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							MoveData.State = EMoveEventState::Sleeping;
 							OnMoveQueue.Enqueue(MoveData);
 						}
+
+						Moving.MoveState = EMoveState::Sleeping;
 					}
 				}				
 				else if (bIsPatrolling) // Patrolling
@@ -680,13 +680,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					FinalAcceptenceRadius = Patrol.AcceptanceRadius;
 
 					EMoveState NewMoveState = bIsInAcceptanceRadius ? EMoveState::PatrolWaiting : EMoveState::Patrolling;
+					const bool bIsPreviouslyPatrolling = Moving.MoveState == EMoveState::PatrolWaiting || Moving.MoveState == EMoveState::Patrolling;
 
 					if (Moving.MoveState != NewMoveState)
 					{
-						Moving.MoveState = NewMoveState;
-
 						// Can trace again next frame
-						Tracing.TimeLeft = Trace.SectorTrace.Patrol.bEnable ? Trace.SectorTrace.Patrol.CoolDown : Trace.SectorTrace.Common.CoolDown;
+						if (!bIsPreviouslyPatrolling) Tracing.TimeLeft = 0;
 
 						// Move Event Patrol
 						if (Subject.HasTrait<FIsSubjective>())
@@ -696,6 +695,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							MoveData.State = bIsInAcceptanceRadius ? EMoveEventState::PatrolWaiting : EMoveEventState::Patrolling;
 							OnMoveQueue.Enqueue(MoveData);
 						}
+
+						Moving.MoveState = NewMoveState;
 					}
 				}			
 				else if(bIsChasing) // Chasing
@@ -706,15 +707,14 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					FinalAcceptenceRadius = Chase.AcceptanceRadius + OtherRadius;
 
 					EMoveState NewMoveState = bIsInAcceptanceRadius ? EMoveState::ReachedTarget : EMoveState::ChasingTarget;
+					const bool bIsPreviouslyChasing = Moving.MoveState == EMoveState::ReachedTarget || Moving.MoveState == EMoveState::ChasingTarget;
 
 					if (Moving.MoveState != NewMoveState)
 					{
-						Moving.MoveState = NewMoveState;
-
 						// Can trace again next frame
-						Tracing.TimeLeft = Trace.SectorTrace.Chase.bEnable ? Trace.SectorTrace.Chase.CoolDown : Trace.SectorTrace.Common.CoolDown;
+						if (!bIsPreviouslyChasing) Tracing.TimeLeft = 0;
 
-						// Move Event ChasingTarget
+						// Move Event Chasing
 						if (Subject.HasTrait<FIsSubjective>())
 						{
 							FMoveData MoveData;
@@ -722,6 +722,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							MoveData.State = bIsInAcceptanceRadius ? EMoveEventState::ReachedTarget : EMoveEventState::ChasingTarget;
 							OnMoveQueue.Enqueue(MoveData);
 						}
+
+						Moving.MoveState = NewMoveState;
 					}
 				}				
 				else // Approaching
@@ -731,15 +733,14 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					FinalAcceptenceRadius = Move.XY.AcceptanceRadius;
 
 					EMoveState NewMoveState = bIsInAcceptanceRadius ? EMoveState::ArrivedAtLocation : EMoveState::MovingToLocation;
+					const bool bIsPreviouslyApproaching = Moving.MoveState == EMoveState::ArrivedAtLocation || Moving.MoveState == EMoveState::MovingToLocation;
 
 					if (Moving.MoveState != NewMoveState)
 					{
-						Moving.MoveState = NewMoveState;
-
 						// Can trace again next frame
-						Tracing.TimeLeft = Trace.SectorTrace.Common.CoolDown;
+						if (!bIsPreviouslyApproaching) Tracing.TimeLeft = 0;
 
-						// Move Event MovingToLocation
+						// Move Event
 						if (Subject.HasTrait<FIsSubjective>())
 						{
 							FMoveData MoveData;
@@ -747,20 +748,25 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							MoveData.State = bIsInAcceptanceRadius ? EMoveEventState::ArrivedAtLocation : EMoveEventState::MovingToLocation;
 							OnMoveQueue.Enqueue(MoveData);
 						}
+
+						Moving.MoveState = NewMoveState;
 					}
 				}
 
-				// Should stop moving under these circumstances
+				// Cases that need to stop moving
 				const bool bIsAttackingNotColling = bIsAttacking ? Subject.GetTrait<FAttacking>().State != EAttackState::Cooling : false; // Stop when attacking and not cooling
 				const bool bIsTimeToBrake = DistanceToGoal < (FMath::Square(Moving.CurrentVelocity.Size2D())) / (2.0f * Move.XY.MoveDeceleration); // 计算最小距离: S_min = V^2 / (2A)
 				const bool bShouldStopMoving = !Move.bEnable || Moving.bLaunching || Moving.bPushedBack || bIsTimeToBrake || bIsInAcceptanceRadius || bIsAppearing || bIsSleeping || bIsAttackingNotColling || bIsDying ;
+				//UE_LOG(LogTemp, Warning, TEXT("bIsAttacking : %d"), bIsAttacking);
 
+
+				// Stop moving under these circumstances
 				if (bShouldStopMoving)
 				{
 					Moving.MoveSpeedMult = 0;
 				}
 				
-				// Adjust move speed
+				// Can move and adjust move speed
 				else
 				{
 					// adjust speed during patrol
@@ -820,7 +826,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					DebugCircleQueue.Enqueue(AcceptanceRadiusCircleConfig);
 
 					FDebugLineConfig LineToGoalConfig;
-					LineToGoalConfig.StartLocation = Located.Location;
+					LineToGoalConfig.StartLocation = Located.Location - FVector(0, 0, SelfRadius);
 					LineToGoalConfig.EndLocation = Moving.Goal;
 					LineToGoalConfig.Color = FColor::Purple;
 					LineToGoalConfig.LineThickness = 0.f;
@@ -844,7 +850,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 						FDebugLineConfig LineToPatrolOriginConfig;
 						LineToPatrolOriginConfig.StartLocation = Patrol.Origin;
-						LineToPatrolOriginConfig.EndLocation = Located.Location;
+						LineToPatrolOriginConfig.EndLocation = Located.Location - FVector(0,0,SelfRadius);
 						LineToPatrolOriginConfig.Color = FColor::Purple;
 						LineToPatrolOriginConfig.LineThickness = 0.f;
 						DebugLineQueue.Enqueue(LineToPatrolOriginConfig);
@@ -1454,55 +1460,53 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 		// Gather all agent that need to do tracing
 		Chain->OperateConcurrently([&](FSolidSubjectHandle Subject, FLocated& Located, FTrace& Trace, FTracing& Tracing, FMoving& Moving)
 			{
-				bool bShouldTrace = false;
 				const bool bHasAttacking = Subject.HasTrait<FAttacking>();
-				const bool bCanNewAttack = bHasAttacking ? !Subject.GetTrait<FAttacking>().bEnable : true;
+				bool bShouldTrace = false;
 
 				if (Tracing.TimeLeft <= 0)
 				{
-					if (bCanNewAttack)
+					if (!bHasAttacking)
 					{
+						bShouldTrace = true;
+
 						// Decide which cooldown to use
 						float CoolDown = 0;
 						switch (Moving.MoveState)
 						{
-							case EMoveState::Sleeping: // 休眠时索敌
-								CoolDown = Trace.SectorTrace.Sleep.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
-								break;
+						case EMoveState::Sleeping: // 休眠时索敌
+							CoolDown = Trace.SectorTrace.Sleep.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
+							break;
 
-							case EMoveState::Patrolling: // 巡逻时索敌
-								CoolDown = Trace.SectorTrace.Patrol.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
-								break;
+						case EMoveState::Patrolling: // 巡逻时索敌
+							CoolDown = Trace.SectorTrace.Patrol.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
+							break;
 
-							case EMoveState::PatrolWaiting: // 巡逻时索敌
-								CoolDown = Trace.SectorTrace.Patrol.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
-								break;
+						case EMoveState::PatrolWaiting: // 巡逻时索敌
+							CoolDown = Trace.SectorTrace.Patrol.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
+							break;
 
-							case EMoveState::ChasingTarget: // 追逐时索敌
-								CoolDown = Trace.SectorTrace.Chase.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
-								break;
+						case EMoveState::ChasingTarget: // 追逐时索敌
+							CoolDown = Trace.SectorTrace.Chase.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
+							break;
 
-							case EMoveState::ReachedTarget: // 追逐时索敌
-								CoolDown = Trace.SectorTrace.Chase.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
-								break;
+						case EMoveState::ReachedTarget: // 追逐时索敌
+							CoolDown = Trace.SectorTrace.Chase.bEnable ? Trace.SectorTrace.Sleep.CoolDown : Trace.SectorTrace.Common.CoolDown;
+							break;
 
-							case EMoveState::MovingToLocation: // 一般情况
-								CoolDown = Trace.SectorTrace.Common.CoolDown;
-								break;
+						case EMoveState::MovingToLocation: // 一般情况
+							CoolDown = Trace.SectorTrace.Common.CoolDown;
+							break;
 
-							case EMoveState::ArrivedAtLocation: // 一般情况
-								CoolDown = Trace.SectorTrace.Common.CoolDown;
-								break;
+						case EMoveState::ArrivedAtLocation: // 一般情况
+							CoolDown = Trace.SectorTrace.Common.CoolDown;
+							break;
 						}
-						Tracing.TimeLeft = CoolDown;
 
-						bShouldTrace = true;
+						Tracing.TimeLeft = CoolDown;
 					}
 				}
-				else
-				{
-					Tracing.TimeLeft -= SafeDeltaTime;
-				}
+
+				Tracing.TimeLeft = FMath::Clamp(Tracing.TimeLeft - SafeDeltaTime, 0 ,FLT_MAX);
 
 				if (bShouldTrace)// we add iterables into separate arrays and then append them.
 				{
@@ -1922,38 +1926,25 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				}
 
 				const bool bHasAttacking = Subject.HasTrait<FAttacking>();
-				const bool bCanNewAttack = bHasAttacking ? !Subject.GetTrait<FAttacking>().bEnable : true;
-				bool bShouldNewAttack = false;
 
-				if (bCanNewAttack)
+				if (!bHasAttacking) // 能否发起新一轮攻击
 				{
-					const bool bHasValidTarget = Tracing.TraceResult.IsValid() && Tracing.TraceResult.HasTrait<FLocated>() && Tracing.TraceResult.HasTrait<FHealth>();
+					const bool bIsTargetValid = Tracing.TraceResult.IsValid() && !Tracing.TraceResult.HasTrait<FDying>() && Tracing.TraceResult.HasTrait<FLocated>() && Tracing.TraceResult.HasTrait<FHealth>() && Tracing.TraceResult.GetTrait<FHealth>().Current > 0;
 
-					if (bHasValidTarget)
+					if (bIsTargetValid)
 					{
 						const float SelfRadius = Collider.Radius * Scaled.Scale;
-						float TargetHealth = Tracing.TraceResult.GetTraitRef<FHealth, EParadigm::Unsafe>().Current;
+						const float OtherRadius = Tracing.TraceResult.HasTrait<FGridData>() ? Tracing.TraceResult.GetTrait<FGridData>().Radius : 0;
 
 						FVector TargetLocation = Tracing.TraceResult.GetTrait<FLocated>().Location;
-						float OtherRadius = Tracing.TraceResult.HasTrait<FGridData>() ? Tracing.TraceResult.GetTrait<FGridData>().Radius : 0;
-
 						float DistSquared = FVector::DistSquared(Located.Location, TargetLocation);
 						float CombinedRadius = Attack.Range + SelfRadius + OtherRadius;
 						float CombinedRadiusSquared = FMath::Square(CombinedRadius);
 
 						// 触发攻击
-						if (DistSquared <= CombinedRadiusSquared && TargetHealth > 0)
+						if (DistSquared <= CombinedRadiusSquared)
 						{
-							bShouldNewAttack = true;
-
-							if (bHasAttacking)
-							{
-								Subject.GetTraitRef<FAttacking>().Reset();
-							}
-							else
-							{
-								Subject.SetTraitDeferred(FAttacking());
-							}
+							Subject.SetTraitDeferred(FAttacking());
 
 							// Attack Aim(Begin) Event
 							if (Subject.HasTrait<FIsSubjective>())
@@ -1966,11 +1957,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							}
 						}
 					}
-				}
-
-				if(!bShouldNewAttack && bHasAttacking && !Subject.GetTrait<FAttacking>().bEnable)
-				{
-					Subject.RemoveTraitDeferred<FAttacking>();
 				}
 
 			}, ThreadsCount, BatchSize);
@@ -2012,7 +1998,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					// 瞄准目标无效，提前中止
 					if (!bIsTargetValid)
 					{
-						Attacking.bEnable = false; // mark trait pending removal
+						Subject.RemoveTraitDeferred<FAttacking>(); // 不再攻击
 						Tracing.TimeLeft = 0; // 可立即重新索敌
 
 						// Attack End Event
@@ -2060,7 +2046,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					// 瞄准目标太远，提前中止
 					if (!bIsDistValid)
 					{
-						Attacking.bEnable = false; // mark trait pending removal
+						Subject.RemoveTraitDeferred<FAttacking>(); // 不再攻击
 
 						// Attack End Event
 						if (Subject.HasTrait<FIsSubjective>())
@@ -2075,8 +2061,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						return;
 					}
 
-					// 瞄准完成，进入下一环节
-					if (bIsAngleValid && Attacking.AimTime >= Attack.MinAimTime)
+					// 瞄准完成，开始攻击
+					if (bIsAngleValid && Attacking.AimTime == Attack.MinAimTime)
 					{
 						Attacking.State = EAttackState::PreCast_FirstExec;
 					}
@@ -2198,7 +2184,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 				}
 
-				// 造成一次伤害
+				// 判定击中
 				if (Attacking.State == EAttackState::PreCast && Attacking.ATKTime >= Attack.TimeOfHit)
 				{
 					Attacking.State = EAttackState::PostCast; // Do Once
@@ -2284,8 +2270,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 				}
 
-				// 冷却等待下一轮攻击
-				if (Attacking.State == EAttackState::PostCast && Attacking.ATKTime >= Attack.DurationPerRound)
+				// 进入冷却
+				if (Attacking.State == EAttackState::PostCast && Attacking.ATKTime == Attack.DurationPerRound)
 				{
 					Attacking.State = EAttackState::Cooling; // Do Once
 
@@ -2300,10 +2286,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 				}
 
-				// 到达计时器时间，本轮攻击结束
-				if (Attacking.State == EAttackState::Cooling && Attacking.CoolTime >= Attack.CoolDown)
+				// 冷却完成，本轮攻击结束
+				if (Attacking.State == EAttackState::Cooling && Attacking.CoolTime == Attack.CoolDown)
 				{
-					Attacking.bEnable = false; // mark trait pending removal
+					Subject.RemoveTraitDeferred<FAttacking>(); // 不再攻击
 
 					// Can trace again next frame ?
 					bool bIsTargetValid = Tracing.TraceResult.IsValid() && !Tracing.TraceResult.HasTrait<FDying>() && Tracing.TraceResult.HasTrait<FLocated>() && Tracing.TraceResult.HasTrait<FHealth>() && Tracing.TraceResult.GetTrait<FHealth>().Current > 0;
@@ -2324,15 +2310,15 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// 更新计时器
 				if (Attacking.State == EAttackState::Aim)
 				{
-					Attacking.AimTime += SafeDeltaTime;
+					Attacking.AimTime = FMath::Clamp(Attacking.AimTime + SafeDeltaTime, 0, Attack.MinAimTime);
 				}
 				else if (Attacking.State == EAttackState::PreCast_FirstExec || Attacking.State == EAttackState::PreCast || Attacking.State == EAttackState::PostCast)
 				{
-					Attacking.ATKTime += SafeDeltaTime;
+					Attacking.ATKTime = FMath::Clamp(Attacking.ATKTime + SafeDeltaTime, 0, Attack.DurationPerRound);
 				}
 				else if (Attacking.State == EAttackState::Cooling)
 				{
-					Attacking.CoolTime += SafeDeltaTime;
+					Attacking.CoolTime = FMath::Clamp(Attacking.CoolTime + SafeDeltaTime, 0, Attack.CoolDown);
 				}
 
 			}, ThreadsCount, BatchSize);
@@ -3134,8 +3120,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						// transit from slot 2 to slot 0 - 1 using AnimLerp1
 						Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 - SafeDeltaTime * Animation.LerpSpeed, 0, 1);
 
-						Animating.AnimPlayRate0 = Animation.IdlePlayRate * FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX);
-						Animating.AnimPlayRate1 = Animation.MovePlayRate * FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX);
+						Animating.AnimPlayRate0 = Animation.IdlePlayRate/* * FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX)*/;
+						Animating.AnimPlayRate1 = Animation.MovePlayRate/* * FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX)*/;
 						//UE_LOG(LogTemp, Warning, TEXT("SlowMultIs: %f"), Slowing.CombinedSlowMult);
 
 						break;
