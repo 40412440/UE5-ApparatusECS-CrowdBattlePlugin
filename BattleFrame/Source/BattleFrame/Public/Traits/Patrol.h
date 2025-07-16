@@ -50,12 +50,13 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "移动速度乘数"))
 	float MoveSpeedMult = 1;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "使用哪里作为原点"))
-	EPatrolOriginMode OriginMode = EPatrolOriginMode::Initial;
-
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "目标丢失后行为"))
 	EPatrolRecoverMode OnLostTarget = EPatrolRecoverMode::Patrol;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "使用哪里作为原点"))
+	EPatrolOriginMode OriginMode = EPatrolOriginMode::Initial;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "巡逻圆心"))
 	FVector Origin = FVector::ZeroVector;
 
 };
@@ -67,7 +68,10 @@ struct BATTLEFRAME_API FPatrolling
 
 public:
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
 	float MoveTimeLeft = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
 	float WaitTimeLeft = 0;
 
 };

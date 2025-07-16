@@ -44,7 +44,9 @@ enum class EInitialDirection : uint8
 UENUM(BlueprintType)
 enum class EAttackState : uint8
 {
+	Aim_FirstExec UMETA(DisplayName = "Aim_FirstExec", ToolTip = "瞄准"),
 	Aim UMETA(DisplayName = "Aim", ToolTip = "瞄准"),
+	PreCast_FirstExec UMETA(DisplayName = "PreCast_FirstExec", ToolTip = "前摇"),
 	PreCast UMETA(DisplayName = "Begin", ToolTip = "前摇"),
 	PostCast UMETA(DisplayName = "Hit", ToolTip = "后摇"),
 	Cooling UMETA(DisplayName = "Cooling", ToolTip = "冷却")

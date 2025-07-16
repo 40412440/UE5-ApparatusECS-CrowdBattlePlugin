@@ -1264,9 +1264,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 				if (bIsAttacking)
 				{
-					const auto State = Subject.GetTraitRef<FAttacking, EParadigm::Unsafe>().State;
-					bIsAttckingStatePrePost = State == EAttackState::PreCast || State == EAttackState::PostCast; // 攻击时只有播放攻击动画的时间段不转向
-					bIsAiming = State == EAttackState::Aim; // 对攻击状态下瞄准阶段做单独处理
+					const auto State = Subject.GetTrait<FAttacking>().State;
+
+					bIsAiming = State == EAttackState::Aim; // 瞄准阶段强制朝向攻击目标
+					bIsAttckingStatePrePost = State == EAttackState::PreCast_FirstExec || State == EAttackState::PreCast || State == EAttackState::PostCast; // 播放攻击动画的时间段不转向
 				}
 
 				// 不转向的情况
@@ -2002,17 +2003,11 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FDefence& Defence,
 				FSlowing& Slowing)
 			{
-				if (Attacking.State == EAttackState::Aim) // 瞄准
+				// 瞄准
+				if (Attacking.State == EAttackState::Aim)
 				{
-					bool bIsTargetValid = false;
-					bool bIsDistValid = false;
-					bool bIsAngleValid = false;
-
 					// 检查被瞄准对象是否有效
-					if (Tracing.TraceResult.IsValid() && Tracing.TraceResult.HasTrait<FLocated>() && Tracing.TraceResult.HasTrait<FHealth>() && Tracing.TraceResult.GetTraitRef<FHealth, EParadigm::Unsafe>().Current > 0)
-					{
-						bIsTargetValid = true;
-					}
+					bool bIsTargetValid = Tracing.TraceResult.IsValid() && !Tracing.TraceResult.HasTrait<FDying>() && Tracing.TraceResult.HasTrait<FLocated>() && Tracing.TraceResult.HasTrait<FHealth>() && Tracing.TraceResult.GetTrait<FHealth>().Current > 0;
 
 					// 瞄准目标无效，提前中止
 					if (!bIsTargetValid)
@@ -2026,6 +2021,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							FAttackData AttackData;
 							AttackData.SelfSubject = FSubjectHandle(Subject);
 							AttackData.State = EAttackEventState::End_Reason_InvalidTarget;
+							AttackData.AttackTarget = Tracing.TraceResult;
 							OnAttackQueue.Enqueue(AttackData);
 						}
 
@@ -2033,6 +2029,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 
 					// 检查距离和夹角
+					bool bIsDistValid = false;
+					bool bIsAngleValid = false;
+
 					if (bIsTargetValid)
 					{
 						// 检查距离
@@ -2069,269 +2068,271 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							FAttackData AttackData;
 							AttackData.SelfSubject = FSubjectHandle(Subject);
 							AttackData.State = EAttackEventState::End_Reason_NotInATKRange;
+							AttackData.AttackTarget = Tracing.TraceResult;
 							OnAttackQueue.Enqueue(AttackData);
 						}
 
 						return;
 					}
 
-					// 限制最短瞄准时长
-					if (Attacking.AimTime >= Attack.MinAimTime && bIsAngleValid)
+					// 瞄准完成，进入下一环节
+					if (bIsAngleValid && Attacking.AimTime >= Attack.MinAimTime)
 					{
-						// 瞄准完成，进入下一环节
-						Attacking.State = EAttackState::PreCast;
+						Attacking.State = EAttackState::PreCast_FirstExec;
 					}
-
-					// 更新计时器
-					Attacking.AimTime += SafeDeltaTime; 
 				}
-				else // 攻击
-				{	
-					// 生成
-					if (UNLIKELY(Attacking.ATKTime == 0)) // First Execute
+
+				// 开始攻击
+				if (Attacking.State == EAttackState::PreCast_FirstExec)
+				{
+					Attacking.State = EAttackState::PreCast; // Do Once
+
+					// Animation
+					Animating.AnimState = EAnimState::Attacking;
+					Animating.bUpdateAnimState = true;
+
+					FVector SpawnLocation = Located.Location;
+					FQuat SpawnRotation = Directed.Direction.ToOrientationQuat();
+
+					// Actor
+					for (const FActorSpawnConfig_Attack& Config : Attack.SpawnActor)
 					{
-						// Animation
-						Animating.AnimState = EAnimState::Attacking;
-						Animating.bUpdateAnimState = true;
+						FActorSpawnConfig_Final NewConfig(Config);
+						NewConfig.OwnerSubject = FSubjectHandle(Subject);
 
-						FVector SpawnLocation = Located.Location;
-						FQuat SpawnRotation = Directed.Direction.ToOrientationQuat();
-
-						// Actor
-						for (const FActorSpawnConfig_Attack& Config : Attack.SpawnActor)
+						switch (Config.SpawnOrigin)
 						{
-							FActorSpawnConfig_Final NewConfig(Config);
-							NewConfig.OwnerSubject = FSubjectHandle(Subject);
+						case ESpawnOrigin::AtSelf:
 
-							switch (Config.SpawnOrigin)
+							NewConfig.AttachToSubject = FSubjectHandle(Subject);
+							NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
+							NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(SpawnRotation, SpawnLocation));
+							Mechanism->SpawnSubjectDeferred(NewConfig);
+							break;
+
+						case ESpawnOrigin::AtTarget:
+
+							if (Tracing.TraceResult.IsValid())
 							{
-								case ESpawnOrigin::AtSelf:
+								NewConfig.AttachToSubject = Tracing.TraceResult;
+								SpawnLocation = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
+								FQuat TargetRotation = Tracing.TraceResult.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.ToOrientationQuat();
+								NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
+								NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(TargetRotation, SpawnLocation));
+								Mechanism->SpawnSubjectDeferred(NewConfig);
+							}
+							break;
+						}
+					}
 
-									NewConfig.AttachToSubject = FSubjectHandle(Subject);
-									NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
-									NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(SpawnRotation, SpawnLocation));
-									Mechanism->SpawnSubjectDeferred(NewConfig);
-									break;
+					// Fx
+					for (const FFxConfig_Attack& Config : Attack.SpawnFx)
+					{
+						FFxConfig_Final NewConfig(Config);
+						NewConfig.OwnerSubject = FSubjectHandle(Subject);
 
-								case ESpawnOrigin::AtTarget:
+						switch (Config.SpawnOrigin)
+						{
+						case ESpawnOrigin::AtSelf:
 
-									if (Tracing.TraceResult.IsValid())
+							NewConfig.AttachToSubject = FSubjectHandle(Subject);
+							NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
+							NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(SpawnRotation, SpawnLocation));
+							Mechanism->SpawnSubjectDeferred(NewConfig);
+							break;
+
+						case ESpawnOrigin::AtTarget:
+
+							if (Tracing.TraceResult.IsValid())
+							{
+								NewConfig.AttachToSubject = Tracing.TraceResult;
+								SpawnLocation = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
+								FQuat TargetRotation = Tracing.TraceResult.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.ToOrientationQuat();
+								NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
+								NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(TargetRotation, SpawnLocation));
+								Mechanism->SpawnSubjectDeferred(NewConfig);
+							}
+							break;
+						}
+					}
+
+					// Sound
+					for (const FSoundConfig_Attack& Config : Attack.PlaySound)
+					{
+						FSoundConfig_Final NewConfig(Config);
+						NewConfig.OwnerSubject = FSubjectHandle(Subject);
+
+						switch (Config.SpawnOrigin)
+						{
+						case EPlaySoundOrigin_Attack::PlaySound3D_AtSelf:
+
+							NewConfig.AttachToSubject = FSubjectHandle(Subject);
+							NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
+							NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(SpawnRotation, SpawnLocation));
+							Mechanism->SpawnSubjectDeferred(NewConfig);
+							break;
+
+						case EPlaySoundOrigin_Attack::PlaySound3D_AtTarget:
+
+							if (Tracing.TraceResult.IsValid())
+							{
+								NewConfig.AttachToSubject = Tracing.TraceResult;
+								SpawnLocation = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
+								FQuat TargetRotation = Tracing.TraceResult.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.ToOrientationQuat();
+								NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
+								NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(TargetRotation, SpawnLocation));
+								Mechanism->SpawnSubjectDeferred(NewConfig);
+							}
+							break;
+						}
+					}
+
+					// Attack Begin Event
+					if (Subject.HasTrait<FIsSubjective>())
+					{
+						FAttackData AttackData;
+						AttackData.SelfSubject = FSubjectHandle(Subject);
+						AttackData.State = EAttackEventState::Begin;
+						AttackData.AttackTarget = Tracing.TraceResult;
+						OnAttackQueue.Enqueue(AttackData);
+					}
+				}
+
+				// 造成一次伤害
+				if (Attacking.State == EAttackState::PreCast && Attacking.ATKTime >= Attack.TimeOfHit)
+				{
+					Attacking.State = EAttackState::PostCast; // Do Once
+
+					TArray<FDmgResult> DmgResults;
+
+					bool bIsTargetValid = Tracing.TraceResult.IsValid() && !Tracing.TraceResult.HasTrait<FDying>() && Tracing.TraceResult.HasTrait<FLocated>() && Tracing.TraceResult.HasTrait<FHealth>() && Tracing.TraceResult.GetTrait<FHealth>().Current > 0;
+
+					if (bIsTargetValid)
+					{
+						// 获取双方位置信息
+						FVector AttackerPos = Located.Location;
+						FVector TargetPos = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
+
+						// 计算距离
+						const float SelfRadius = Collider.Radius * Scaled.Scale;
+						float OtherRadius = Tracing.TraceResult.HasTrait<FGridData>() ? Tracing.TraceResult.GetTraitRef<FGridData, EParadigm::Unsafe>().Radius : 0;
+						float Distance = FMath::Clamp(FVector::Distance(AttackerPos, TargetPos) - SelfRadius - OtherRadius, 0, FLT_MAX);
+
+						// 计算夹角
+						FVector AttackerForward = Subject.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.GetSafeNormal2D();
+						FVector ToTargetDir = (TargetPos - AttackerPos).GetSafeNormal2D();
+						float Angle = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(AttackerForward, ToTargetDir)));
+
+						// Deal Dmg
+						if (Attack.TimeOfHitAction == EAttackMode::ApplyDMG || Attack.TimeOfHitAction == EAttackMode::SuicideATK)
+						{
+							if (!Tracing.TraceResult.HasTrait<FDying>())
+							{
+								if (Distance <= Attack.RangeToleranceHit && Angle <= Attack.AngleToleranceHit)
+								{
+									if (Damage.DmgRadius == 0)
 									{
-										NewConfig.AttachToSubject = Tracing.TraceResult;
-										SpawnLocation = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
-										FQuat TargetRotation = Tracing.TraceResult.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.ToOrientationQuat();
-										NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
-										NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(TargetRotation, SpawnLocation));
-										Mechanism->SpawnSubjectDeferred(NewConfig);
+										// 单体
+										ApplyPointDamageAndDebuffDeferred(FSubjectArray{ TArray<FSubjectHandle>{Tracing.TraceResult} }, FSubjectArray(), FSubjectHandle{ Subject }, FSubjectHandle{ Subject }, Located.Location, FDamage_Point(Damage), FDebuff_Point(Debuff), DmgResults);
 									}
-									break;
-							}
-						}
+									else
+									{
+										// 范围
+										FFilter TargetFilter;
 
-						// Fx
-						for (const FFxConfig_Attack& Config : Attack.SpawnFx)
-						{
-							FFxConfig_Final NewConfig(Config);
-							NewConfig.OwnerSubject = FSubjectHandle(Subject);
+										TargetFilter.Include(Trace.IncludeTraits);
+										TargetFilter.Exclude(Trace.ExcludeTraits);
 
-							switch (Config.SpawnOrigin)
-							{
-							case ESpawnOrigin::AtSelf:
-
-								NewConfig.AttachToSubject = FSubjectHandle(Subject);
-								NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
-								NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(SpawnRotation, SpawnLocation));
-								Mechanism->SpawnSubjectDeferred(NewConfig);
-								break;
-
-							case ESpawnOrigin::AtTarget:
-
-								if (Tracing.TraceResult.IsValid())
-								{
-									NewConfig.AttachToSubject = Tracing.TraceResult;
-									SpawnLocation = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
-									FQuat TargetRotation = Tracing.TraceResult.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.ToOrientationQuat();
-									NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
-									NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(TargetRotation, SpawnLocation));
-									Mechanism->SpawnSubjectDeferred(NewConfig);
+										ApplyRadialDamageAndDebuffDeferred(TargetPos, FSubjectArray(), FSubjectHandle{ Subject }, FSubjectHandle{ Subject }, Located.Location, FDamage_Radial(Damage), FDebuff_Radial(Debuff), TargetFilter, Tracing.NeighborGrid, DmgResults);
+									}
 								}
-								break;
 							}
 						}
+					}
 
-						// Sound
-						for (const FSoundConfig_Attack& Config : Attack.PlaySound)
-						{
-							FSoundConfig_Final NewConfig(Config);
-							NewConfig.OwnerSubject = FSubjectHandle(Subject);
+					// Attack Hit Event
+					if (Subject.HasTrait<FIsSubjective>())
+					{
+						FAttackData AttackData;
+						AttackData.SelfSubject = FSubjectHandle(Subject);
+						AttackData.State = EAttackEventState::Hit;
+						AttackData.AttackTarget = Tracing.TraceResult;
+						AttackData.DmgResults.Append(DmgResults);
+						OnAttackQueue.Enqueue(AttackData);
+					}
 
-							switch (Config.SpawnOrigin)
-							{
-							case EPlaySoundOrigin_Attack::PlaySound3D_AtSelf:
+					// Suicide
+					if (Attack.TimeOfHitAction == EAttackMode::SuicideATK || Attack.TimeOfHitAction == EAttackMode::Despawn)
+					{
+						Subject.DespawnDeferred();
 
-								NewConfig.AttachToSubject = FSubjectHandle(Subject);
-								NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
-								NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(SpawnRotation, SpawnLocation));
-								Mechanism->SpawnSubjectDeferred(NewConfig);
-								break;
-
-							case EPlaySoundOrigin_Attack::PlaySound3D_AtTarget:
-
-								if (Tracing.TraceResult.IsValid())
-								{
-									NewConfig.AttachToSubject = Tracing.TraceResult;
-									SpawnLocation = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
-									FQuat TargetRotation = Tracing.TraceResult.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.ToOrientationQuat();
-									NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
-									NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(TargetRotation, SpawnLocation));
-									Mechanism->SpawnSubjectDeferred(NewConfig);
-								}
-								break;
-							}
-						}
-
-						// Attack Begin Event
 						if (Subject.HasTrait<FIsSubjective>())
 						{
-							FAttackData AttackData;
-							AttackData.SelfSubject = FSubjectHandle(Subject);
-							AttackData.State = EAttackEventState::Begin;
-							AttackData.AttackTarget = Tracing.TraceResult.IsValid() ? Tracing.TraceResult : FSubjectHandle();
-							OnAttackQueue.Enqueue(AttackData);
-						}
-					}
+							// Death Event SuicideAttack
+							FDeathData DeathData;
+							DeathData.SelfSubject = FSubjectHandle(Subject);
+							DeathData.State = EDeathEventState::SuicideAttack;
+							OnDeathQueue.Enqueue(DeathData);
 
-					// 到达造成伤害的时间点并且本轮之前也没有攻击过，造成一次伤害
-					if (Attacking.ATKTime >= Attack.TimeOfHit && Attacking.ATKTime < Attack.DurationPerRound)
-					{
-						if (Attacking.State == EAttackState::PreCast) // First Execute
-						{
-							Attacking.State = EAttackState::PostCast;
-
-							if (Tracing.TraceResult.IsValid() && Tracing.TraceResult.HasTrait<FLocated>())
-							{
-								// 获取双方位置信息
-								FVector AttackerPos = Located.Location;
-								FVector TargetPos = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
-
-								// 计算距离
-								const float SelfRadius = Collider.Radius * Scaled.Scale;
-								float OtherRadius = Tracing.TraceResult.HasTrait<FGridData>() ? Tracing.TraceResult.GetTraitRef<FGridData, EParadigm::Unsafe>().Radius : 0;
-								float Distance = FMath::Clamp(FVector::Distance(AttackerPos, TargetPos) - SelfRadius - OtherRadius, 0, FLT_MAX);
-
-								// 计算夹角
-								FVector AttackerForward = Subject.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.GetSafeNormal2D();
-								FVector ToTargetDir = (TargetPos - AttackerPos).GetSafeNormal2D();
-								float Angle = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(AttackerForward, ToTargetDir)));
-
-								TArray<FDmgResult> DmgResults;
-
-								// Deal Dmg
-								if (Attack.TimeOfHitAction == EAttackMode::ApplyDMG || Attack.TimeOfHitAction == EAttackMode::SuicideATK)
-								{
-									if (!Tracing.TraceResult.HasTrait<FDying>())
-									{
-										if (Distance <= Attack.RangeToleranceHit && Angle <= Attack.AngleToleranceHit)
-										{
-											if (Damage.DmgRadius == 0)
-											{
-												// 单体
-												ApplyPointDamageAndDebuffDeferred(FSubjectArray{ TArray<FSubjectHandle>{Tracing.TraceResult} }, FSubjectArray(), FSubjectHandle{ Subject }, FSubjectHandle{ Subject }, Located.Location, FDamage_Point(Damage), FDebuff_Point(Debuff), DmgResults);
-											}
-											else
-											{
-												// 范围
-												FFilter TargetFilter;
-
-												TargetFilter.Include(Trace.IncludeTraits);
-												TargetFilter.Exclude(Trace.ExcludeTraits);
-
-												ApplyRadialDamageAndDebuffDeferred(TargetPos, FSubjectArray(), FSubjectHandle{ Subject }, FSubjectHandle{ Subject }, Located.Location, FDamage_Radial(Damage), FDebuff_Radial(Debuff), TargetFilter, Tracing.NeighborGrid, DmgResults);
-											}
-										}
-									}
-								}
-
-								// Attack Hit Event
-								if (Subject.HasTrait<FIsSubjective>())
-								{
-									FAttackData AttackData;
-									AttackData.SelfSubject = FSubjectHandle(Subject);
-									AttackData.State = EAttackEventState::Hit;
-									AttackData.AttackTarget = Tracing.TraceResult.IsValid() ? Tracing.TraceResult : FSubjectHandle();
-									AttackData.DmgResults.Append(DmgResults);
-									OnAttackQueue.Enqueue(AttackData);
-								}
-
-								// Suicide
-								if (Attack.TimeOfHitAction == EAttackMode::SuicideATK || Attack.TimeOfHitAction == EAttackMode::Despawn)
-								{
-									Subject.DespawnDeferred();
-
-									if (Subject.HasTrait<FIsSubjective>())
-									{
-										// Death Event SuicideAttack
-										FDeathData DeathData;
-										DeathData.SelfSubject = FSubjectHandle(Subject);
-										DeathData.State = EDeathEventState::SuicideAttack;
-										OnDeathQueue.Enqueue(DeathData);
-
-										// Attack Event Complete
-										FAttackData AttackData;
-										AttackData.SelfSubject = FSubjectHandle(Subject);
-										AttackData.State = EAttackEventState::End_Reason_Complete;
-										AttackData.AttackTarget = Tracing.TraceResult.IsValid() ? Tracing.TraceResult : FSubjectHandle();
-										OnAttackQueue.Enqueue(AttackData);
-									}
-								}
-							}
-						}
-					}
-
-					// 冷却等待下一轮攻击
-					else if (Attacking.ATKTime >= Attack.DurationPerRound && Attacking.ATKTime < Attack.DurationPerRound + Attack.CoolDown)
-					{
-						if (Attacking.State == EAttackState::PostCast) // First Execute
-						{
-							Attacking.State = EAttackState::Cooling;
-
-							Animating.AnimState = EAnimState::BS_IdleMove;
-							Animating.bUpdateAnimState = true;
-
-							// Attack Event Cooling 
-							if (Subject.HasTrait<FIsSubjective>())
-							{
-								FAttackData AttackData;
-								AttackData.SelfSubject = FSubjectHandle(Subject);
-								AttackData.State = EAttackEventState::Cooling;
-								AttackData.AttackTarget = Tracing.TraceResult.IsValid() ? Tracing.TraceResult : FSubjectHandle();
-								OnAttackQueue.Enqueue(AttackData);
-							}
-						}
-					}
-
-					// 到达计时器时间，本轮攻击结束
-					else if (Attacking.ATKTime >= Attack.DurationPerRound + Attack.CoolDown)
-					{
-						Attacking.bEnable = false;
-						//Moving.LaunchVelSum = FVector::ZeroVector; // 击退力清零
-
-						// Can trace again next frame
-						if (!Tracing.TraceResult.IsValid()) Tracing.TimeLeft = 0;
-
-						// Attack Event Complete
-						if (Subject.HasTrait<FIsSubjective>())
-						{
+							// Attack Event Complete
 							FAttackData AttackData;
 							AttackData.SelfSubject = FSubjectHandle(Subject);
 							AttackData.State = EAttackEventState::End_Reason_Complete;
-							AttackData.AttackTarget = Tracing.TraceResult.IsValid() ? Tracing.TraceResult : FSubjectHandle();
+							AttackData.AttackTarget = Tracing.TraceResult;
 							OnAttackQueue.Enqueue(AttackData);
 						}
 					}
+				}
 
-					// 更新计时器
-					Defence.bCanSlowATKSpeed ? Attacking.ATKTime += FMath::Clamp(SafeDeltaTime * Slowing.CombinedSlowMult,0.0001f, FLT_MAX) : Attacking.ATKTime += SafeDeltaTime;
+				// 冷却等待下一轮攻击
+				if (Attacking.State == EAttackState::PostCast && Attacking.ATKTime >= Attack.DurationPerRound)
+				{
+					Attacking.State = EAttackState::Cooling; // Do Once
+
+					// Attack Event Cooling 
+					if (Subject.HasTrait<FIsSubjective>())
+					{
+						FAttackData AttackData;
+						AttackData.SelfSubject = FSubjectHandle(Subject);
+						AttackData.State = EAttackEventState::Cooling;
+						AttackData.AttackTarget = Tracing.TraceResult;
+						OnAttackQueue.Enqueue(AttackData);
+					}
+				}
+
+				// 到达计时器时间，本轮攻击结束
+				if (Attacking.State == EAttackState::Cooling && Attacking.CoolTime >= Attack.CoolDown)
+				{
+					Attacking.bEnable = false; // mark trait pending removal
+
+					// Can trace again next frame ?
+					bool bIsTargetValid = Tracing.TraceResult.IsValid() && !Tracing.TraceResult.HasTrait<FDying>() && Tracing.TraceResult.HasTrait<FLocated>() && Tracing.TraceResult.HasTrait<FHealth>() && Tracing.TraceResult.GetTrait<FHealth>().Current > 0;
+
+					if (!bIsTargetValid) Tracing.TimeLeft = 0;
+
+					// Attack Event Complete
+					if (Subject.HasTrait<FIsSubjective>())
+					{
+						FAttackData AttackData;
+						AttackData.SelfSubject = FSubjectHandle(Subject);
+						AttackData.State = EAttackEventState::End_Reason_Complete;
+						AttackData.AttackTarget = Tracing.TraceResult;
+						OnAttackQueue.Enqueue(AttackData);
+					}
+				}
+
+				// 更新计时器
+				if (Attacking.State == EAttackState::Aim)
+				{
+					Attacking.AimTime += SafeDeltaTime;
+				}
+				else if (Attacking.State == EAttackState::PreCast_FirstExec || Attacking.State == EAttackState::PreCast || Attacking.State == EAttackState::PostCast)
+				{
+					Attacking.ATKTime += SafeDeltaTime;
+				}
+				else if (Attacking.State == EAttackState::Cooling)
+				{
+					Attacking.CoolTime += SafeDeltaTime;
 				}
 
 			}, ThreadsCount, BatchSize);
@@ -3070,10 +3071,18 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FMoving& Moving,
 				FSlowing& Slowing)
 			{
-				// switch back to BS_IdleMove
+				// Switch back to BS_IdleMove
 				const bool bIsAppearing = Subject.HasTrait<FAppearing>();
-				const bool bIsAttacking = Subject.HasTrait<FAttacking>();
 				const bool bIsDying = Subject.HasTrait<FDying>();
+
+				bool bIsAttacking = Subject.HasTrait<FAttacking>();
+
+				if (bIsAttacking)
+				{
+					auto ATKState = Subject.GetTrait<FAttacking>().State;
+					bIsAttacking = ATKState != EAttackState::Aim || ATKState != EAttackState::Cooling; // 判断子步骤
+				}
+
 				const bool bIsMoving = !bIsAppearing && !bIsAttacking && !bIsDying;
 
 				if (bIsMoving && Animating.AnimState != EAnimState::BS_IdleMove)
@@ -3096,13 +3105,13 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							}
 
 							// write idle anim to slot 0
-							//Animating.AnimCurrentTime0 = GetGameTimeSinceCreation();
+							Animating.AnimCurrentTime0 = GetGameTimeSinceCreation();
 							Animating.AnimIndex0 = Animation.IndexOfIdleAnim;
 							Animating.AnimPauseFrame0 = 0;
 							Animating.AnimOffsetTime0 = FMath::RandRange(Animation.IdleRandomTimeOffset.X, Animation.IdleRandomTimeOffset.Y);
 
 							// write move anim to slot 1
-							//Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
+							Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
 							Animating.AnimIndex1 = Animation.IndexOfMoveAnim;
 							Animating.AnimPauseFrame1 = 0;
 							Animating.AnimOffsetTime1 = FMath::RandRange(Animation.MoveRandomTimeOffset.X, Animation.MoveRandomTimeOffset.Y);
@@ -3196,7 +3205,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							Animating.AnimLerp0 = FMath::Clamp(Animating.AnimLerp0 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
 
 							Animating.AnimPlayRate1 = Animating.AnimPauseFrame1 / Animating.SampleRate / Attack.DurationPerRound;
-							Animating.AnimPlayRate1 *= Defence.bCanSlowATKSpeed ? FMath::Clamp(Slowing.CombinedSlowMult,0.0001f,FLT_MAX) : 1;
+							//Animating.AnimPlayRate1 *= Defence.bCanSlowATKSpeed ? FMath::Clamp(Slowing.CombinedSlowMult,0.0001f,FLT_MAX) : 1;
 						}
 						else
 						{
@@ -3212,7 +3221,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
 
 							Animating.AnimPlayRate2 = Animating.AnimPauseFrame2 / Animating.SampleRate / Attack.DurationPerRound;
-							Animating.AnimPlayRate2 *= Defence.bCanSlowATKSpeed ? FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX) : 1;
+							//Animating.AnimPlayRate2 *= Defence.bCanSlowATKSpeed ? FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX) : 1;
 						}
 
 						break;
