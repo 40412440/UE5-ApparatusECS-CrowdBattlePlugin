@@ -17,6 +17,12 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否启用被击中时的发光效果"))
 	bool bCanGlow = true;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "播放受击动画，只会在Agent静止且播放Idle动画时生效"))
+	bool bPlayAnim = true;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "受击动画时长"))
+	float AnimLength = 1;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "被击中时的挤压/拉伸强度"))
 	float JiggleStr = 0.5f;
 
@@ -40,7 +46,7 @@ public:
 
 	float GlowTime = 0.0f;
 	float JiggleTime = 0.0f;
-
+	float AnimTime = 0.0f;
 
 	FORCEINLINE void ResetGlow()
 	{
@@ -50,5 +56,10 @@ public:
 	FORCEINLINE void ResetJiggle()
 	{
 		JiggleTime = 0.0f;
+	}
+
+	FORCEINLINE void ResetAnim()
+	{
+		AnimTime = 0.0f;
 	}
 };

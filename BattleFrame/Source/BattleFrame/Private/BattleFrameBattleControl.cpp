@@ -207,13 +207,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// 出生动画 | Birth Anim
 				if (Subject.HasFlag(AppearAnimFlag))
 				{
-					if (Appearing.AnimTime == 0)
-					{
-						// 动画状态机
-						Animating.AnimState = EAnimState::Appearing;
-						Animating.bUpdateAnimState = true;
-					}
-
 					if (Appearing.AnimTime >= Appear.Duration)
 					{
 						Subject.SetFlag(AppearAnimFlag,false);
@@ -452,6 +445,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FPatrol& Patrol,
 				FChase& Chase,
 				FMove& Move,
+				FFall& Fall,
 				FMoving& Moving,
 				FNavigation& Navigation,
 				FNavigating& Navigating,
@@ -459,10 +453,11 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FTracing& Tracing,
 				FAvoidance& Avoidance,
 				FAvoiding& Avoiding,
+				FAnimating& Animating,
 				FGridData& GridData)
 			{
 				// 死亡区域检测			
-				if (Located.Location.Z < Move.Z.KillZ)
+				if (Located.Location.Z < Fall.KillZ)
 				{
 					Subject.DespawnDeferred();
 
@@ -509,6 +504,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				const bool bIsDying = Subject.HasTrait<FDying>();
 				const bool bIsSleeping = Subject.HasTrait<FSleeping>();
 				const bool bIsPatrolling = Subject.HasTrait<FPatrolling>();
+				const bool bIsBeingHit = Subject.HasTrait<FBeingHit>();
 				const bool bIsChasing = Chase.bEnable && bIsValidTraceResult;
 
 				const bool bIsTraceResultHasLocated = bIsValidTraceResult ? Tracing.TraceResult.HasTrait<FLocated>() : false;
@@ -1121,9 +1117,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				auto PerformSphereTrace = [&](FVector& OutLocation) -> bool
 					{
 						TRACE_CPUPROFILER_EVENT_SCOPE_STR("SphereTraceForGround");
-						const float TraceDistance = FMath::Abs(SelfLocation.Z - Move.Z.KillZ);
+						const float TraceDistance = FMath::Abs(SelfLocation.Z - Fall.KillZ);
 						const FVector TraceStart = SelfLocation + FVector(0, 0, SelfRadius);
-						const FVector TraceEnd = FVector(SelfLocation.X, SelfLocation.Y, Move.Z.KillZ);
+						const FVector TraceEnd = FVector(SelfLocation.X, SelfLocation.Y, Fall.KillZ);
 
 						FCollisionShape CollisionShape;
 						CollisionShape.SetSphere(SelfRadius);
@@ -1141,7 +1137,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							TraceStart,
 							TraceEnd,
 							SelfRadius,
-							Move.Z.GroundObjectType,
+							Fall.GroundObjectType,
 							true,
 							IgnoreActors,
 							EDrawDebugTrace::None,
@@ -1174,17 +1170,17 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				bool bIsSet = false;
 				FVector GroundLocation = FVector::ZeroVector;
 
-				switch (Move.Z.GroundTraceMode)
+				switch (Fall.GroundTraceMode)
 				{
 					case EGroundTraceMode::FlowFieldAndSphereTrace:
 						// 模式1：优先使用流场，失败时回退到球体追踪
-						bIsSet = GetInterpedWorldLocation(Navigating.FlowField, SelfLocation, Move.Z.SphereTraceAngleThreshold, GroundLocation);
+						bIsSet = GetInterpedWorldLocation(Navigating.FlowField, SelfLocation, Fall.SphereTraceAngleThreshold, GroundLocation);
 						if (!bIsSet) bIsSet = PerformSphereTrace(GroundLocation);
 						break;
 
 					case EGroundTraceMode::FlowField:
 						// 模式2：仅使用流场采样
-						bIsSet = GetInterpedWorldLocation(Navigating.FlowField, SelfLocation, Move.Z.SphereTraceAngleThreshold, GroundLocation);
+						bIsSet = GetInterpedWorldLocation(Navigating.FlowField, SelfLocation, Fall.SphereTraceAngleThreshold, GroundLocation);
 						break;
 
 					case EGroundTraceMode::SphereTrace:
@@ -1198,7 +1194,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					// 计算投影高度
 					const float GroundHeight = GroundLocation.Z;
 
-					if (UNLIKELY(Move.Z.bCanFly))
+					if (UNLIKELY(Fall.bCanFly))
 					{
 						Moving.CurrentVelocity.Z += FMath::Clamp(Moving.FlyingHeight + GroundHeight - SelfLocation.Z, -100, 100);//fly at a certain height above ground
 						Moving.CurrentVelocity.Z *= 0.9f;
@@ -1211,12 +1207,18 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						if (UNLIKELY(SelfLocation.Z - CollisionThreshold > SelfRadius * 0.1f))// need a bit of tolerance or it will be hard to decide is it is on ground or in the air
 						{
 							// 应用重力
-							Moving.CurrentVelocity.Z += Move.Z.Gravity * SafeDeltaTime;
+							Moving.CurrentVelocity.Z += Fall.Gravity * SafeDeltaTime;
 
-							// 进入/保持下落状态
 							if (!Moving.bFalling)
 							{
+								// 进入坠落状态
 								Moving.bFalling = true;
+
+								// 使用坠落动画
+								if (Fall.bFallAnim )
+								{
+									Subject.SetFlag(FallAnimFlag);
+								}
 							}
 						}
 						else
@@ -1227,30 +1229,42 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							// 着陆状态切换
 							if (Moving.bFalling)
 							{
+								// 移除坠落状态
 								Moving.bFalling = false;
+
+								// 中止坠落动画
+								Subject.SetFlag(FallAnimFlag, false);
+
 								FVector BounceDecay = FVector(Move.XY.MoveBounceVelocityDecay.X, Move.XY.MoveBounceVelocityDecay.X, Move.XY.MoveBounceVelocityDecay.Y);
 								Moving.CurrentVelocity = Moving.CurrentVelocity * BounceDecay * FVector(1, 1, (FMath::Abs(Moving.CurrentVelocity.Z) > 100.f) ? -1 : 0);// zero out small number
 							}
 
 							// 平滑移动到地面
-							Located.Location.Z = /*CollisionThreshold*/FMath::FInterpTo(SelfLocation.Z, CollisionThreshold, SafeDeltaTime, SelfRadius * 0.5);
+							Located.Location.Z = FMath::FInterpTo(SelfLocation.Z, CollisionThreshold, SafeDeltaTime, SelfRadius * 0.5);
 						}
 					}
 				}
 				else
 				{
-					if (UNLIKELY(Move.Z.bCanFly))
+					if (UNLIKELY(Fall.bCanFly))
 					{
 						Moving.CurrentVelocity.Z *= 0.9f;
 					}
 					else
 					{
 						// 应用重力
-						Moving.CurrentVelocity.Z += Move.Z.Gravity * SafeDeltaTime;
+						Moving.CurrentVelocity.Z += Fall.Gravity * SafeDeltaTime;
 
 						if (!Moving.bFalling)
 						{
+							// 进入坠落状态
 							Moving.bFalling = true;
+
+							// 使用坠落动画
+							if (Fall.bFallAnim)
+							{
+								Subject.SetFlag(FallAnimFlag);
+							}
 						}
 					}
 				}
@@ -1914,6 +1928,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 			{
 				if (!Attack.bEnable) return;
 
+				if (Subject.HasFlag(HitAnimFlag)) return;
+
 				// Debug Draw Attack Range
 				if (Attack.bDrawDebugShape)
 				{
@@ -2073,9 +2089,11 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				{
 					Attacking.State = EAttackState::PreCast; // Do Once
 
-					// Animation
-					Animating.AnimState = EAnimState::Attacking;
-					Animating.bUpdateAnimState = true;
+					// Start Animation
+					if (Attack.bCanPlayAnim)
+					{
+						Subject.SetFlag(AttackAnimFlag);
+					}
 
 					FVector SpawnLocation = Located.Location;
 					FQuat SpawnRotation = Directed.Direction.ToOrientationQuat();
@@ -2275,6 +2293,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				{
 					Attacking.State = EAttackState::Cooling; // Do Once
 
+					// Stop Animation
+					Subject.SetFlag(AttackAnimFlag,false);
+
 					// Attack Event Cooling 
 					if (Subject.HasTrait<FIsSubjective>())
 					{
@@ -2344,7 +2365,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 			{
 				bool bCanRemoveBeingHit = true;
 
-				// 结算伤害与统计数据
+				// 统计并结算伤害
 				while (!Health.DamageToTake.IsEmpty() && !Health.DamageInstigator.IsEmpty())
 				{
 					// 如果怪物死了，跳出循环
@@ -2391,9 +2412,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						{
 							Subject.SetTraitDeferred(FDying{ false,0,0,0,0,Instigator,HitDirection });	// 标记为死亡
 
-							if (Subject.HasTrait<FMove>())
+							if (Subject.HasTrait<FFall>())
 							{
-								Subject.GetTraitRef<FMove, EParadigm::Unsafe>().Z.bCanFly = false; // 如果在飞行会掉下来
+								Subject.GetTraitRef<FFall, EParadigm::Unsafe>().bCanFly = false; // 如果在飞行会掉下来
 							}
 
 							// 统计数据
@@ -2414,7 +2435,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 				}
 
-				// 更新血条
+				// 血条
 				const bool bHasHealthBar = Subject.HasTrait<FHealthBar>();
 
 				if(bHasHealthBar)
@@ -2458,11 +2479,11 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 				}
 
+				// 发光,形变,动画
 				const bool bHasHit = Subject.HasTrait<FHit>();
 				const bool bHasCurves = Subject.HasTrait<FCurves>();
 				const bool bHasAnimating = Subject.HasTrait<FAnimating>();
 
-				// 受击发光与形变
 				if(bHasHit && bHasCurves && bHasAnimating)
 				{
 					auto& Hit = Subject.GetTraitRef<FHit>();
@@ -2541,6 +2562,24 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						{
 							bCanRemoveBeingHit = false;
 						}
+					}
+
+					//------------------------ 受击动画 | Hit Anim -------------------------
+
+					const bool bIsAnimating = Subject.HasFlag(HitAnimFlag);
+
+					if (bIsAnimating)
+					{
+						if (BeingHit.AnimTime >= Hit.AnimLength)
+						{
+							Subject.SetFlag(HitAnimFlag, false);
+						}
+						else
+						{
+							bCanRemoveBeingHit = false;
+						}
+
+						BeingHit.AnimTime += SafeDeltaTime;
 					}
 				}
 
@@ -2984,13 +3023,13 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				{
 					Dying.Time += SafeDeltaTime; // 计时
 
-					// 是否关闭碰撞
+					// 关闭碰撞
 					if (Death.bDisableCollision && !Subject.HasFlag(DeathDisableCollisionFlag) && Moving.CurrentVelocity.Size2D() < 0)
 					{
 						Subject.SetFlag(DeathDisableCollisionFlag);
 					}
 
-					//----------------------- 死亡消融 | Death Dissolve -------------------------
+					// 死亡消融
 					
 					if (Subject.HasFlag(DeathDissolveFlag))
 					{
@@ -3011,19 +3050,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 						// 更新溶解时间
 						Dying.DeathDissolveTime += SafeDeltaTime;
-					}
-
-					//----------------------- 死亡动画 | Death Anim -------------------------
-
-					if (Subject.HasFlag(DeathAnimFlag))
-					{
-						if (Dying.DeathAnimTime == 0)
-						{
-							Animating.AnimState = EAnimState::Dying;
-							Animating.bUpdateAnimState = true;
-						}
-
-						Dying.DeathAnimTime += SafeDeltaTime;
 					}
 				}
 				else
@@ -3052,29 +3078,77 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FAppear& Appear,
 				FAttack& Attack,
 				FDefence& Defence,
+				FHit& Hit,
 				FDeath& Death,
 				FMove& Move,
+				FFall& Fall,
 				FMoving& Moving,
 				FSlowing& Slowing)
 			{
-				// Switch back to BS_IdleMove
-				const bool bIsAppearing = Subject.HasTrait<FAppearing>();
-				const bool bIsDying = Subject.HasTrait<FDying>();
+				bool bIsDyingAnim = Subject.HasFlag(DeathAnimFlag);
+				bool bIsAppearAnim = Subject.HasFlag(AppearAnimFlag);
+			    bool bIsHitAnim = Subject.HasFlag(HitAnimFlag);
+				bool bIsAttackAnim = Subject.HasFlag(AttackAnimFlag);
+				bool bIsFallAnim = Subject.HasFlag(FallAnimFlag);
 
-				bool bIsAttacking = Subject.HasTrait<FAttacking>();
-
-				if (bIsAttacking)
+				if (bIsHitAnim)
 				{
-					auto ATKState = Subject.GetTrait<FAttacking>().State;
-					bIsAttacking = ATKState != EAttackState::Aim || ATKState != EAttackState::Cooling; // 判断子步骤
+					bIsHitAnim = Subject.HasTrait<FAttacking>() ? Subject.GetTrait<FAttacking>().State != EAttackState::PreCast : bIsHitAnim; // 前摇动画是不能打断的，但是后摇可以取消
 				}
 
-				const bool bIsMoving = !bIsAppearing && !bIsAttacking && !bIsDying;
-
-				if (bIsMoving && Animating.AnimState != EAnimState::BS_IdleMove)
+				const bool bIsMoveAnim = !bIsAppearAnim && !bIsAttackAnim && !bIsHitAnim && !bIsDyingAnim && !bIsFallAnim;
+				//UE_LOG(LogTemp, Warning, TEXT("bIsHitAnim: %d"), bIsHitAnim);
+				
+				// Switch anim based on priority
+				if (bIsDyingAnim )
 				{
-					Animating.AnimState = EAnimState::BS_IdleMove;
-					Animating.bUpdateAnimState = true;
+					if (Animating.AnimState != EAnimState::Dying)
+					{
+						Animating.AnimState = EAnimState::Dying;
+						Animating.bUpdateAnimState = true;
+					}
+				}
+				else if (bIsAppearAnim)
+				{
+					if (Animating.AnimState != EAnimState::Appearing)
+					{
+						Animating.AnimState = EAnimState::Appearing;
+						Animating.bUpdateAnimState = true;
+					}
+				}
+				else if (bIsHitAnim)
+				{
+					if (Animating.AnimState != EAnimState::BeingHit)
+					{
+						Animating.AnimState = EAnimState::BeingHit;
+						Animating.bUpdateAnimState = true;
+
+						Subject.SetFlag(AttackAnimFlag, false); // once hit anim will interrupt attack anim
+					}
+				}
+				else if (bIsAttackAnim)
+				{
+					if (Animating.AnimState != EAnimState::Attacking)
+					{
+						Animating.AnimState = EAnimState::Attacking;
+						Animating.bUpdateAnimState = true;
+					}
+				}
+				else if (bIsFallAnim)
+				{
+					if (Animating.AnimState != EAnimState::Falling)
+					{
+						Animating.AnimState = EAnimState::Falling;
+						Animating.bUpdateAnimState = true;
+					}
+				}
+				else if (bIsMoveAnim)
+				{
+					if (Animating.AnimState != EAnimState::BS_IdleMove)
+					{
+						Animating.AnimState = EAnimState::BS_IdleMove;
+						Animating.bUpdateAnimState = true;
+					}
 				}
 
 				// 动画状态机 | Anim State Machine
@@ -3092,13 +3166,11 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 							// write idle anim to slot 0
 							Animating.AnimCurrentTime0 = GetGameTimeSinceCreation();
-							Animating.AnimIndex0 = Animation.IndexOfIdleAnim;
 							Animating.AnimPauseFrame0 = 0;
 							Animating.AnimOffsetTime0 = FMath::RandRange(Animation.IdleRandomTimeOffset.X, Animation.IdleRandomTimeOffset.Y);
 
 							// write move anim to slot 1
 							Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
-							Animating.AnimIndex1 = Animation.IndexOfMoveAnim;
 							Animating.AnimPauseFrame1 = 0;
 							Animating.AnimOffsetTime1 = FMath::RandRange(Animation.MoveRandomTimeOffset.X, Animation.MoveRandomTimeOffset.Y);
 
@@ -3114,15 +3186,15 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						const TRange<float> OutputRange(0, 1);
 						float Input = Moving.CurrentVelocity.Size2D();
 						float TargetLerp = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
-						Animating.AnimLerp0 = FMath::FInterpConstantTo(Animating.AnimLerp0, TargetLerp, SafeDeltaTime, Animation.LerpSpeed);
-						//UE_LOG(LogTemp, Warning, TEXT("CurrentAngularVelocity: %f"), Animating.AnimLerp0);
 
-						// transit from slot 2 to slot 0 - 1 using AnimLerp1
+						Animating.AnimLerp0 = FMath::FInterpConstantTo(Animating.AnimLerp0, TargetLerp, SafeDeltaTime, Animation.LerpSpeed);
 						Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 - SafeDeltaTime * Animation.LerpSpeed, 0, 1);
 
-						Animating.AnimPlayRate0 = Animation.IdlePlayRate/* * FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX)*/;
-						Animating.AnimPlayRate1 = Animation.MovePlayRate/* * FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX)*/;
-						//UE_LOG(LogTemp, Warning, TEXT("SlowMultIs: %f"), Slowing.CombinedSlowMult);
+						Animating.AnimPlayRate0 = Animation.IdlePlayRate;
+						Animating.AnimPlayRate1 = Animation.MovePlayRate;
+
+						Animating.AnimIndex0 = Animation.IndexOfIdleAnim;
+						Animating.AnimIndex1 = Animation.IndexOfMoveAnim;
 
 						break;
 					}
@@ -3147,132 +3219,30 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						break;
 					}
 
+					case EAnimState::BeingHit:
+					{
+						PlayAnimAsMontage(Animation, Animating, Moving, Animation.IndexOfHitAnim, Hit.AnimLength, 10, SafeDeltaTime);
+
+						break;
+					}
+
 					case EAnimState::Attacking:
 					{
-						if (Animating.bUpdateAnimState)
-						{
-							if (Animating.PreviousAnimState == EAnimState::BS_IdleMove)
-							{
-								Animating.CurrentMontageSlot = 2;
+						PlayAnimAsMontage(Animation, Animating, Moving, Animation.IndexOfAttackAnim, Attack.DurationPerRound, 1, SafeDeltaTime);
 
-								// write Attack anim into slot 2
-								Animating.AnimCurrentTime2 = GetGameTimeSinceCreation();
-								Animating.AnimIndex2 = Animation.IndexOfAttackAnim;
-								Animating.AnimPauseFrame2 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfAttackAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfAttackAnim] : 0;
-								Animating.AnimLerp1 = 0;
-							}
-							else
-							{
-								if (Animating.CurrentMontageSlot == 1)
-								{
-									CopyPasteAnimData(Animating, 1, 0);// copy anim from 1 to slot 0
-								}
-								else
-								{
-									CopyPasteAnimData(Animating, 2, 0);// copy anim from 1 to slot 0
-									Animating.CurrentMontageSlot = 1;
-								}
+						break;
+					}
 
-								// write Attack anim into slot 1
-								Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
-								Animating.AnimIndex1 = Animation.IndexOfAttackAnim;
-								Animating.AnimPauseFrame1 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfAttackAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfAttackAnim] : 0;
-								Animating.AnimLerp0 = 0;
-								Animating.AnimLerp1 = 0;
-							}
-
-							Animating.PreviousAnimState = Animating.AnimState;
-							Animating.bUpdateAnimState = false;
-						}
-
-						if (Animating.CurrentMontageSlot == 1)
-						{
-							// transit from slot 0 to slot 1 using AnimLerp0
-							Animating.AnimLerp0 = FMath::Clamp(Animating.AnimLerp0 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
-
-							Animating.AnimPlayRate1 = Animating.AnimPauseFrame1 / Animating.SampleRate / Attack.DurationPerRound;
-							//Animating.AnimPlayRate1 *= Defence.bCanSlowATKSpeed ? FMath::Clamp(Slowing.CombinedSlowMult,0.0001f,FLT_MAX) : 1;
-						}
-						else
-						{
-							// write blendspace ratio into AnimLerp0
-							const TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
-							const TRange<float> OutputRange(0, 1);
-							float Input = FMath::Max(Moving.CurrentVelocity.Size2D(), FMath::Abs(Moving.CurrentAngularVelocity));
-							float TargetLerp = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
-							Animating.AnimLerp0 = FMath::FInterpConstantTo(Animating.AnimLerp0, TargetLerp, SafeDeltaTime, Animation.LerpSpeed);
-							//UE_LOG(LogTemp, Warning, TEXT("CurrentAngularVelocity: %f"), Animating.AnimLerp0);
-
-							// transit from slot 0 - 1 to slot 2 using AnimLerp1
-							Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
-
-							Animating.AnimPlayRate2 = Animating.AnimPauseFrame2 / Animating.SampleRate / Attack.DurationPerRound;
-							//Animating.AnimPlayRate2 *= Defence.bCanSlowATKSpeed ? FMath::Clamp(Slowing.CombinedSlowMult, 0.0001f, FLT_MAX) : 1;
-						}
+					case EAnimState::Falling:
+					{
+						PlayAnimAsMontage(Animation, Animating, Moving, Animation.IndexOfFallAnim, 0, 1, SafeDeltaTime);
 
 						break;
 					}
 
 					case EAnimState::Dying:
 					{
-						if (Animating.bUpdateAnimState)
-						{
-							if (Animating.PreviousAnimState == EAnimState::BS_IdleMove)
-							{
-								Animating.CurrentMontageSlot = 2;
-
-								// write Death anim into slot 2
-								Animating.AnimCurrentTime2 = GetGameTimeSinceCreation();
-								Animating.AnimIndex2 = Animation.IndexOfDeathAnim;
-								Animating.AnimPauseFrame2 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfDeathAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfDeathAnim] : 0;
-								Animating.AnimLerp1 = 0;
-							}
-							else
-							{
-								if (Animating.CurrentMontageSlot == 1)
-								{
-									CopyPasteAnimData(Animating, 1, 0);// copy anim from 1 to slot 0
-								}
-								else
-								{
-									CopyPasteAnimData(Animating, 2, 0);// copy anim from 2 to slot 0
-									Animating.CurrentMontageSlot = 1;
-								}
-
-								// write Death anim into slot 1
-								Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
-								Animating.AnimIndex1 = Animation.IndexOfDeathAnim;
-								Animating.AnimPauseFrame1 = Animating.AnimPauseFrameArray.Num() > Animation.IndexOfDeathAnim ? Animating.AnimPauseFrameArray[Animation.IndexOfDeathAnim] : 0;
-								Animating.AnimLerp0 = 0;
-								Animating.AnimLerp1 = 0;
-							}
-
-							Animating.PreviousAnimState = Animating.AnimState;
-							Animating.bUpdateAnimState = false;
-						}
-
-						if (Animating.CurrentMontageSlot == 1)
-						{
-							// transit from slot 0 to slot 1 using AnimLerp0
-							Animating.AnimLerp0 = FMath::Clamp(Animating.AnimLerp0 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
-
-							Animating.AnimPlayRate1 = Animating.AnimPauseFrame1 / Animating.SampleRate / Death.AnimLength;
-						}
-						else
-						{
-							// write blendspace ratio into AnimLerp0
-							const TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
-							const TRange<float> OutputRange(0, 1);
-							float Input = FMath::Max(Moving.CurrentVelocity.Size2D(), FMath::Abs(Moving.CurrentAngularVelocity));
-							float TargetLerp = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
-							Animating.AnimLerp0 = FMath::FInterpConstantTo(Animating.AnimLerp0, TargetLerp, SafeDeltaTime, Animation.LerpSpeed);
-							//UE_LOG(LogTemp, Warning, TEXT("CurrentAngularVelocity: %f"), Animating.AnimLerp0);
-
-							// transit from slot 0 - 1 to slot 2 using AnimLerp1
-							Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
-
-							Animating.AnimPlayRate2 = Animating.AnimPauseFrame2 / Animating.SampleRate / Death.AnimLength;
-						}
+						PlayAnimAsMontage(Animation, Animating, Moving, Animation.IndexOfDeathAnim, Death.AnimLength, 1, SafeDeltaTime);
 
 						break;
 					}
@@ -4623,6 +4593,7 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuff(const FSubjectArray& S
 		const bool bHasBeingHit = Overlapper.HasTrait<FBeingHit>();
 		const bool bHasHitGlow = Overlapper.HasFlag(HitGlowFlag);
 		const bool bHasHitJiggle = Overlapper.HasFlag(HitJiggleFlag);
+		const bool bHasHitAnim = Overlapper.HasFlag(HitAnimFlag);
 		const bool bHasPatrolling = Overlapper.HasTrait<FPatrolling>();
 		const bool bHasTrace = Overlapper.HasTrait<FTrace>();
 		const bool bHasIsSubjective = Overlapper.HasTrait<FIsSubjective>();
@@ -4904,6 +4875,17 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuff(const FSubjectArray& S
 					NewBeingHit.ResetJiggle();
 				}
 			}
+
+			// Anim
+			if (Hit.bPlayAnim && !bHasHitAnim)
+			{
+				Overlapper.SetFlag(HitAnimFlag);
+
+				if (bHasBeingHit)
+				{
+					NewBeingHit.ResetAnim();
+				}
+			}
 		}
 
 		Overlapper.SetTrait(NewBeingHit);
@@ -4964,6 +4946,7 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuffDeferred(const FSubject
 		const bool bHasBeingHit = Overlapper.HasTrait<FBeingHit>();
 		const bool bHasHitGlow = Overlapper.HasFlag(HitGlowFlag);
 		const bool bHasHitJiggle = Overlapper.HasFlag(HitJiggleFlag);
+		const bool bHasHitAnim = Overlapper.HasFlag(HitAnimFlag);
 		const bool bHasPatrolling = Overlapper.HasTrait<FPatrolling>();
 		const bool bHasTrace = Overlapper.HasTrait<FTrace>();
 		const bool bHasIsSubjective = Overlapper.HasTrait<FIsSubjective>();
@@ -5248,6 +5231,17 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuffDeferred(const FSubject
 					NewBeingHit.ResetJiggle();
 				}
 			}
+
+			// Anim
+			if (Hit.bPlayAnim && !bHasHitAnim)
+			{
+				Overlapper.SetFlag(HitAnimFlag);
+
+				if (bHasBeingHit)
+				{
+					NewBeingHit.ResetAnim();
+				}
+			}
 		}
 
 		Overlapper.SetTraitDeferred(NewBeingHit);
@@ -5319,6 +5313,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(const FVector& Origin
 		const bool bHasBeingHit = Overlapper.HasTrait<FBeingHit>();
 		const bool bHasHitGlow = Overlapper.HasFlag(HitGlowFlag);
 		const bool bHasHitJiggle = Overlapper.HasFlag(HitJiggleFlag);
+		const bool bHasHitAnim = Overlapper.HasFlag(HitAnimFlag);
 		const bool bHasPatrolling = Overlapper.HasTrait<FPatrolling>();
 		const bool bHasTrace = Overlapper.HasTrait<FTrace>();
 		const bool bHasIsSubjective = Overlapper.HasTrait<FIsSubjective>();
@@ -5606,6 +5601,17 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(const FVector& Origin
 					NewBeingHit.ResetJiggle();
 				}
 			}
+
+			// Anim
+			if (Hit.bPlayAnim && !bHasHitAnim)
+			{
+				Overlapper.SetFlag(HitAnimFlag);
+
+				if (bHasBeingHit)
+				{
+					NewBeingHit.ResetAnim();
+				}
+			}
 		}
 
 		Overlapper.SetTrait(NewBeingHit);
@@ -5677,6 +5683,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuffDeferred(const FVector
 		const bool bHasBeingHit = Overlapper.HasTrait<FBeingHit>();
 		const bool bHasHitGlow = Overlapper.HasFlag(HitGlowFlag);
 		const bool bHasHitJiggle = Overlapper.HasFlag(HitJiggleFlag);
+		const bool bHasHitAnim = Overlapper.HasFlag(HitAnimFlag);
 		const bool bHasPatrolling = Overlapper.HasTrait<FPatrolling>();
 		const bool bHasTrace = Overlapper.HasTrait<FTrace>();
 		const bool bHasIsSubjective = Overlapper.HasTrait<FIsSubjective>();
@@ -5963,6 +5970,17 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuffDeferred(const FVector
 					NewBeingHit.ResetJiggle();
 				}
 			}
+
+			// Anim
+			if (Hit.bPlayAnim && !bHasHitAnim)
+			{
+				Overlapper.SetFlag(HitAnimFlag);
+
+				if (bHasBeingHit)
+				{
+					NewBeingHit.ResetAnim();
+				}
+			}
 		}
 
 		Overlapper.SetTraitDeferred(NewBeingHit);
@@ -6035,6 +6053,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(const FVector& StartLoc
 		const bool bHasBeingHit = Overlapper.HasTrait<FBeingHit>();
 		const bool bHasHitGlow = Overlapper.HasFlag(HitGlowFlag);
 		const bool bHasHitJiggle = Overlapper.HasFlag(HitJiggleFlag);
+		const bool bHasHitAnim = Overlapper.HasFlag(HitAnimFlag);
 		const bool bHasPatrolling = Overlapper.HasTrait<FPatrolling>();
 		const bool bHasTrace = Overlapper.HasTrait<FTrace>();
 		const bool bHasIsSubjective = Overlapper.HasTrait<FIsSubjective>();
@@ -6315,6 +6334,17 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(const FVector& StartLoc
 					NewBeingHit.ResetJiggle();
 				}
 			}
+
+			// Anim
+			if (Hit.bPlayAnim && !bHasHitAnim)
+			{
+				Overlapper.SetFlag(HitAnimFlag);
+
+				if (bHasBeingHit)
+				{
+					NewBeingHit.ResetAnim();
+				}
+			}
 		}
 
 		Overlapper.SetTrait(NewBeingHit);
@@ -6387,6 +6417,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(const FVector& 
 		const bool bHasBeingHit = Overlapper.HasTrait<FBeingHit>();
 		const bool bHasHitGlow = Overlapper.HasFlag(HitGlowFlag);
 		const bool bHasHitJiggle = Overlapper.HasFlag(HitJiggleFlag);
+		const bool bHasHitAnim = Overlapper.HasFlag(HitAnimFlag);
 		const bool bHasPatrolling = Overlapper.HasTrait<FPatrolling>();
 		const bool bHasTrace = Overlapper.HasTrait<FTrace>();
 		const bool bHasIsSubjective = Overlapper.HasTrait<FIsSubjective>();
@@ -6665,6 +6696,17 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(const FVector& 
 				if (bHasBeingHit)
 				{
 					NewBeingHit.ResetJiggle();
+				}
+			}
+
+			// Anim
+			if (Hit.bPlayAnim && !bHasHitAnim)
+			{
+				Overlapper.SetFlag(HitAnimFlag);
+
+				if (bHasBeingHit)
+				{
+					NewBeingHit.ResetAnim();
 				}
 			}
 		}

@@ -111,6 +111,7 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsByConfigRectangular
     AgentRecord.SetTrait(AgentConfig->Defence);
     AgentRecord.SetTrait(AgentConfig->Sleep);
     AgentRecord.SetTrait(AgentConfig->Move);
+    AgentRecord.SetTrait(AgentConfig->Fall);
     AgentRecord.SetTrait(FMoving());
     AgentRecord.SetTrait(AgentConfig->Chase);
     AgentRecord.SetTrait(AgentConfig->Patrol);
@@ -133,6 +134,23 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsByConfigRectangular
     AgentRecord.SetTrait(FTemporalDamaging());
     AgentRecord.SetTrait(FSlowing());
     AgentRecord.SetTrait(AgentConfig->Statistics);
+
+    AgentRecord.SetFlag(AppearDissolveFlag, false);
+    AgentRecord.SetFlag(DeathDissolveFlag, false);
+
+    AgentRecord.SetFlag(HitGlowFlag, false);
+    AgentRecord.SetFlag(HitJiggleFlag, false);
+    AgentRecord.SetFlag(HitPoppingTextFlag, false);
+    AgentRecord.SetFlag(HitDecideHealthFlag, false);
+    AgentRecord.SetFlag(DeathDisableCollisionFlag, false);
+    AgentRecord.SetFlag(RegisterMultipleFlag, false);
+
+    AgentRecord.SetFlag(AppearAnimFlag, false);
+    AgentRecord.SetFlag(AttackAnimFlag, false);
+    AgentRecord.SetFlag(HitAnimFlag, false);
+    AgentRecord.SetFlag(DeathAnimFlag, false);
+    AgentRecord.SetFlag(FallAnimFlag, false);
+
 
     // Apply Multipliers
     auto& HealthTrait = AgentRecord.GetTraitRef<FHealth>();
@@ -162,6 +180,7 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsByConfigRectangular
         auto& Scaled = Config.GetTraitRef<FScaled>();
         auto& Collider = Config.GetTraitRef<FCollider>();
         auto& Move = Config.GetTraitRef<FMove>();
+        auto& Fall = Config.GetTraitRef<FFall>();
         auto& Moving = Config.GetTraitRef<FMoving>();
         auto& Patrol = Config.GetTraitRef<FPatrol>();
 
@@ -170,9 +189,9 @@ TArray<FSubjectHandle> AAgentSpawner::SpawnAgentsByConfigRectangular
 
         FVector SpawnPoint3D = Origin + FVector(RandomX, RandomY, 0);
 
-        if (Move.Z.bCanFly)
+        if (Fall.bCanFly)
         {
-            Moving.FlyingHeight = FMath::RandRange(Move.Z.FlyHeightRange.X, Move.Z.FlyHeightRange.Y);
+            Moving.FlyingHeight = FMath::RandRange(Fall.FlyHeight.X, Fall.FlyHeight.Y);
             SpawnPoint3D = FVector(SpawnPoint3D.X, SpawnPoint3D.Y, SpawnPoint3D.Z + Moving.FlyingHeight);
         }
         else

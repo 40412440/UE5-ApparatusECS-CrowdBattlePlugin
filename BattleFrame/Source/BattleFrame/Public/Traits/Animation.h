@@ -41,6 +41,9 @@ struct BATTLEFRAME_API FAnimation
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "移动动画播放速度"))
     float MovePlayRate = 1;
 
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "坠落动画播放速度"))
+    float FallPlayRate = 1;
+
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "跳跃动画的索引值,AnimToTextureDataAsset里可查到"))
     int32 IndexOfIdleAnim = 0;
 
@@ -53,14 +56,14 @@ struct BATTLEFRAME_API FAnimation
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "攻击动画的索引值,AnimToTextureDataAsset里可查到"))
     int32 IndexOfAttackAnim = 3;
 
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "受击动画的索引值,AnimToTextureDataAsset里可查到"))
+    int32 IndexOfHitAnim = 4;
+
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "死亡动画的索引值,AnimToTextureDataAsset里可查到"))
-    int32 IndexOfDeathAnim = 4;
+    int32 IndexOfDeathAnim = 5;
 
-    //UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "坠落动画的索引值"))
-    //int32 IndexOfFallAnim = 6;
-
-    //UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "受击动画的索引值"))
-    //int32 IndexOfHitAnim = 4;
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "坠落动画的索引值,AnimToTextureDataAsset里可查到"))
+    int32 IndexOfFallAnim = 6;
 
     //UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "跳跃动画的索引值"))
     //int32 IndexOfJumpAnim = 7;

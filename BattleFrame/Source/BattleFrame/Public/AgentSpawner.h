@@ -32,23 +32,25 @@ public:
 
 	AAgentSpawner();
 
-	//UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	//TArray<TSoftObjectPtr<UAgentConfigDataAsset>> AgentConfigAssets;
-
 	UWorld* CurrentWorld = nullptr;
 	AMechanism* Mechanism = nullptr;
 	ABattleFrameBattleControl* BattleControl = nullptr;
 
-	EFlagmarkBit AppearAnimFlag = EFlagmarkBit::A;
-	EFlagmarkBit AppearDissolveFlag = EFlagmarkBit::B;
+	EFlagmarkBit AppearDissolveFlag = EFlagmarkBit::A;
+	EFlagmarkBit DeathDissolveFlag = EFlagmarkBit::B;
+
 	EFlagmarkBit HitGlowFlag = EFlagmarkBit::C;
 	EFlagmarkBit HitJiggleFlag = EFlagmarkBit::D;
 	EFlagmarkBit HitPoppingTextFlag = EFlagmarkBit::E;
 	EFlagmarkBit HitDecideHealthFlag = EFlagmarkBit::F;
-	EFlagmarkBit DeathAnimFlag = EFlagmarkBit::G;
-	EFlagmarkBit DeathDissolveFlag = EFlagmarkBit::H;
-	EFlagmarkBit DeathDisableCollisionFlag = EFlagmarkBit::I;
-	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::J;
+	EFlagmarkBit DeathDisableCollisionFlag = EFlagmarkBit::G;
+	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::H;
+
+	EFlagmarkBit AppearAnimFlag = EFlagmarkBit::I;
+	EFlagmarkBit AttackAnimFlag = EFlagmarkBit::J;
+	EFlagmarkBit HitAnimFlag = EFlagmarkBit::K;
+	EFlagmarkBit DeathAnimFlag = EFlagmarkBit::L;
+	EFlagmarkBit FallAnimFlag = EFlagmarkBit::M;
 
 	TArray<FSubjectHandle> SpawnAgentsByConfigRectangular
 	(

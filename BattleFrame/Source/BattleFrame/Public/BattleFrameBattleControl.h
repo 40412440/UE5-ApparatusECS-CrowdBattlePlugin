@@ -103,18 +103,23 @@ public:
 	FStreamableManager StreamableManager;
 
 	// Agent Sub-Status Flags
-	EFlagmarkBit AppearAnimFlag = EFlagmarkBit::A;
-	EFlagmarkBit AppearDissolveFlag = EFlagmarkBit::B;
+	EFlagmarkBit AppearDissolveFlag = EFlagmarkBit::A;
+	EFlagmarkBit DeathDissolveFlag = EFlagmarkBit::B;
+
 	EFlagmarkBit HitGlowFlag = EFlagmarkBit::C;
 	EFlagmarkBit HitJiggleFlag = EFlagmarkBit::D;
 	EFlagmarkBit HitPoppingTextFlag = EFlagmarkBit::E;
 	EFlagmarkBit HitDecideHealthFlag = EFlagmarkBit::F;
-	EFlagmarkBit DeathAnimFlag = EFlagmarkBit::G;
-	EFlagmarkBit DeathDissolveFlag = EFlagmarkBit::H;
-	EFlagmarkBit DeathDisableCollisionFlag = EFlagmarkBit::I;
-	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::J;
+	EFlagmarkBit DeathDisableCollisionFlag = EFlagmarkBit::G;
+	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::H;
 
-	// Event Callbacks
+	EFlagmarkBit AppearAnimFlag = EFlagmarkBit::I;
+	EFlagmarkBit AttackAnimFlag = EFlagmarkBit::J;
+	EFlagmarkBit HitAnimFlag = EFlagmarkBit::K;
+	EFlagmarkBit DeathAnimFlag = EFlagmarkBit::L;
+	EFlagmarkBit FallAnimFlag = EFlagmarkBit::M;
+
+	// Event Interface
 	TQueue<FAppearData, EQueueMode::Mpsc> OnAppearQueue;
 	TQueue<FTraceData, EQueueMode::Mpsc> OnTraceQueue;
 	TQueue<FMoveData, EQueueMode::Mpsc> OnMoveQueue;
@@ -205,6 +210,69 @@ public:
 	static void DrawDebugSector(UWorld* World, const FVector& Center, const FVector& Direction, float Radius, float AngleDegrees, float Height, const FColor& Color, bool bPersistentLines, float LifeTime, uint8 DepthPriority, float Thickness);
 
 	static void CopyPasteAnimData(FAnimating& Animating, int32 From, int32 To);
+
+	FORCEINLINE void PlayAnimAsMontage(FAnimation& Animation, FAnimating& Animating, FMoving& Moving, int32 AnimIndex, float AnimLength, float LerpSpeedMult, float SafeDeltaTime)
+	{
+		if (Animating.bUpdateAnimState)
+		{
+			if (Animating.PreviousAnimState == EAnimState::BS_IdleMove) // Use slot 2
+			{
+				Animating.CurrentMontageSlot = 2;
+
+				if (Animating.AnimIndex2 != AnimIndex) // 不重置Lerp，这样可以保证动画过渡连续性
+				{
+					Animating.AnimLerp1 = 0;
+				}
+
+				Animating.AnimCurrentTime2 = GetGameTimeSinceCreation();
+				Animating.AnimPauseFrame2 = Animating.AnimPauseFrameArray.Num() > AnimIndex ? Animating.AnimPauseFrameArray[AnimIndex] : 0;
+			}
+			else // Use slot 1
+			{
+				if (Animating.CurrentMontageSlot == 1)
+				{
+					CopyPasteAnimData(Animating, 1, 0);// copy anim from 1 to slot 0
+				}
+				else
+				{
+					CopyPasteAnimData(Animating, 2, 0);// copy anim from 2 to slot 0
+					Animating.CurrentMontageSlot = 1;
+				}
+
+				// write Hit anim into slot 1
+				Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
+				Animating.AnimPauseFrame1 = Animating.AnimPauseFrameArray.Num() > AnimIndex ? Animating.AnimPauseFrameArray[AnimIndex] : 0;
+
+				Animating.AnimLerp0 = 0;
+				Animating.AnimLerp1 = 0;
+			}
+
+			Animating.PreviousAnimState = Animating.AnimState;
+			Animating.bUpdateAnimState = false;
+		}
+
+		if (Animating.CurrentMontageSlot == 2)
+		{
+			Animating.AnimIndex2 = AnimIndex;
+			Animating.AnimPlayRate2 = AnimLength == 0 ? 0 : Animating.AnimPauseFrame2 / Animating.SampleRate / AnimLength;
+
+			const TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
+			const TRange<float> OutputRange(0, 1);
+			float Input = Moving.CurrentVelocity.Size2D();
+			float TargetLerp = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
+
+			Animating.AnimLerp0 = FMath::FInterpConstantTo(Animating.AnimLerp0, TargetLerp, SafeDeltaTime, Animation.LerpSpeed);
+			Animating.AnimLerp1 = FMath::Clamp(Animating.AnimLerp1 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
+		}
+		else
+		{
+			Animating.AnimIndex1 = AnimIndex;
+			Animating.AnimPlayRate1 = AnimLength == 0 ? 0 : Animating.AnimPauseFrame1 / Animating.SampleRate / AnimLength;
+
+			// transit from slot 0 to slot 1 using AnimLerp0
+			Animating.AnimLerp0 = FMath::Clamp(Animating.AnimLerp0 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
+		}
+	}
 
 	FORCEINLINE std::pair<bool, float> ProcessCritDamage(float BaseDamage, float damageMult, float Probability)
 	{

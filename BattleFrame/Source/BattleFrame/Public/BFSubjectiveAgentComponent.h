@@ -47,7 +47,23 @@ public:
     AMechanism* Mechanism = nullptr;
     ABattleFrameBattleControl* BattleControl = nullptr;
 
-    EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::M;
+    // Agent Sub-Status Flags
+    EFlagmarkBit AppearDissolveFlag = EFlagmarkBit::A;
+    EFlagmarkBit DeathDissolveFlag = EFlagmarkBit::B;
+
+    EFlagmarkBit HitGlowFlag = EFlagmarkBit::C;
+    EFlagmarkBit HitJiggleFlag = EFlagmarkBit::D;
+    EFlagmarkBit HitPoppingTextFlag = EFlagmarkBit::E;
+    EFlagmarkBit HitDecideHealthFlag = EFlagmarkBit::F;
+    EFlagmarkBit DeathDisableCollisionFlag = EFlagmarkBit::G;
+    EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::H;
+
+    EFlagmarkBit AppearAnimFlag = EFlagmarkBit::I;
+    EFlagmarkBit AttackAnimFlag = EFlagmarkBit::J;
+    EFlagmarkBit HitAnimFlag = EFlagmarkBit::K;
+    EFlagmarkBit DeathAnimFlag = EFlagmarkBit::L;
+    EFlagmarkBit FallAnimFlag = EFlagmarkBit::M;
+
 
 protected:
 

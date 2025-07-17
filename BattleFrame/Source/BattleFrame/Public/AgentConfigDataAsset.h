@@ -81,6 +81,9 @@ public:
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "移动"))
     FMove Move;
 
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "坠落"))
+    FFall Fall;
+
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "导航"))
     FNavigation Navigation;
 

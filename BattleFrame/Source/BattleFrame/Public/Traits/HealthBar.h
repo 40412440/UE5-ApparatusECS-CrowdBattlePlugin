@@ -23,7 +23,7 @@ public:
 	bool UseInterpolation = true;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "血条插值变化的速度"))
-	float InterpSpeed = 0.5f;
+	float InterpSpeed = 1.f;
 
 	float TargetRatio = 1.f;
 	float CurrentRatio = 1.f;

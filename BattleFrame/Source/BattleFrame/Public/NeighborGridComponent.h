@@ -82,16 +82,21 @@ public:
 	TArray<TQueue<int32,EQueueMode::Mpsc>> OccupiedCellsQueues;
 
 	// Agent Sub-Status Flags
-	EFlagmarkBit AppearAnimFlag = EFlagmarkBit::A;
-	EFlagmarkBit AppearDissolveFlag = EFlagmarkBit::B;
+	EFlagmarkBit AppearDissolveFlag = EFlagmarkBit::A;
+	EFlagmarkBit DeathDissolveFlag = EFlagmarkBit::B;
+
 	EFlagmarkBit HitGlowFlag = EFlagmarkBit::C;
 	EFlagmarkBit HitJiggleFlag = EFlagmarkBit::D;
 	EFlagmarkBit HitPoppingTextFlag = EFlagmarkBit::E;
 	EFlagmarkBit HitDecideHealthFlag = EFlagmarkBit::F;
-	EFlagmarkBit DeathAnimFlag = EFlagmarkBit::G;
-	EFlagmarkBit DeathDissolveFlag = EFlagmarkBit::H;
-	EFlagmarkBit DeathDisableCollisionFlag = EFlagmarkBit::I;
-	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::J;
+	EFlagmarkBit DeathDisableCollisionFlag = EFlagmarkBit::G;
+	EFlagmarkBit RegisterMultipleFlag = EFlagmarkBit::H;
+
+	EFlagmarkBit AppearAnimFlag = EFlagmarkBit::I;
+	EFlagmarkBit AttackAnimFlag = EFlagmarkBit::J;
+	EFlagmarkBit HitAnimFlag = EFlagmarkBit::K;
+	EFlagmarkBit DeathAnimFlag = EFlagmarkBit::L;
+	EFlagmarkBit FallAnimFlag = EFlagmarkBit::M;
 
 	// All filters we gonna use
 	FFilter RegisterNeighborGrid_Trace_Filter;

@@ -58,25 +58,26 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct BATTLEFRAME_API FZMovement
+struct BATTLEFRAME_API FFall
 {
 	GENERATED_BODY()
 
 public:
 	// 添加构造函数
-	FZMovement()
+	FFall()
 	{
 		// 默认添加WorldStatic到GroundObjectType
 		GroundObjectType.Add(UEngineTypes::ConvertToObjectType(ECC_WorldStatic));
 	}
 
-	//---------------Z Movement-----------------//
-
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否可以飞行"))
 	bool bCanFly = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "随机飞行高度，出生后固定 (X: 最小高度, Y: 最大高度)"))
-	FVector2D FlyHeightRange = FVector2D(200.f, 400.f);
+	FVector2D FlyHeight = FVector2D(200.f, 400.f);
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否可以播放坠落动画"))
+	bool bFallAnim = true;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "重力"))
 	float Gravity = -2000.f;
@@ -116,11 +117,6 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "平面运动", DisplayName = "XY Movement"))
 	FXYMovement XY;
-
-	//---------------Z Movement-----------------//
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "垂直运动", DisplayName = "Z Movement"))
-	FZMovement Z;
 
 };
 
