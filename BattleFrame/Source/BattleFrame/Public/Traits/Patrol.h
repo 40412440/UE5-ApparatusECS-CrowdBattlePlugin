@@ -8,7 +8,8 @@ UENUM(BlueprintType)
 enum class EPatrolOriginMode : uint8
 {
 	Initial UMETA(DisplayName = "Around Initial Location", ToolTip = "原点为出生时坐标"),
-	Previous UMETA(DisplayName = "Around Previous Location", ToolTip = "原点为上次结束巡逻后的位置")
+	Previous UMETA(DisplayName = "Around Previous Location", ToolTip = "原点为上次结束巡逻后的位置"),
+	Custom UMETA(DisplayName = "Around Custom Location", ToolTip = "原点为自定义位置")
 };
 
 UENUM(BlueprintType)

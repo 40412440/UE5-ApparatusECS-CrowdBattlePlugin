@@ -3094,6 +3094,15 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				if (bIsHitAnim)
 				{
 					bIsHitAnim = Subject.HasTrait<FAttacking>() ? Subject.GetTrait<FAttacking>().State != EAttackState::PreCast : bIsHitAnim; // 前摇动画是不能打断的，但是后摇可以取消
+
+					if (bIsHitAnim)
+					{
+						Subject.SetFlag(AttackAnimFlag, false); // hit anim will interrupt attack anim
+					}
+					else
+					{
+						Subject.SetFlag(HitAnimFlag, false);
+					}
 				}
 
 				const bool bIsMoveAnim = !bIsAppearAnim && !bIsAttackAnim && !bIsHitAnim && !bIsDyingAnim && !bIsFallAnim;
@@ -3122,8 +3131,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					{
 						Animating.AnimState = EAnimState::BeingHit;
 						Animating.bUpdateAnimState = true;
-
-						Subject.SetFlag(AttackAnimFlag, false); // once hit anim will interrupt attack anim
 					}
 				}
 				else if (bIsAttackAnim)
@@ -3221,28 +3228,28 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 					case EAnimState::BeingHit:
 					{
-						PlayAnimAsMontage(Animation, Animating, Moving, Animation.IndexOfHitAnim, Hit.AnimLength, 10, SafeDeltaTime);
+						PlayAnimAsMontage(Animation, Animating, Moving, false, true, Hit.AnimLength, 1, Animation.IndexOfHitAnim, 10, SafeDeltaTime);
 
 						break;
 					}
 
 					case EAnimState::Attacking:
 					{
-						PlayAnimAsMontage(Animation, Animating, Moving, Animation.IndexOfAttackAnim, Attack.DurationPerRound, 1, SafeDeltaTime);
+						PlayAnimAsMontage(Animation, Animating, Moving, false, true, Attack.DurationPerRound, 1, Animation.IndexOfAttackAnim, 1, SafeDeltaTime);
 
 						break;
 					}
 
 					case EAnimState::Falling:
 					{
-						PlayAnimAsMontage(Animation, Animating, Moving, Animation.IndexOfFallAnim, 0, 1, SafeDeltaTime);
+						PlayAnimAsMontage(Animation, Animating, Moving, true, false, 1, Animation.FallPlayRate, Animation.IndexOfFallAnim, 1, SafeDeltaTime);
 
 						break;
 					}
 
 					case EAnimState::Dying:
 					{
-						PlayAnimAsMontage(Animation, Animating, Moving, Animation.IndexOfDeathAnim, Death.AnimLength, 1, SafeDeltaTime);
+						PlayAnimAsMontage(Animation, Animating, Moving, false, true, Death.AnimLength, 1, Animation.IndexOfDeathAnim, 1, SafeDeltaTime);
 
 						break;
 					}

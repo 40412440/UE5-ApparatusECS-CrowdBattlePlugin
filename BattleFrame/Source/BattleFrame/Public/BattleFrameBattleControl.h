@@ -211,7 +211,7 @@ public:
 
 	static void CopyPasteAnimData(FAnimating& Animating, int32 From, int32 To);
 
-	FORCEINLINE void PlayAnimAsMontage(FAnimation& Animation, FAnimating& Animating, FMoving& Moving, int32 AnimIndex, float AnimLength, float LerpSpeedMult, float SafeDeltaTime)
+	FORCEINLINE void PlayAnimAsMontage(FAnimation& Animation, FAnimating& Animating, FMoving& Moving, bool bLooped, bool bUseAnimLength, float AnimLength, float PlayRate, int32 AnimIndex, float LerpSpeedMult, float SafeDeltaTime)
 	{
 		if (Animating.bUpdateAnimState)
 		{
@@ -225,7 +225,7 @@ public:
 				}
 
 				Animating.AnimCurrentTime2 = GetGameTimeSinceCreation();
-				Animating.AnimPauseFrame2 = Animating.AnimPauseFrameArray.Num() > AnimIndex ? Animating.AnimPauseFrameArray[AnimIndex] : 0;
+				Animating.AnimPauseFrame2 = bLooped ? 0 : Animating.AnimPauseFrameArray.Num() > AnimIndex ? Animating.AnimPauseFrameArray[AnimIndex] : 0;
 			}
 			else // Use slot 1
 			{
@@ -241,7 +241,7 @@ public:
 
 				// write Hit anim into slot 1
 				Animating.AnimCurrentTime1 = GetGameTimeSinceCreation();
-				Animating.AnimPauseFrame1 = Animating.AnimPauseFrameArray.Num() > AnimIndex ? Animating.AnimPauseFrameArray[AnimIndex] : 0;
+				Animating.AnimPauseFrame1 = bLooped ? 0 : Animating.AnimPauseFrameArray.Num() > AnimIndex ? Animating.AnimPauseFrameArray[AnimIndex] : 0;
 
 				Animating.AnimLerp0 = 0;
 				Animating.AnimLerp1 = 0;
@@ -254,10 +254,10 @@ public:
 		if (Animating.CurrentMontageSlot == 2)
 		{
 			Animating.AnimIndex2 = AnimIndex;
-			Animating.AnimPlayRate2 = AnimLength == 0 ? 0 : Animating.AnimPauseFrame2 / Animating.SampleRate / AnimLength;
+			Animating.AnimPlayRate2 = bUseAnimLength ? Animating.AnimPauseFrame2 / Animating.SampleRate / AnimLength : PlayRate;
 
-			const TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
-			const TRange<float> OutputRange(0, 1);
+			TRange<float> InputRange(Animation.BS_IdleMove[0], Animation.BS_IdleMove[1]);
+			TRange<float> OutputRange(0, 1);
 			float Input = Moving.CurrentVelocity.Size2D();
 			float TargetLerp = FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Input);
 
@@ -267,7 +267,7 @@ public:
 		else
 		{
 			Animating.AnimIndex1 = AnimIndex;
-			Animating.AnimPlayRate1 = AnimLength == 0 ? 0 : Animating.AnimPauseFrame1 / Animating.SampleRate / AnimLength;
+			Animating.AnimPlayRate1 = bUseAnimLength ? Animating.AnimPauseFrame1 / Animating.SampleRate / AnimLength : PlayRate;
 
 			// transit from slot 0 to slot 1 using AnimLerp0
 			Animating.AnimLerp0 = FMath::Clamp(Animating.AnimLerp0 + SafeDeltaTime * Animation.LerpSpeed, 0, 1);
@@ -330,13 +330,15 @@ public:
 		Patrolling.WaitTimeLeft = Patrol.CoolDown;
 
 		// Reset origin based on mode
-		if (Patrol.OriginMode == EPatrolOriginMode::Previous)
+		switch (Patrol.OriginMode)
 		{
-			Patrol.Origin = Located.Location; // use current location
-		}
-		else
-		{
-			Patrol.Origin = Located.InitialLocation; // use initial location
+			case EPatrolOriginMode::Previous:
+				Patrol.Origin = Located.Location; // use current location
+				break;
+
+			case EPatrolOriginMode::Initial:
+				Patrol.Origin = Located.InitialLocation; // use initial location
+				break;
 		}
 	};
 
