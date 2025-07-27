@@ -57,7 +57,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "使用哪里作为原点"))
 	EPatrolOriginMode OriginMode = EPatrolOriginMode::Initial;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "巡逻圆心"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "巡逻圆心", EditCondition = "OriginMode == EPatrolOriginMode::Custom", EditConditionHides))
 	FVector Origin = FVector::ZeroVector;
 
 };

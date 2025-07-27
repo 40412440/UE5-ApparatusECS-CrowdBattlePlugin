@@ -43,8 +43,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVOSphereObstacle")
 	float NewSpeedLimit = 2000;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVOSphereObstacle")
-	bool bExcludeFromVisibilityCheck = false;
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVOSphereObstacle")
+	//bool bExcludeFromVisibilityCheck = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RVOSphereObstacle")
 	USphereComponent* SphereComponent;

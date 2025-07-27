@@ -42,8 +42,8 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVOSquareObstacle")
     bool bInsideOut = false;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVOSquareObstacle")
-    bool bExcludeFromVisibilityCheck = false;
+    //UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVOSquareObstacle")
+    //bool bExcludeFromVisibilityCheck = false;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RVOSquareObstacle")
     UBoxComponent* BoxComponent;

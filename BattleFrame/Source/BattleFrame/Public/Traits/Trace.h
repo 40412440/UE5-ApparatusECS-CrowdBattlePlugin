@@ -7,6 +7,70 @@
 
 class UNeighborGridComponent;
 
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FSectorTraceParams
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "检测目标是不是在障碍物后面"))
+	bool bCheckObstacle = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "索敌视野半径", DisplayName = "Radius"))
+	float TraceRadius = 1000;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (UIMin = 0, UIMax = 360, Tooltip = "索敌视野角度", DisplayName = "Angle"))
+	float TraceAngle = 360.f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "索敌视野高度", DisplayName = "Height"))
+	float TraceHeight = 300.f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "位置偏移"))
+	FVector LocationOffset = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "朝向偏移"))
+	float YawOffset = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "每几秒索敌一次", DisplayName = "Frequency"))
+	float CoolDown = 2;
+
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FSectorTraceParamsSpecific
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "启用"))
+	bool bEnable = true;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "检测目标是不是在障碍物后面"))
+	bool bCheckObstacle = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "索敌视野半径", DisplayName = "Radius"))
+	float TraceRadius = 1000;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (UIMin = 0, UIMax = 360, Tooltip = "索敌视野角度", DisplayName = "Angle"))
+	float TraceAngle = 360.f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "索敌视野高度", DisplayName = "Height"))
+	float TraceHeight = 300.f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "位置偏移"))
+	FVector LocationOffset = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "朝向偏移"))
+	float YawOffset = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "每几秒索敌一次", DisplayName = "Frequency"))
+	float CoolDown = 2;
+
+};
+
 USTRUCT(BlueprintType)
 struct BATTLEFRAME_API FSectorTraceShape
 {
@@ -29,6 +93,24 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FBFFilter
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "包含具有这些特征的目标"))
+	TArray<UScriptStruct*> IncludeTraits;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "排除具有这些特征的目标"))
+	TArray<UScriptStruct*> ExcludeTraits;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "障碍物碰撞类型"))
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObstacleObjectType;
+
+};
+
+USTRUCT(BlueprintType)
 struct BATTLEFRAME_API FTrace
 {
 	GENERATED_BODY()
@@ -44,17 +126,11 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "扇形索敌参数"))
 	FSectorTraceShape SectorTrace = FSectorTraceShape();
 
-	//UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "索敌冷却时间（秒）"))
-	//float CoolDown = 2;
-
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "索敌模式 (TargetIsPlayer_0: 目标为玩家, SphereTraceByTraits: 根据特征索敌)"))
 	ETraceMode Mode = ETraceMode::TargetIsPlayer_0;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "包含具有这些特征的目标"))
-	TArray<UScriptStruct*> IncludeTraits;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "排除具有这些特征的目标"))
-	TArray<UScriptStruct*> ExcludeTraits;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "索敌条件过滤器"))
+	FBFFilter Filter = FBFFilter();
 
 };
 
@@ -112,4 +188,7 @@ public:
 		return *this;
 	}
 };
+
+
+
 

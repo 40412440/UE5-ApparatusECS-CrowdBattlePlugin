@@ -4,7 +4,10 @@
 #include "SubjectHandle.h"
 #include "GridData.generated.h"
 
-// these values are cached for cpu cache optimizaiton
+// these values are cached for cache optimizaiton, 
+// this is exactly 32 bits
+// 1 cpu cache line can contain 2 of this struct
+
 USTRUCT(BlueprintType, meta = (ForceAlignment = 4))
 struct BATTLEFRAME_API FGridData
 {
@@ -35,5 +38,4 @@ public:
     {
         return Data.SubjectHash;
     }
-
 };

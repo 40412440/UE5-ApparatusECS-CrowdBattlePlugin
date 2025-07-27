@@ -1,4 +1,4 @@
-/*
+﻿/*
 * BattleFrame
 * Created: 2025
 * Author: Leroy Works, All Rights Reserved.
@@ -63,6 +63,7 @@
 #include "Traits/Chase.h"
 #include "Traits/Patrol.h"
 #include "Traits/TextPopConfig.h"
+#include "Traits/ProjectileConfig.h"
 #include "Traits/MayDie.h"
 #include "Traits/PrimaryType.h"
 #include "Traits/Transform.h"
@@ -170,6 +171,8 @@ private:
 	FFilter SpawnFxFilter;
 	FFilter PlaySoundFilter;
 	FFilter SubjectFilterBase;
+
+	FFilter ProjectileFilter;
 
 
 public:
@@ -342,20 +345,20 @@ public:
 		}
 	};
 
-	
+
 	//---------------------------------------------Damager------------------------------------------------------------------
 
 	void ApplyPointDamageAndDebuff(const FSubjectArray& Subjects, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Point& Damage, const FDebuff_Point& Debuff, TArray<FDmgResult>& DamageResults);
 
 	void ApplyPointDamageAndDebuffDeferred(const FSubjectArray& Subjects, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Point& Damage, const FDebuff_Point& Debuff, TArray<FDmgResult>& DamageResults);
 
-	void ApplyRadialDamageAndDebuff(const FVector& Origin, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Radial& Damage, const FDebuff_Radial& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults);
+	void ApplyRadialDamageAndDebuff(UNeighborGridComponent* NeighborGridComponent, const int32 KeepCount, const FVector& Origin, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Radial& Damage, const FDebuff_Radial& Debuff, TArray<FDmgResult>& DamageResults);
 
-	void ApplyRadialDamageAndDebuffDeferred(const FVector& Origin, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Radial& Damage, const FDebuff_Radial& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults);
+	void ApplyRadialDamageAndDebuffDeferred(UNeighborGridComponent* NeighborGridComponent, const int32 KeepCount, const FVector& Origin, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Radial& Damage, const FDebuff_Radial& Debuff, TArray<FDmgResult>& DamageResults);
 
-	void ApplyBeamDamageAndDebuff(const FVector& StartLocation, const FVector& EndLocation, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Beam& Damage, const FDebuff_Beam& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults);
+	void ApplyBeamDamageAndDebuff(UNeighborGridComponent* NeighborGridComponent, const int32 KeepCount, const FVector& StartLocation, const FVector& EndLocation, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Beam& Damage, const FDebuff_Beam& Debuff, TArray<FDmgResult>& DamageResults);
 
-	void ApplyBeamDamageAndDebuffDeferred(const FVector& StartLocation, const FVector& EndLocation, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Beam& Damage, const FDebuff_Beam& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults);
+	void ApplyBeamDamageAndDebuffDeferred(UNeighborGridComponent* NeighborGridComponent, const int32 KeepCount, const FVector& StartLocation, const FVector& EndLocation, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Beam& Damage, const FDebuff_Beam& Debuff, TArray<FDmgResult>& DamageResults);
 
 	
 	//-------------------------------------------Pack Data------------------------------------------------------------------

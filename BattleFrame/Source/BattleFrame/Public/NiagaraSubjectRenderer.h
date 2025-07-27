@@ -90,6 +90,5 @@ public:
     UWorld* CurrentWorld = nullptr;
     AMechanism* Mechanism = nullptr;
     ABattleFrameBattleControl* BattleControl = nullptr;
-    UNiagaraComponent* SpawnedNiagaraSystem;
 
 };

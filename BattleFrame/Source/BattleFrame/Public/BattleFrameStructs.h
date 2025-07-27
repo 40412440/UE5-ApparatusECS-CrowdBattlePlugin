@@ -7,6 +7,17 @@
 #include "BattleFrameStructs.generated.h" 
 
 
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FObjectTypes
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
+
+};
 
 USTRUCT(BlueprintType)
 struct BATTLEFRAME_API FTraceResult
@@ -15,11 +26,17 @@ struct BATTLEFRAME_API FTraceResult
 
 public:
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "碰撞发生时，被索敌对象的SubjectHandle"))
     FSubjectHandle Subject = FSubjectHandle();
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    FVector Location = FVector::ZeroVector;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "碰撞发生时，被索敌对象的位置"))
+    FVector SubjectLocation = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "碰撞发生时，索敌图形的位置"))
+	FVector ShapeLocation = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "碰撞发生时，索敌图形与被索敌对象的碰撞点"))
+	FVector HitLocation = FVector::ZeroVector;
 
     float CachedDistSq = -1.0f;
 };
@@ -51,116 +68,6 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct BATTLEFRAME_API FSectorTraceParamsSpecific
-{
-	GENERATED_BODY()
-
-public:
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "启用"))
-	bool bEnable = true;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "检测目标是不是在障碍物后面"))
-	bool bCheckVisibility = false;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "索敌视野半径", DisplayName = "Radius"))
-	float TraceRadius = 1000;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (UIMin = 0, UIMax = 360, Tooltip = "索敌视野角度", DisplayName = "Angle"))
-	float TraceAngle = 360.f;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "索敌视野高度", DisplayName = "Height"))
-	float TraceHeight = 300.f;
-
-	//UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "位置偏移"))
-	//FVector LocationOffset = FVector::ZeroVector;
-
-	//UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "朝向偏移"))
-	//float YawOffset = 0;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "每几秒索敌一次", DisplayName = "Frequency"))
-	float CoolDown = 2;
-
-
-	//FSectorTraceParamsSpecific() {};
-
-	//FSectorTraceParamsSpecific(const FSectorTraceParamsSpecific& Params)
-	//{
-	//	bEnable = Params.bEnable;
-	//	TraceRadius = Params.TraceRadius;
-	//	TraceAngle = Params.TraceAngle;
-	//	TraceHeight = Params.TraceHeight;
-	//	bCheckVisibility = Params.bCheckVisibility;
-	//	LocationOffset = Params.LocationOffset;
-	//	YawOffset = Params.YawOffset;
-	//}
-
-	//FSectorTraceParamsSpecific& operator=(const FSectorTraceParamsSpecific& Params)
-	//{
-	//	bEnable = Params.bEnable;
-	//	TraceRadius = Params.TraceRadius;
-	//	TraceAngle = Params.TraceAngle;
-	//	TraceHeight = Params.TraceHeight;
-	//	bCheckVisibility = Params.bCheckVisibility;
-	//	LocationOffset = Params.LocationOffset;
-	//	YawOffset = Params.YawOffset;
-	//	return *this;
-	//}
-};
-
-USTRUCT(BlueprintType)
-struct BATTLEFRAME_API FSectorTraceParams
-{
-	GENERATED_BODY()
-
-public:
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "检测目标是不是在障碍物后面"))
-	bool bCheckVisibility = false;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "索敌视野半径", DisplayName = "Radius"))
-	float TraceRadius = 1000;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (UIMin = 0, UIMax = 360, Tooltip = "索敌视野角度", DisplayName = "Angle"))
-	float TraceAngle = 360.f;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "索敌视野高度", DisplayName = "Height"))
-	float TraceHeight = 300.f;
-
-	//UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "位置偏移"))
-	//FVector LocationOffset = FVector::ZeroVector;
-
-	//UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "朝向偏移"))
-	//float YawOffset = 0;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "每几秒索敌一次", DisplayName = "Frequency"))
-	float CoolDown = 2;
-
-	//FSectorTraceParams() {};
-
-	//FSectorTraceParams(const FSectorTraceParams& Params)
-	//{
-	//	TraceRadius = Params.TraceRadius;
-	//	TraceAngle = Params.TraceAngle;
-	//	TraceHeight = Params.TraceHeight;
-	//	bCheckVisibility = Params.bCheckVisibility;
-	//	LocationOffset = Params.LocationOffset;
-	//	YawOffset = Params.YawOffset;
-	//}
-
-	//FSectorTraceParams& operator=(const FSectorTraceParams& Params)
-	//{
-	//	TraceRadius = Params.TraceRadius;
-	//	TraceAngle = Params.TraceAngle;
-	//	TraceHeight = Params.TraceHeight;
-	//	bCheckVisibility = Params.bCheckVisibility;
-	//	LocationOffset = Params.LocationOffset;
-	//	YawOffset = Params.YawOffset;
-	//	return *this;
-	//}
-};
-
-USTRUCT(BlueprintType)
 struct BATTLEFRAME_API FSphereSweepParamsSpecific
 {
 	GENERATED_BODY()
@@ -180,7 +87,7 @@ public:
 	float TraceHeight = 300.f;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "检测目标是不是在障碍物后面"))
-	bool bCheckVisibility = false;
+	bool bCheckObstacle = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "位置偏移"))
 	FVector LocationOffset = FVector::ZeroVector;
@@ -221,7 +128,7 @@ public:
 	float TraceHeight = 300.f;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "检测目标是不是在障碍物后面"))
-	bool bCheckVisibility = false;
+	bool bCheckObstacle = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "位置偏移"))
 	FVector LocationOffset = FVector::ZeroVector;
@@ -629,7 +536,10 @@ public:
 	float Duration = 0.f;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "线宽"))
-	float LineThickness = 0.f;
+	float LineThickness = 1.f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "碰撞点大小"))
+	float HitPointSize = 1.f;
 
 	FTraceDrawDebugConfig() = default;
 

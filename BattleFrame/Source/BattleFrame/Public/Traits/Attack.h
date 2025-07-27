@@ -6,7 +6,10 @@
 #include "SoundConfig.h"
 #include "FxConfig.h"
 #include "ProjectileConfig.h"
+#include "SubjectRecord.h"
+#include "ProjectileConfigDataAsset.h"
 #include "Attack.generated.h"
+
 
 UENUM(BlueprintType)
 enum class EAttackMode : uint8
@@ -60,8 +63,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否播放攻击动画"))
 	bool bCanPlayAnim = true;
 
-	//UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	//TArray<FProjectileConfig_Ballistic> SpawnProjectile;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
+	TArray<TSoftObjectPtr<UProjectileConfigDataAsset>> SpawnProjectile;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
 	TArray<FActorSpawnConfig_Attack> SpawnActor;

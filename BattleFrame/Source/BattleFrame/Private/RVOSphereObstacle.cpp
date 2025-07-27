@@ -38,7 +38,7 @@ void ARVOSphereObstacle::BeginPlay()
 	Template.GetTraitRef<FSphereObstacle>().bOverrideSpeedLimit = bOverrideSpeedLimit;
 	Template.GetTraitRef<FSphereObstacle>().NewSpeedLimit = NewSpeedLimit;
 	Template.GetTraitRef<FSphereObstacle>().bStatic = !bIsDynamicObstacle;
-	Template.GetTraitRef<FSphereObstacle>().bExcluded = bExcludeFromVisibilityCheck;
+	//Template.GetTraitRef<FSphereObstacle>().bExcluded = bExcludeFromVisibilityCheck;
 
 	AMechanism* Mechanism = UMachine::ObtainMechanism(GetWorld());
 	SubjectHandle = Mechanism->SpawnSubject(Template);
@@ -73,6 +73,6 @@ void ARVOSphereObstacle::Tick(float DeltaTime)
 		SubjectHandle.GetTraitRef<FCollider, EParadigm::Unsafe>().Radius = Radius;
 		SubjectHandle.GetTraitRef<FSphereObstacle, EParadigm::Unsafe>().bOverrideSpeedLimit = bOverrideSpeedLimit;
 		SubjectHandle.GetTraitRef<FSphereObstacle, EParadigm::Unsafe>().NewSpeedLimit = NewSpeedLimit;
-		SubjectHandle.GetTraitRef<FSphereObstacle, EParadigm::Unsafe>().bExcluded = bExcludeFromVisibilityCheck;
+		//SubjectHandle.GetTraitRef<FSphereObstacle, EParadigm::Unsafe>().bExcluded = bExcludeFromVisibilityCheck;
 	}
 }

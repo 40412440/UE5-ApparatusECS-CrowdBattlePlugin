@@ -18,3 +18,15 @@ public:
 	FSubjectHandle Host = FSubjectHandle();
 
 };
+
+//USTRUCT(BlueprintType)
+//struct BATTLEFRAME_API FInstigatorSubject
+//{
+//	GENERATED_BODY()
+//
+//public:
+//
+//	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+//	FSubjectHandle Instigator = FSubjectHandle();
+//
+//};

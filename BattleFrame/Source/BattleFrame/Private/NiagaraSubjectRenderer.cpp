@@ -20,7 +20,7 @@
 ANiagaraSubjectRenderer::ANiagaraSubjectRenderer()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.bStartWithTickEnabled = false;
+	PrimaryActorTick.bStartWithTickEnabled = true;
 }
 
 // Called when the game starts or when spawned
@@ -90,8 +90,7 @@ void ANiagaraSubjectRenderer::Register()
 			const FAnimation& Animation,
 			const FAnimating& Animating)
 		{
-			FQuat Rotation{ FQuat::Identity };
-			Rotation = Directed.Direction.Rotation().Quaternion();
+			FQuat Rotation = Directed.Direction.ToOrientationQuat();
 
 			FVector FinalScale(Scale);
 			FinalScale *= Scaled.RenderScale;
@@ -100,17 +99,17 @@ void ANiagaraSubjectRenderer::Register()
 			FTransform SubjectTransform(Rotation * OffsetRotation.Quaternion(),Located.Location + OffsetLocation - FVector(0, 0, Radius), FinalScale);
 
 			FSubjectHandle RenderBatch = FSubjectHandle();
-			FRenderBatchData* Data = nullptr;
+			FAgentRenderBatchData* Data = nullptr;
 
 			// Get the first render batch that has a free trans slot
 			for (const FSubjectHandle Renderer : SpawnedRenderBatches)
 			{
-				FRenderBatchData* CurrentData = Renderer.GetTraitPtr<FRenderBatchData, EParadigm::Unsafe>();
+				FAgentRenderBatchData* CurrentData = Renderer.GetTraitPtr<FAgentRenderBatchData, EParadigm::Unsafe>();
 
 				if (CurrentData->FreeTransforms.Num() > 0 || CurrentData->Transforms.Num() < RenderBatchSize)
 				{
 					RenderBatch = Renderer;
-					Data = Renderer.GetTraitPtr<FRenderBatchData, EParadigm::Unsafe>();
+					Data = Renderer.GetTraitPtr<FAgentRenderBatchData, EParadigm::Unsafe>();
 					break;
 				}
 			}
@@ -118,7 +117,7 @@ void ANiagaraSubjectRenderer::Register()
 			if (!Data)// all current batches are full
 			{
 				RenderBatch = AddRenderBatch();// add a new batch
-				Data = RenderBatch.GetTraitPtr<FRenderBatchData, EParadigm::Unsafe>();
+				Data = RenderBatch.GetTraitPtr<FAgentRenderBatchData, EParadigm::Unsafe>();
 			}
 
 			int32 NewInstanceId;
@@ -193,7 +192,7 @@ void ANiagaraSubjectRenderer::IdleCheck()
 
 	for (const FSubjectHandle RenderBatch : CachedSpawnedRenderBatches)
 	{
-		FRenderBatchData* CurrentData = RenderBatch.GetTraitPtr<FRenderBatchData, EParadigm::Unsafe>();
+		FAgentRenderBatchData* CurrentData = RenderBatch.GetTraitPtr<FAgentRenderBatchData, EParadigm::Unsafe>();
 
 		if (CurrentData->FreeTransforms.Num() == CurrentData->Transforms.Num())// current render batch is completely empty
 		{
@@ -210,10 +209,10 @@ void ANiagaraSubjectRenderer::IdleCheck()
 FSubjectHandle ANiagaraSubjectRenderer::AddRenderBatch()
 {
 	//TRACE_CPUPROFILER_EVENT_SCOPE_STR("AddRenderBatch");
-	FSubjectHandle RenderBatch = Mechanism->SpawnSubject(FRenderBatchData());
+	FSubjectHandle RenderBatch = Mechanism->SpawnSubject(FAgentRenderBatchData());
 	SpawnedRenderBatches.Add(RenderBatch);
 
-	FRenderBatchData* NewData = RenderBatch.GetTraitPtr<FRenderBatchData, EParadigm::Unsafe>();
+	FAgentRenderBatchData* NewData = RenderBatch.GetTraitPtr<FAgentRenderBatchData, EParadigm::Unsafe>();
 
 	NewData->Scale = Scale;
 	NewData->OffsetLocation = OffsetLocation;
@@ -242,7 +241,7 @@ FSubjectHandle ANiagaraSubjectRenderer::AddRenderBatch()
 void ANiagaraSubjectRenderer::RemoveRenderBatch(FSubjectHandle RenderBatch)
 {
 	//TRACE_CPUPROFILER_EVENT_SCOPE_STR("RemoveRenderBatch");
-	FRenderBatchData* RenderBatchData = RenderBatch.GetTraitPtr<FRenderBatchData, EParadigm::Unsafe>();
+	FAgentRenderBatchData* RenderBatchData = RenderBatch.GetTraitPtr<FAgentRenderBatchData, EParadigm::Unsafe>();
 	RenderBatchData->SpawnedNiagaraSystem->DestroyComponent();
 	SpawnedRenderBatches.Remove(RenderBatch);
 	RenderBatch->Despawn();

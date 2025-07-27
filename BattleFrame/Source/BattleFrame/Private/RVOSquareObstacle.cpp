@@ -68,8 +68,8 @@ void ARVOSquareObstacle::BeginPlay()
         HeightValue,      // height_
         true,            // isConvex_
         !bIsDynamicObstacle, // bStatic
-        false,           // bRegistered
-        bExcludeFromVisibilityCheck // bExcluded
+        false            // bRegistered
+        //bExcludeFromVisibilityCheck // bExcluded
     };
 
     FBoxObstacle BoxObstacle2
@@ -85,8 +85,8 @@ void ARVOSquareObstacle::BeginPlay()
         HeightValue,      // height_
         true,            // isConvex_
         !bIsDynamicObstacle, // bStatic
-        false,           // bRegistered
-        bExcludeFromVisibilityCheck // bExcluded
+        false            // bRegistered
+        //bExcludeFromVisibilityCheck // bExcluded
     };
 
     FBoxObstacle BoxObstacle3
@@ -102,8 +102,8 @@ void ARVOSquareObstacle::BeginPlay()
         HeightValue,      // height_
         true,            // isConvex_
         !bIsDynamicObstacle, // bStatic
-        false,           // bRegistered
-        bExcludeFromVisibilityCheck // bExcluded
+        false            // bRegistered
+        //bExcludeFromVisibilityCheck // bExcluded
     };
 
     FBoxObstacle BoxObstacle4
@@ -119,8 +119,8 @@ void ARVOSquareObstacle::BeginPlay()
         HeightValue,      // height_
         true,            // isConvex_
         !bIsDynamicObstacle, // bStatic
-        false,           // bRegistered
-        bExcludeFromVisibilityCheck // bExcluded
+        false            // bRegistered
+        //bExcludeFromVisibilityCheck // bExcluded
     };
 
     FSubjectRecord Record1;
@@ -238,11 +238,10 @@ void ARVOSquareObstacle::Tick(float DeltaTime)
                 ObstacleData->prePoint_ = PrePoint;
                 ObstacleData->nextPoint_ = NextPoint;
                 ObstacleData->nextNextPoint_ = NextNextPoint;
-                ObstacleData->unitDir_ = RVO::Vector2((NextLocation - Location).GetSafeNormal2D().X,
-                    (NextLocation - Location).GetSafeNormal2D().Y);
+                ObstacleData->unitDir_ = RVO::Vector2((NextLocation - Location).GetSafeNormal2D().X, (NextLocation - Location).GetSafeNormal2D().Y);
                 ObstacleData->pointZ_ = Location.Z;
                 ObstacleData->height_ = CurrentHeight;
-                ObstacleData->bExcluded = bExcludeFromVisibilityCheck;
+                //ObstacleData->bExcluded = bExcludeFromVisibilityCheck;
             };
 
         UpdateObstacle(Obstacle1, Point1Location, Point1, Point4, Point2, Point3, Point2Location);

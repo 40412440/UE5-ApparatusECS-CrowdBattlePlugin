@@ -11,8 +11,8 @@
 #include "RenderBatchData.generated.h"
 
 
-USTRUCT(BlueprintType, Category = "TraitRenderer")
-struct BATTLEFRAME_API FRenderBatchData
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FAgentRenderBatchData
 {
     GENERATED_BODY()
 
@@ -66,9 +66,9 @@ struct BATTLEFRAME_API FRenderBatchData
     TArray<bool> InsidePool_Array;
 
 
-    FRenderBatchData(){};
+    FAgentRenderBatchData(){};
 
-    FRenderBatchData(const FRenderBatchData& Data)
+    FAgentRenderBatchData(const FAgentRenderBatchData& Data)
     {
         LockFlag.store(Data.LockFlag.load());
 
@@ -95,7 +95,7 @@ struct BATTLEFRAME_API FRenderBatchData
         InsidePool_Array = Data.InsidePool_Array;
     }
 
-    FRenderBatchData& operator=(const FRenderBatchData& Data)
+    FAgentRenderBatchData& operator=(const FAgentRenderBatchData& Data)
     {
         LockFlag.store(Data.LockFlag.load());
 
@@ -120,6 +120,100 @@ struct BATTLEFRAME_API FRenderBatchData
         Text_Value_Style_Scale_Offset_Array = Data.Text_Value_Style_Scale_Offset_Array;
 
         InsidePool_Array = Data.InsidePool_Array;
+
+        return *this;
+    }
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FFxRenderBatchData
+{
+    GENERATED_BODY()
+
+private:
+
+    mutable std::atomic<bool> LockFlag{ false };
+
+public:
+
+    void Lock() const
+    {
+        while (LockFlag.exchange(true, std::memory_order_acquire));
+    }
+
+    void Unlock() const
+    {
+        LockFlag.store(false, std::memory_order_release);
+    }
+
+    // Renderer
+    UNiagaraComponent* SpawnedNiagaraSystem = nullptr;
+
+    // Pooling_Attached
+    FBitMask ValidTransforms_Attached;
+    TArray<int32> FreeTransforms_Attached;
+    TArray<float> CoolDowns_Attached;
+    TArray<bool> LocationEventArray_Attached;
+
+    // Transform_Attached
+    TArray<FTransform> Transforms_Attached;
+    TArray<FVector> LocationArray_Attached;
+    TArray<FQuat> OrientationArray_Attached;
+    TArray<FVector> ScaleArray_Attached;
+
+    // Transform_Burst
+    TArray<FVector> LocationArray_Burst;
+    TArray<FQuat> OrientationArray_Burst;
+    TArray<FVector> ScaleArray_Burst;
+
+    FORCEINLINE void ResetBurstData()
+    {
+        LocationArray_Burst.Empty();
+        OrientationArray_Burst.Empty();
+        ScaleArray_Burst.Empty();
+    }
+    FFxRenderBatchData() {};
+
+    FFxRenderBatchData(const FFxRenderBatchData& Data)
+    {
+        LockFlag.store(Data.LockFlag.load());
+
+        SpawnedNiagaraSystem = Data.SpawnedNiagaraSystem;
+
+        ValidTransforms_Attached = Data.ValidTransforms_Attached;
+        FreeTransforms_Attached = Data.FreeTransforms_Attached;
+        CoolDowns_Attached = Data.CoolDowns_Attached;
+        LocationEventArray_Attached = Data.LocationEventArray_Attached;
+
+        Transforms_Attached = Data.Transforms_Attached;
+        LocationArray_Attached = Data.LocationArray_Attached;
+        OrientationArray_Attached = Data.OrientationArray_Attached;
+        ScaleArray_Attached = Data.ScaleArray_Attached;
+
+        LocationArray_Burst = Data.LocationArray_Burst;
+        OrientationArray_Burst = Data.OrientationArray_Burst;
+        ScaleArray_Burst = Data.ScaleArray_Burst;
+    }
+
+    FFxRenderBatchData& operator=(const FFxRenderBatchData& Data)
+    {
+        LockFlag.store(Data.LockFlag.load());
+
+        SpawnedNiagaraSystem = Data.SpawnedNiagaraSystem;
+
+        ValidTransforms_Attached = Data.ValidTransforms_Attached;
+        FreeTransforms_Attached = Data.FreeTransforms_Attached;
+        CoolDowns_Attached = Data.CoolDowns_Attached;
+        LocationEventArray_Attached = Data.LocationEventArray_Attached;
+
+        Transforms_Attached = Data.Transforms_Attached;
+        LocationArray_Attached = Data.LocationArray_Attached;
+        OrientationArray_Attached = Data.OrientationArray_Attached;
+        ScaleArray_Attached = Data.ScaleArray_Attached;
+
+        LocationArray_Burst = Data.LocationArray_Burst;
+        OrientationArray_Burst = Data.OrientationArray_Burst;
+        ScaleArray_Burst = Data.ScaleArray_Burst;
 
         return *this;
     }

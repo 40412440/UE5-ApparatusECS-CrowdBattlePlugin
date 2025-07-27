@@ -9,10 +9,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "NiagaraSystem.h" // Include the Niagara System header
-#include "NiagaraComponent.h" // Include the Niagara Component header
 #include "Machine.h"
 #include "HAL/PlatformMisc.h"
-
 #include "NiagaraFXRenderer.generated.h"
 
 UENUM(BlueprintType)
@@ -21,6 +19,10 @@ enum class EFxMode : uint8
 	InPlace UMETA(DisplayName = "InPlace"),
 	Attached UMETA(DisplayName = "Attached")
 };
+
+class UWorld;
+class AMechanism;
+class ABattleFrameBattleControl;
 
 UCLASS()
 class BATTLEFRAME_API ANiagaraFXRenderer : public AActor
@@ -37,30 +39,47 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	EFxMode Mode = EFxMode::InPlace;
+	void IdleCheck();
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FSubjectHandle AddRenderBatch();
+
+	void RemoveRenderBatch(FSubjectHandle RenderBatch);
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings")
+	UNiagaraSystem* NiagaraSystemAsset;
+
+	//UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings")
+	//EFxMode Mode = EFxMode::InPlace;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings | Filter")
 	UScriptStruct* TraitType = nullptr;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings | Filter")
 	UScriptStruct* SubType = nullptr;
 
-	// Variable to hold the Niagara System Asset
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UNiagaraSystem* NiagaraAsset;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings | Performance")
+	float PoollingCoolDown = 3;
 
-	// Niagara component that will handle the effects
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly)
-	UNiagaraComponent* NiagaraComponent;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings | Performance")
+	int32 RenderBatchSize = 500;
 
-	TArray<FTransform> Transforms;
-	FBitMask ValidTransforms;
-	TArray<int32> FreeTransforms;
-	TArray<float> CoolDowns;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings | Performance")
+	int32 MaxThreadsAllowed = FMath::Clamp(FPlatformMisc::NumberOfWorkerThreadsToSpawn(), 1, FPlatformMisc::NumberOfCoresIncludingHyperthreads());
 
-	TArray<FVector> LocationArray;
-	TArray<FQuat> OrientationArray;
-	TArray<FVector> ScaleArray;
-	TArray<bool> LocationEventArray;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Settings | Performance")
+	int32 MinBatchSizeAllowed = 100;
+
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "CachedVars")
+	TArray<FSubjectHandle> SpawnedRenderBatches;
+
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "CachedVars")
+	int32 ProjectileCount = 0;
+
+	int32 ThreadsCount = 1;
+	int32 BatchSize = 1;
+	bool Initialized = false;
+	UWorld* CurrentWorld = nullptr;
+	AMechanism* Mechanism = nullptr;
+	ABattleFrameBattleControl* BattleControl = nullptr;
+
 };

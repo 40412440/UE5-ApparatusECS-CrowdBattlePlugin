@@ -144,13 +144,13 @@ public:
 		const int32 KeepCount,
 		const FVector& Origin, 
 		const float Radius, 
-		const bool bCheckVisibility, 
+		const bool bCheckObstacle, 
 		const FVector& CheckOrigin, 
 		const float CheckRadius, 
 		const ESortMode SortMode,
 		const FVector& SortOrigin,
 		const FSubjectArray& IgnoreSubjects,
-		const FFilter& Filter, 
+		const FBFFilter& Filter,
 		const FTraceDrawDebugConfig& DrawDebugConfig,
 		bool& Hit, 
 		TArray<FTraceResult>& Results
@@ -162,13 +162,13 @@ public:
 		const FVector& Start, 
 		const FVector& End, 
 		const float Radius, 
-		const bool bCheckVisibility, 
+		const bool bCheckObstacle, 
 		const FVector& CheckOrigin, 
 		const float CheckRadius, 
 		const ESortMode SortMode,
 		const FVector& SortOrigin,
 		const FSubjectArray& IgnoreSubjects,
-		const FFilter& Filter, 
+		const FBFFilter& Filter,
 		const FTraceDrawDebugConfig& DrawDebugConfig,
 		bool& Hit, 
 		TArray<FTraceResult>& Results
@@ -182,27 +182,27 @@ public:
 		const float Height, 
 		const FVector& Direction, 
 		const float Angle, 
-		const bool bCheckVisibility, 
+		const bool bCheckObstacle, 
 		const FVector& CheckOrigin, 
 		const float CheckRadius, 
 		const ESortMode SortMode,
 		const FVector& SortOrigin, 
 		const FSubjectArray& IgnoreSubjects,
-		const FFilter& Filter, 
+		const FBFFilter& Filter,
 		const FTraceDrawDebugConfig& DrawDebugConfig,
 		bool& Hit, 
 		TArray<FTraceResult>& Results
 	) const;	
 
-	void SphereSweepForObstacle
-	(
-		const FVector& Start,
-		const FVector& End,
-		float Radius,
-		const FTraceDrawDebugConfig& DrawDebugConfig,
-		bool& Hit,
-		FTraceResult& Result
-	) const;
+	//void SphereSweepForObstacle
+	//(
+	//	const FVector& Start,
+	//	const FVector& End,
+	//	float Radius,
+	//	const FTraceDrawDebugConfig& DrawDebugConfig,
+	//	bool& Hit,
+	//	FTraceResult& Result
+	//) const;
 
 	void Update();
 
@@ -239,6 +239,7 @@ public:
 
 	FORCEINLINE TArray<FIntVector> SphereSweepForCells(const FVector& Start, const FVector& End, float Radius) const
 	{
+		//TRACE_CPUPROFILER_EVENT_SCOPE_STR("SphereSweepForCells");
 		// 预计算关键参数 - 现在每个轴有自己的半径值
 		const FVector RadiusInCellsValue(Radius / CellSize.X, Radius / CellSize.Y, Radius / CellSize.Z);
 		const FIntVector RadiusInCells(
@@ -251,7 +252,6 @@ public:
 			FMath::Square(RadiusInCellsValue.Z));
 
 		// 改用TArray+BitArray加速去重
-		TArray<FIntVector> GridCells;
 		TSet<FIntVector> GridCellsSet; // 保持TSet或根据性能测试调整
 
 		FIntVector StartCell = LocationToCoord(Start);
@@ -379,16 +379,18 @@ public:
 	}
 
 	/* Convert a cage-local 3D location to a global 3D location. No bounding checks are performed.*/
+	//UFUNCTION(BlueprintCallable)
 	FORCEINLINE FVector CoordToLocation(const FIntVector& Coord) const
 	{
 		// Convert the cage point to a local position within the cage
 		FVector LocalPoint = FVector(Coord.X, Coord.Y, Coord.Z) * CellSize;
 
 		// Convert the local position to a global position by adding the cage's minimum bounds
-		return LocalPoint + Bounds.Min;
+		return LocalPoint + Bounds.Min + CellSize * 0.5f;
 	}
 
 	/* Convert a global 3D location to a position within the cage.No bounding checks are performed.*/
+	//UFUNCTION(BlueprintCallable)
 	FORCEINLINE FIntVector LocationToCoord(const FVector& Location) const
 	{
 		FVector NewLocation = (Location - Bounds.Min) * InvCellSizeCache; 

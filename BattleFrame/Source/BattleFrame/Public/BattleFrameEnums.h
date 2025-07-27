@@ -71,7 +71,8 @@ enum class EOrientMode : uint8
 {
 	ToPath UMETA(DisplayName = "ToPath", Tooltip = "面朝移动路径"),
 	ToMovement UMETA(DisplayName = "ToMovement", Tooltip = "面朝实际运动方向"),
-	ToMovementForwardAndBackward UMETA(DisplayName = "ToMovementForwardAndBackward", Tooltip = "面朝或背对实际运动方向")
+	ToMovementForwardAndBackward UMETA(DisplayName = "ToMovementForwardAndBackward", Tooltip = "面朝或背对实际运动方向"),
+	ToCustom UMETA(DisplayName = "ToCustom", Tooltip = "面朝自定义方向"),
 };
 
 UENUM(BlueprintType)
@@ -167,4 +168,21 @@ enum class EAnimState : uint8
 	Dying UMETA(DisplayName = "Dying"),
 	Falling UMETA(DisplayName = "Falling"),
 	Jumping UMETA(DisplayName = "Jumping")
+};
+
+UENUM(BlueprintType)
+enum class EProjectileMoveMode : uint8
+{
+	Static UMETA(DisplayName = "Static", ToolTip = "静态"),
+	Interped UMETA(DisplayName = "Interped", ToolTip = "插值"),
+	Ballistic UMETA(DisplayName = "Ballistic", ToolTip = "抛物线"),
+	Tracking UMETA(DisplayName = "Tracking", ToolTip = "跟踪")
+};
+
+UENUM(BlueprintType)
+enum class EProjectileDamageMode : uint8
+{
+	Point UMETA(DisplayName = "Point", ToolTip = "点"),
+	Radial UMETA(DisplayName = "Radial", ToolTip = "球形"),
+	Beam UMETA(DisplayName = "Beam", ToolTip = "球扫")
 };

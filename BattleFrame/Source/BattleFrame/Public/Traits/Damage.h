@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Traits/Trace.h"
 #include "Damage.generated.h"
 
 UENUM(BlueprintType)
@@ -42,7 +43,10 @@ public:
 	bool bUseFalloff = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "是否排除障碍物后的目标"))
-	bool bCheckVisibility = false;
+	bool bCheckObstacle = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "伤害过滤器"))
+	FBFFilter Filter = FBFFilter();
 
 };
 
@@ -68,6 +72,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "暴击概率"))
 	float CritProbability = 0.1f;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "伤害过滤器"))
+	FBFFilter Filter = FBFFilter();
+
 	// 默认构造函数
 	FDamage_Point() = default;
 
@@ -80,7 +87,6 @@ public:
 		CritDmgMult = InDamage.CritDmgMult;
 		CritProbability = InDamage.CritProbability;
 	}
-
 };
 
 USTRUCT(BlueprintType)
@@ -112,7 +118,10 @@ public:
 	bool bUseFalloff = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "是否排除障碍物后的目标"))
-	bool bCheckVisibility = false;
+	bool bCheckObstacle = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "范围伤害过滤器"))
+	FBFFilter Filter = FBFFilter();
 
 	// 默认构造函数
 	FDamage_Radial() = default;
@@ -127,9 +136,9 @@ public:
 		CritProbability = InDamage.CritProbability;
 		DmgRadius = InDamage.DmgRadius;
 		bUseFalloff = InDamage.bUseFalloff;
-		bCheckVisibility = InDamage.bCheckVisibility;
+		bCheckObstacle = InDamage.bCheckObstacle;
+		Filter = InDamage.Filter;
 	}
-
 };
 
 USTRUCT(BlueprintType)
@@ -157,8 +166,18 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "伤害半径，0为单体伤害"))
 	float DmgRadius = 0.f;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "伤害方向乘以距离"))
+	FVector DmgDirectionAndDistance = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "是否启用范围伤害衰减"))
+	bool bUseFalloff = false;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "是否排除障碍物后的目标"))
-	bool bCheckVisibility = false;
+	bool bCheckObstacle = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "范围伤害过滤器"))
+	FBFFilter Filter = FBFFilter();
+
 
 	// 默认构造函数
 	FDamage_Beam() = default;
@@ -172,7 +191,33 @@ public:
 		CritDmgMult = InDamage.CritDmgMult;
 		CritProbability = InDamage.CritProbability;
 		DmgRadius = InDamage.DmgRadius;
-		bCheckVisibility = InDamage.bCheckVisibility;
+		bUseFalloff = InDamage.bUseFalloff;
+		bCheckObstacle = InDamage.bCheckObstacle;
+		Filter = InDamage.Filter;
 	}
 
+	// 从FDamage_Point构造
+	FDamage_Beam(const FDamage_Point& InDamage)
+	{
+		DmgType = InDamage.DmgType;
+		Damage = InDamage.Damage;
+		PercentDmg = InDamage.PercentDmg;
+		CritDmgMult = InDamage.CritDmgMult;
+		CritProbability = InDamage.CritProbability;
+		Filter = InDamage.Filter;
+	}
+
+	// 从FDamage_Radial构造
+	FDamage_Beam(const FDamage_Radial& InDamage)
+	{
+		DmgType = InDamage.DmgType;
+		Damage = InDamage.Damage;
+		PercentDmg = InDamage.PercentDmg;
+		CritDmgMult = InDamage.CritDmgMult;
+		CritProbability = InDamage.CritProbability;
+		DmgRadius = InDamage.DmgRadius;
+		bUseFalloff = InDamage.bUseFalloff;
+		bCheckObstacle = InDamage.bCheckObstacle;
+		Filter = InDamage.Filter;
+	}
 };

@@ -300,7 +300,7 @@ void UBFSubjectiveAgentComponent::SyncTransformSubjectToActor(AActor* OwnerActor
 {
     if (!OwnerActor) return;
 
-    FTransform Transform;
+    FTransform Transform = FTransform::Identity;
 
     auto Located = GetTraitPtr<FLocated, EParadigm::Unsafe>();
 

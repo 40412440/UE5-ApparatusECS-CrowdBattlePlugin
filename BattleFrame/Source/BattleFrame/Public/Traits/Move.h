@@ -73,7 +73,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否可以飞行"))
 	bool bCanFly = false;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "随机飞行高度，出生后固定 (X: 最小高度, Y: 最大高度)"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "随机飞行高度，出生后固定 (X: 最小高度, Y: 最大高度)", EditCondition = "bCanFly == true", EditConditionHides))
 	FVector2D FlyHeight = FVector2D(200.f, 400.f);
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否可以播放坠落动画"))

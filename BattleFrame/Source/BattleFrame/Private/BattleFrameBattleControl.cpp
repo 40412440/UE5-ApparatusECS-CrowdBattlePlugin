@@ -1,4 +1,4 @@
-/*
+﻿/*
 * BattleFrame
 * Created: 2025
 * Author: Leroy Works, All Rights Reserved.
@@ -371,6 +371,14 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				TArray<FTraceResult> Results;
 				FTraceDrawDebugConfig DebugConfig;
 
+				FBFFilter Filter;
+				Filter.IncludeTraits.Add(TBaseStructure<FAgent>::Get());
+				Filter.IncludeTraits.Add(TBaseStructure<FLocated>::Get());
+				Filter.IncludeTraits.Add(TBaseStructure<FScaled>::Get());
+				Filter.IncludeTraits.Add(TBaseStructure<FCollider>::Get());
+				Filter.IncludeTraits.Add(TBaseStructure<FMoving>::Get());
+				Filter.IncludeTraits.Add(TBaseStructure<FActivated>::Get());
+
 				SphereObstacle.NeighborGrid->SphereTraceForSubjects
 				(
 					-1,
@@ -382,7 +390,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					ESortMode::None,
 					FVector::ZeroVector,
 					FSubjectArray(SphereObstacle.OverridingAgents.Array()),
-					FFilter::Make<FAgent, FLocated, FScaled, FCollider, FMoving, FActivated>(),
+					Filter,
 					DebugConfig,
 					Hit,
 					Results
@@ -1121,25 +1129,16 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						const FVector TraceStart = SelfLocation + FVector(0, 0, SelfRadius);
 						const FVector TraceEnd = FVector(SelfLocation.X, SelfLocation.Y, Fall.KillZ);
 
-						FCollisionShape CollisionShape;
-						CollisionShape.SetSphere(SelfRadius);
-
-						FCollisionQueryParams TraceParams;
-						TraceParams.bTraceComplex = true;
-						TraceParams.AddIgnoredActor(this);
-
 						FHitResult HitResult;
-						UWorld* World = GetWorld();
 
-						TArray<TObjectPtr<AActor>> IgnoreActors;
 						bool bHit = UKismetSystemLibrary::SphereTraceSingleForObjects(
-							World,
+							GetWorld(),
 							TraceStart,
 							TraceEnd,
 							SelfRadius,
 							Fall.GroundObjectType,
 							true,
-							IgnoreActors,
+							TArray<TObjectPtr<AActor>>(),
 							EDrawDebugTrace::None,
 							HitResult,
 							true,
@@ -1320,13 +1319,28 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						FVector VelocityDirection = LerpedVelocity.GetSafeNormal2D();
 						VelocitySize = LerpedVelocity.Size2D();
 
-						// 朝向-移动方向夹角 插值
-						float DotProduct = FVector::DotProduct(Moving.DesiredVelocity.GetSafeNormal2D(), VelocityDirection);
-						float AngleDegrees = FMath::RadiansToDegrees(FMath::Acos(DotProduct));
-
-						float bInvertSign = AngleDegrees > 90.f && Move.Yaw.TurnMode == EOrientMode::ToMovementForwardAndBackward ? -1.f : 1.f;
-
-						Directed.DesiredDirection = Move.Yaw.TurnMode == EOrientMode::ToPath ? DesiredVelocity.GetSafeNormal2D() : VelocityDirection * bInvertSign;
+						switch (Move.Yaw.TurnMode)
+						{
+							case EOrientMode::ToPath:
+							{
+								Directed.DesiredDirection = DesiredMoveDirection.Size() == KINDA_SMALL_NUMBER ? Directed.DesiredDirection : DesiredMoveDirection;
+								break;
+							}
+							case EOrientMode::ToMovement:
+							{
+								Directed.DesiredDirection = VelocityDirection;
+								break;
+							}
+							case EOrientMode::ToMovementForwardAndBackward:
+							{
+								// 朝向-移动方向夹角 插值
+								float DotProduct = FVector::DotProduct(Moving.DesiredVelocity.GetSafeNormal2D(), VelocityDirection);
+								float AngleDegrees = FMath::RadiansToDegrees(FMath::Acos(DotProduct));
+								float bInvertSign = AngleDegrees > 90.f ? -1.f : 1.f;
+								Directed.DesiredDirection = VelocityDirection * bInvertSign;
+								break;
+							}
+						}
 					}
 
 					// 执行转向插值
@@ -1406,7 +1420,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 
 					// 应用朝向
-					if (bIsAiming || VelocitySize > Move.XY.MoveSpeed * 0.05f)
+					if (bIsAiming || VelocitySize > KINDA_SMALL_NUMBER)
 					{
 						Directed.Direction = CurrentRot.Vector();
 					}
@@ -1583,207 +1597,179 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		// Do Trace
 		ParallelFor(ValidSubjects.Num(), [&](int32 Index)
+		{
+			FSolidSubjectHandle Subject = ValidSubjects[Index];
+
+			FLocated& Located = Subject.GetTraitRef<FLocated>();
+			FDirected& Directed = Subject.GetTraitRef<FDirected>();
+			FScaled& Scaled = Subject.GetTraitRef<FScaled>();
+			FCollider& Collider = Subject.GetTraitRef<FCollider>();
+
+			FTrace& Trace = Subject.GetTraitRef<FTrace>();
+			FTracing& Tracing = Subject.GetTraitRef<FTracing>();
+			FSleep& Sleep = Subject.GetTraitRef<FSleep>();
+			FPatrol& Patrol = Subject.GetTraitRef<FPatrol>();
+			FChase& Chase = Subject.GetTraitRef<FChase>();
+			FMoving& Moving = Subject.GetTraitRef<FMoving>();
+			FNavigating& Navigating = Subject.GetTraitRef<FNavigating>();
+
+			// 确定用哪一套索敌参数
+			bool bFinalCheckVisibility = false;
+			bool bFinalDrawDebugShape = Trace.bDrawDebugShape;
+			bool bIsParamsSet = false;
+			bool bCanTrace = false;
+
+			float FinalRange = Collider.Radius * Scaled.Scale;
+			float FinalAngle = 0;
+			float FinalHeight = 0;
+
+			EMoveState MoveState = Moving.MoveState;
+			FSectorTraceParamsSpecific Params;
+			FSectorTraceParams Params_Common;
+
+			switch (MoveState)
 			{
-				FSolidSubjectHandle Subject = ValidSubjects[Index];
+			case EMoveState::Sleeping: // 休眠时索敌
 
-				FLocated& Located = Subject.GetTraitRef<FLocated>();
-				FDirected& Directed = Subject.GetTraitRef<FDirected>();
-				FScaled& Scaled = Subject.GetTraitRef<FScaled>();
-				FCollider& Collider = Subject.GetTraitRef<FCollider>();
+				bCanTrace = Sleep.bCanTrace;
+				Params = Trace.SectorTrace.Sleep;
 
-				FTrace& Trace = Subject.GetTraitRef<FTrace>();
-				FTracing& Tracing = Subject.GetTraitRef<FTracing>();
-				FSleep& Sleep = Subject.GetTraitRef<FSleep>();
-				FPatrol& Patrol = Subject.GetTraitRef<FPatrol>();
-				FChase& Chase = Subject.GetTraitRef<FChase>();
-				FMoving& Moving = Subject.GetTraitRef<FMoving>();
-				FNavigating& Navigating = Subject.GetTraitRef<FNavigating>();
-
-				// 确定用哪一套索敌参数
-				bool bFinalCheckVisibility = false;
-				bool bFinalDrawDebugShape = Trace.bDrawDebugShape;
-				bool bIsParamsSet = false;
-				bool bCanTrace = false;
-
-				float FinalRange = Collider.Radius * Scaled.Scale;
-				float FinalAngle = 0;
-				float FinalHeight = 0;
-
-				EMoveState MoveState = Moving.MoveState;
-				FSectorTraceParamsSpecific Params;
-				FSectorTraceParams Params_Common;
-
-				switch (MoveState)
+				if (Params.bEnable && Sleep.bCanTrace)
 				{
-				case EMoveState::Sleeping: // 休眠时索敌
-
-					bCanTrace = Sleep.bCanTrace;
-					Params = Trace.SectorTrace.Sleep;
-
-					if (Params.bEnable && Sleep.bCanTrace)
-					{
-						FinalRange += Params.TraceRadius;
-						FinalAngle = Params.TraceAngle;
-						FinalHeight = Params.TraceHeight;
-						bFinalCheckVisibility = Params.bCheckVisibility;
-						bIsParamsSet = true;
-					}
-
-					break;
-
-				case EMoveState::Patrolling: // 巡逻时索敌
-
-					bCanTrace = Patrol.bCanTrace;
-					Params = Trace.SectorTrace.Patrol;
-
-					if (Params.bEnable && Patrol.bCanTrace)
-					{
-						FinalRange += Params.TraceRadius;
-						FinalAngle = Params.TraceAngle;
-						FinalHeight = Params.TraceHeight;
-						bFinalCheckVisibility = Params.bCheckVisibility;
-						bIsParamsSet = true;
-					}
-
-					break;
-
-				case EMoveState::PatrolWaiting: // 巡逻时索敌
-
-					bCanTrace = Patrol.bCanTrace;
-					Params = Trace.SectorTrace.Patrol;
-
-					if (Params.bEnable && Patrol.bCanTrace)
-					{
-						FinalRange += Params.TraceRadius;
-						FinalAngle = Params.TraceAngle;
-						FinalHeight = Params.TraceHeight;
-						bFinalCheckVisibility = Params.bCheckVisibility;
-						bIsParamsSet = true;
-					}
-
-					break;
-
-				case EMoveState::ChasingTarget: // 追逐时索敌
-
-					bCanTrace = Chase.bCanTrace;
-					Params = Trace.SectorTrace.Chase;
-
-					if (Params.bEnable && Chase.bCanTrace)
-					{
-						FinalRange += Params.TraceRadius;
-						FinalAngle = Params.TraceAngle;
-						FinalHeight = Params.TraceHeight;
-						bFinalCheckVisibility = Params.bCheckVisibility;
-						bIsParamsSet = true;
-					}
-
-					break;
-
-				case EMoveState::ReachedTarget: // 追逐时索敌
-
-					bCanTrace = Chase.bCanTrace;
-					Params = Trace.SectorTrace.Chase;
-
-					if (Params.bEnable && Chase.bCanTrace)
-					{
-						FinalRange += Params.TraceRadius;
-						FinalAngle = Params.TraceAngle;
-						FinalHeight = Params.TraceHeight;
-						bFinalCheckVisibility = Params.bCheckVisibility;
-						bIsParamsSet = true;
-					}
-
-					break;
-
-				case EMoveState::MovingToLocation: // 一般情况
-
-					bCanTrace = Trace.bEnable;
-					Params_Common = Trace.SectorTrace.Common;
-
-					FinalRange += Params_Common.TraceRadius;
-					FinalAngle = Params_Common.TraceAngle;
-					FinalHeight = Params_Common.TraceHeight;
-					bFinalCheckVisibility = Params_Common.bCheckVisibility;
+					FinalRange += Params.TraceRadius;
+					FinalAngle = Params.TraceAngle;
+					FinalHeight = Params.TraceHeight;
+					bFinalCheckVisibility = Params.bCheckObstacle;
 					bIsParamsSet = true;
-
-					break;
-
-				case EMoveState::ArrivedAtLocation: // 一般情况
-
-					bCanTrace = Trace.bEnable;
-					Params_Common = Trace.SectorTrace.Common;
-
-					FinalRange += Params_Common.TraceRadius;
-					FinalAngle = Params_Common.TraceAngle;
-					FinalHeight = Params_Common.TraceHeight;
-					bFinalCheckVisibility = Params_Common.bCheckVisibility;
-					bIsParamsSet = true;
-
-					break;
 				}
 
-				// 保底参数
-				if (bCanTrace && !bIsParamsSet)
-				{
-					Params_Common = Trace.SectorTrace.Common;
+				break;
 
-					FinalRange += Params_Common.TraceRadius;
-					FinalAngle = Params_Common.TraceAngle;
-					FinalHeight = Params_Common.TraceHeight;
-					bFinalCheckVisibility = Params_Common.bCheckVisibility;
+			case EMoveState::Patrolling: // 巡逻时索敌
+
+				bCanTrace = Patrol.bCanTrace;
+				Params = Trace.SectorTrace.Patrol;
+
+				if (Params.bEnable && Patrol.bCanTrace)
+				{
+					FinalRange += Params.TraceRadius;
+					FinalAngle = Params.TraceAngle;
+					FinalHeight = Params.TraceHeight;
+					bFinalCheckVisibility = Params.bCheckObstacle;
+					bIsParamsSet = true;
 				}
 
-				bool bHasValidTraceResult = false;
+				break;
 
-				if (bCanTrace)
+			case EMoveState::PatrolWaiting: // 巡逻时索敌
+
+				bCanTrace = Patrol.bCanTrace;
+				Params = Trace.SectorTrace.Patrol;
+
+				if (Params.bEnable && Patrol.bCanTrace)
 				{
-					// Draw Debug Config
-					FTraceDrawDebugConfig EmptyDebugConfig;
+					FinalRange += Params.TraceRadius;
+					FinalAngle = Params.TraceAngle;
+					FinalHeight = Params.TraceHeight;
+					bFinalCheckVisibility = Params.bCheckObstacle;
+					bIsParamsSet = true;
+				}
 
-					FTraceDrawDebugConfig DebugConfig;
-					DebugConfig.bDrawDebugShape = bFinalDrawDebugShape;
-					DebugConfig.Color = FColor::Orange;
-					DebugConfig.Duration = Tracing.TimeLeft;
-					DebugConfig.LineThickness = 0.f;
+				break;
 
-					if (bFinalDrawDebugShape)
-					{
-						FDebugSectorConfig SectorConfig1;
-						SectorConfig1.Location = Located.Location;
-						SectorConfig1.Radius = FinalRange;
-						SectorConfig1.Height = FinalHeight;
-						SectorConfig1.Direction = Directed.Direction.GetSafeNormal2D();
-						SectorConfig1.Angle = FinalAngle;
-						SectorConfig1.Duration = DebugConfig.Duration;
-						SectorConfig1.Color = DebugConfig.Color;
-						SectorConfig1.LineThickness = 10;
-						SectorConfig1.DepthPriority = 0;
+			case EMoveState::ChasingTarget: // 追逐时索敌
 
-						DebugSectorQueue.Enqueue(SectorConfig1);
+				bCanTrace = Chase.bCanTrace;
+				Params = Trace.SectorTrace.Chase;
 
-						FDebugSectorConfig SectorConfig2;
-						SectorConfig2.Location = Located.Location;
-						SectorConfig2.Radius = FinalRange;
-						SectorConfig2.Height = FinalHeight;
-						SectorConfig2.Direction = Directed.Direction.GetSafeNormal2D();
-						SectorConfig2.Angle = FinalAngle;
-						SectorConfig2.Duration = DebugConfig.Duration;
-						SectorConfig2.Color = DebugConfig.Color;
-						SectorConfig2.LineThickness = 0;
-						SectorConfig2.DepthPriority = 3;
+				if (Params.bEnable && Chase.bCanTrace)
+				{
+					FinalRange += Params.TraceRadius;
+					FinalAngle = Params.TraceAngle;
+					FinalHeight = Params.TraceHeight;
+					bFinalCheckVisibility = Params.bCheckObstacle;
+					bIsParamsSet = true;
+				}
 
-						DebugSectorQueue.Enqueue(SectorConfig2);
-					}
+				break;
 
-					Tracing.TraceResult = FSubjectHandle();
+			case EMoveState::ReachedTarget: // 追逐时索敌
 
-					// Do trace
-					switch (Trace.Mode)
-					{
+				bCanTrace = Chase.bCanTrace;
+				Params = Trace.SectorTrace.Chase;
+
+				if (Params.bEnable && Chase.bCanTrace)
+				{
+					FinalRange += Params.TraceRadius;
+					FinalAngle = Params.TraceAngle;
+					FinalHeight = Params.TraceHeight;
+					bFinalCheckVisibility = Params.bCheckObstacle;
+					bIsParamsSet = true;
+				}
+
+				break;
+
+			case EMoveState::MovingToLocation: // 一般情况
+
+				bCanTrace = Trace.bEnable;
+				Params_Common = Trace.SectorTrace.Common;
+
+				FinalRange += Params_Common.TraceRadius;
+				FinalAngle = Params_Common.TraceAngle;
+				FinalHeight = Params_Common.TraceHeight;
+				bFinalCheckVisibility = Params_Common.bCheckObstacle;
+				bIsParamsSet = true;
+
+				break;
+
+			case EMoveState::ArrivedAtLocation: // 一般情况
+
+				bCanTrace = Trace.bEnable;
+				Params_Common = Trace.SectorTrace.Common;
+
+				FinalRange += Params_Common.TraceRadius;
+				FinalAngle = Params_Common.TraceAngle;
+				FinalHeight = Params_Common.TraceHeight;
+				bFinalCheckVisibility = Params_Common.bCheckObstacle;
+				bIsParamsSet = true;
+
+				break;
+			}
+
+			// 保底参数
+			if (bCanTrace && !bIsParamsSet)
+			{
+				Params_Common = Trace.SectorTrace.Common;
+
+				FinalRange += Params_Common.TraceRadius;
+				FinalAngle = Params_Common.TraceAngle;
+				FinalHeight = Params_Common.TraceHeight;
+				bFinalCheckVisibility = Params_Common.bCheckObstacle;
+			}
+
+			bool bHasValidTraceResult = false;
+
+			if (bCanTrace)
+			{
+				// Draw Debug Config
+				FTraceDrawDebugConfig DebugConfig;
+				DebugConfig.bDrawDebugShape = bFinalDrawDebugShape;
+				DebugConfig.Color = FColor::Orange;
+				DebugConfig.Duration = Tracing.TimeLeft;
+				DebugConfig.LineThickness = 5;
+				DebugConfig.HitPointSize = 3;
+
+				Tracing.TraceResult = FSubjectHandle();
+
+				// Do trace
+				switch (Trace.Mode)
+				{
 					case ETraceMode::TargetIsPlayer_0:
 					{
 						if (bPlayerIsValid)
 						{
+							TArray<FHitResult> VisibilityResults;
+
 							// 高度检查
 							float HeightDifference = PlayerLocation.Z - Located.Location.Z;
 
@@ -1806,10 +1792,27 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 									{
 										if (bFinalCheckVisibility && IsValid(Tracing.NeighborGrid))
 										{
-											bool Hit = false;
-											FTraceResult Result;
+											const FVector SubjectSurfacePoint = PlayerLocation - (ToPlayerDir * PlayerRadius);
+												
+											FHitResult VisibilityResult;
+											bool Hit = UKismetSystemLibrary::SphereTraceSingleForObjects
+											(
+												GetWorld(),
+												Located.Location,
+												SubjectSurfacePoint,
+												0,
+												Trace.Filter.ObstacleObjectType,
+												true,
+												TArray<TObjectPtr<AActor>>(),
+												EDrawDebugTrace::None,
+												VisibilityResult,
+												true,
+												FLinearColor::Gray,
+												FLinearColor::Red,
+												1
+											);
 
-											Tracing.NeighborGrid->SphereSweepForObstacle(Located.Location, PlayerLocation, 1, EmptyDebugConfig, Hit, Result);
+											VisibilityResults.Add(VisibilityResult);
 
 											if (!Hit)
 											{
@@ -1823,6 +1826,51 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 									}
 								}
 							}
+
+							// draw visibility check results
+							for (const auto& VisibilityResult : VisibilityResults)
+							{
+								// 计算起点到终点的向量
+								FVector Direction = VisibilityResult.TraceEnd - VisibilityResult.TraceStart;
+								float TotalDistance = Direction.Size();
+
+								// 处理零距离情况（使用默认旋转）
+								FRotator ShapeRot = FRotator::ZeroRotator;
+
+								if (TotalDistance > 0)
+								{
+									Direction /= TotalDistance;
+									ShapeRot = FRotationMatrix::MakeFromZ(Direction).Rotator();
+								}
+
+								// 计算圆柱部分高度（总高度减去两端的半球）
+								float CylinderHeight = 0;
+
+								// 计算胶囊体中心位置（两点中点）
+								FVector ShapeLoc = (VisibilityResult.TraceStart + VisibilityResult.TraceEnd) * 0.5f;
+
+								// 配置调试胶囊体参数
+								FDebugCapsuleConfig CapsuleConfig;
+								CapsuleConfig.Color = DebugConfig.Color;
+								CapsuleConfig.Location = ShapeLoc;
+								CapsuleConfig.Rotation = ShapeRot;
+								CapsuleConfig.Radius = 0;
+								CapsuleConfig.Height = CylinderHeight;
+								CapsuleConfig.LineThickness = DebugConfig.LineThickness;
+								CapsuleConfig.Duration = DebugConfig.Duration;
+
+								// 加入调试队列
+								ABattleFrameBattleControl::GetInstance()->DebugCapsuleQueue.Enqueue(CapsuleConfig);
+
+								// 绘制碰撞点
+								FDebugPointConfig PointConfig;
+								PointConfig.Color = VisibilityResult.bBlockingHit ? FColor::Red : FColor::Green;
+								PointConfig.Duration = DebugConfig.Duration;
+								PointConfig.Location = VisibilityResult.bBlockingHit ? VisibilityResult.ImpactPoint : VisibilityResult.TraceEnd;
+								PointConfig.Size = DebugConfig.HitPointSize;
+
+								ABattleFrameBattleControl::GetInstance()->DebugPointQueue.Enqueue(PointConfig);
+							}
 						}
 
 						break;
@@ -1832,12 +1880,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					{
 						if (LIKELY(IsValid(Tracing.NeighborGrid)))
 						{
-							FFilter TargetFilter;
 							bool Hit;
 							TArray<FTraceResult> Results;
-
-							TargetFilter.Include(Trace.IncludeTraits);
-							TargetFilter.Exclude(Trace.ExcludeTraits);
 
 							const FVector TraceDirection = Directed.Direction.GetSafeNormal2D();
 
@@ -1855,14 +1899,14 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								FinalAngle,         // 扇形角度
 								bFinalCheckVisibility,
 								Located.Location,
-								1,
+								0,
 								ESortMode::NearToFar,
 								Located.Location,
 								IgnoreList,
-								TargetFilter,       // 过滤条件
-								EmptyDebugConfig,
+								Trace.Filter,       // 过滤条件
+								DebugConfig,
 								Hit,
-								Results              // 输出结果
+								Results             // 输出结果
 							);
 
 							// 直接使用结果（扇形检测已包含角度验证）
@@ -1873,34 +1917,64 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						}
 						break;
 					}
-					}
-
-					bHasValidTraceResult = Tracing.TraceResult.IsValid();
-
-					// Trace Event, Succeed or Fail
-					const bool bHasIsSubjective = Subject.HasTrait<FIsSubjective>();
-
-					if (bHasIsSubjective)
-					{
-						FTraceData TraceData;
-						TraceData.SelfSubject = FSubjectHandle(Subject);
-						TraceData.State = bHasValidTraceResult ? ETraceEventState::End_Reason_Succeed : ETraceEventState::End_Reason_Fail;
-						TraceData.TraceResult = bHasValidTraceResult ? Tracing.TraceResult : FSubjectHandle();
-						OnTraceQueue.Enqueue(TraceData);
-					}
 				}
 
-				// Go back to patrol state when no target
-				const bool bShouldPatrol = !bHasValidTraceResult && !Subject.HasTrait<FPatrolling>() && Patrol.OnLostTarget == EPatrolRecoverMode::Patrol;
+				bHasValidTraceResult = Tracing.TraceResult.IsValid();
 
-				if (bShouldPatrol)
+				// Draw Trace Sector
+				if (bFinalDrawDebugShape)
 				{
-					FPatrolling NewPatrolling;
-					ResetPatrol(Patrol, NewPatrolling, Located);
-					Subject.SetTraitDeferred(NewPatrolling);
+					// Trace Shape
+					FDebugSectorConfig SectorConfig1;
+					SectorConfig1.Location = Located.Location;
+					SectorConfig1.Radius = FinalRange;
+					SectorConfig1.Height = FinalHeight;
+					SectorConfig1.Direction = Directed.Direction.GetSafeNormal2D();
+					SectorConfig1.Angle = FinalAngle;
+					SectorConfig1.Duration = DebugConfig.Duration;
+					SectorConfig1.Color = DebugConfig.Color;
+					SectorConfig1.LineThickness = 0;
+					SectorConfig1.DepthPriority = 0;
+
+					DebugSectorQueue.Enqueue(SectorConfig1);
+
+					//FDebugSectorConfig SectorConfig2;
+					//SectorConfig2.Location = Located.Location;
+					//SectorConfig2.Radius = FinalRange;
+					//SectorConfig2.Height = FinalHeight;
+					//SectorConfig2.Direction = Directed.Direction.GetSafeNormal2D();
+					//SectorConfig2.Angle = FinalAngle;
+					//SectorConfig2.Duration = DebugConfig.Duration;
+					//SectorConfig2.Color = DebugConfig.Color;
+					//SectorConfig2.LineThickness = 0;
+					//SectorConfig2.DepthPriority = 3;
+
+					//DebugSectorQueue.Enqueue(SectorConfig2);
 				}
 
-			});
+				// Trace Event, Succeed or Fail
+				const bool bHasIsSubjective = Subject.HasTrait<FIsSubjective>();
+
+				if (bHasIsSubjective)
+				{
+					FTraceData TraceData;
+					TraceData.SelfSubject = FSubjectHandle(Subject);
+					TraceData.State = bHasValidTraceResult ? ETraceEventState::End_Reason_Succeed : ETraceEventState::End_Reason_Fail;
+					TraceData.TraceResult = bHasValidTraceResult ? Tracing.TraceResult : FSubjectHandle();
+					OnTraceQueue.Enqueue(TraceData);
+				}
+			}
+
+			// Go back to patrol state when no target
+			const bool bShouldPatrol = !bHasValidTraceResult && !Subject.HasTrait<FPatrolling>() && Patrol.OnLostTarget == EPatrolRecoverMode::Patrol;
+
+			if (bShouldPatrol)
+			{
+				FPatrolling NewPatrolling;
+				ResetPatrol(Patrol, NewPatrolling, Located);
+				Subject.SetTraitDeferred(NewPatrolling);
+			}
+		});
 
 		Chain->Release();
 
@@ -2234,21 +2308,20 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							{
 								if (Distance <= Attack.RangeToleranceHit && Angle <= Attack.AngleToleranceHit)
 								{
-									if (Damage.DmgRadius == 0)
-									{
-										// 单体
-										ApplyPointDamageAndDebuffDeferred(FSubjectArray{ TArray<FSubjectHandle>{Tracing.TraceResult} }, FSubjectArray(), FSubjectHandle{ Subject }, FSubjectHandle{ Subject }, Located.Location, FDamage_Point(Damage), FDebuff_Point(Debuff), DmgResults);
-									}
-									else
-									{
-										// 范围
-										FFilter TargetFilter;
-
-										TargetFilter.Include(Trace.IncludeTraits);
-										TargetFilter.Exclude(Trace.ExcludeTraits);
-
-										ApplyRadialDamageAndDebuffDeferred(TargetPos, FSubjectArray(), FSubjectHandle{ Subject }, FSubjectHandle{ Subject }, Located.Location, FDamage_Radial(Damage), FDebuff_Radial(Debuff), TargetFilter, Tracing.NeighborGrid, DmgResults);
-									}
+									// 范围伤害
+									ApplyRadialDamageAndDebuffDeferred
+									(
+										Tracing.NeighborGrid, 
+										-1, 
+										TargetPos, 
+										FSubjectArray(), 
+										FSubjectHandle{ Subject }, 
+										FSubjectHandle{ Subject }, 
+										Located.Location, 
+										FDamage_Radial(Damage), 
+										FDebuff_Radial(Debuff), 
+										DmgResults
+									);
 								}
 							}
 						}
@@ -3091,17 +3164,39 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				bool bIsAttackAnim = Subject.HasFlag(AttackAnimFlag);
 				bool bIsFallAnim = Subject.HasFlag(FallAnimFlag);
 
+				if (bIsDyingAnim && !Subject.HasTrait<FDying>())
+				{
+					Subject.SetFlag(DeathAnimFlag, false);
+				}
+
+				if (bIsAppearAnim && !Subject.HasTrait<FAppearing>())
+				{
+					Subject.SetFlag(AppearAnimFlag, false);
+				}
+
+				if (bIsAttackAnim && !Subject.HasTrait<FAttacking>())
+				{
+					Subject.SetFlag(AttackAnimFlag, false);
+				}
+
 				if (bIsHitAnim)
 				{
-					bIsHitAnim = Subject.HasTrait<FAttacking>() ? Subject.GetTrait<FAttacking>().State != EAttackState::PreCast : bIsHitAnim; // 前摇动画是不能打断的，但是后摇可以取消
-
-					if (bIsHitAnim)
+					if (!Subject.HasTrait<FBeingHit>())
 					{
-						Subject.SetFlag(AttackAnimFlag, false); // hit anim will interrupt attack anim
+						Subject.SetFlag(HitAnimFlag, false);
 					}
 					else
 					{
-						Subject.SetFlag(HitAnimFlag, false);
+						bIsHitAnim = Subject.HasTrait<FAttacking>() ? Subject.GetTrait<FAttacking>().State != EAttackState::PreCast : bIsHitAnim; // 前摇动画是不能打断的，但是后摇可以取消
+
+						if (bIsHitAnim)
+						{
+							Subject.SetFlag(AttackAnimFlag, false); // hit anim will interrupt attack anim
+						}
+						else
+						{
+							Subject.SetFlag(HitAnimFlag, false);
+						}
 					}
 				}
 
@@ -3269,7 +3364,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		Chain->OperateConcurrently(
 			[&](FSolidSubjectHandle Subject,
-				FRenderBatchData& Data)
+				FAgentRenderBatchData& Data)
 			{
 				Data.ValidTransforms.Reset();
 
@@ -3306,7 +3401,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				Animating.FireFxInterped = FMath::FInterpTo(Animating.FireFxInterped, Animating.FireFx, SafeDeltaTime, 5);
 				Animating.PoisonFxInterped = FMath::FInterpTo(Animating.PoisonFxInterped, Animating.PoisonFx, SafeDeltaTime, 5);
 
-				FRenderBatchData& Data = Rendering.Renderer.GetTraitRef<FRenderBatchData, EParadigm::Unsafe>();
+				FAgentRenderBatchData& Data = Rendering.Renderer.GetTraitRef<FAgentRenderBatchData, EParadigm::Unsafe>();
 
 				FQuat Rotation{ FQuat::Identity };
 				Rotation = Directed.Direction.Rotation().Quaternion();
@@ -3379,7 +3474,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		Chain->OperateConcurrently(
 			[&](FSolidSubjectHandle Subject,
-				FRenderBatchData& Data)
+				FAgentRenderBatchData& Data)
 			{
 				// 重置和隐藏限制数组成员
 				Data.FreeTransforms.Reset();
@@ -3401,7 +3496,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		Mechanism->Operate<FUnsafeChain>(RenderBatchFilter,
 			[&](FSubjectHandle Subject,
-				FRenderBatchData& Data)
+				FAgentRenderBatchData& Data)
 			{
 				// ------------------Transform---------------------------------
 
@@ -3629,6 +3724,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 						FSubjectRecord FxRecord;
 						FxRecord.SetTrait(FSpawningFx());
+						FxRecord.SetTrait(FIsBurstFx());
 						FxRecord.SetTrait(FxLocated);
 						FxRecord.SetTrait(FxDirected);
 						FxRecord.SetTrait(FxScaled);
@@ -4026,7 +4122,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				Config.Size,
 				Config.Color,
 				false,
-				-1.f,
+				Config.Duration,
 				3
 			);
 		}
@@ -4142,6 +4238,375 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	//------------------- 投射物 | Projectile --------------------
 
 	// 投射物 | Projectile
+	#pragma region
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("Projectile");
+
+		auto Chain = Mechanism->EnchainSolid(ProjectileFilter);
+		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
+
+		Chain->OperateConcurrently(
+			[&](FSolidSubjectHandle Subject,
+				FSubType& SubType,
+				FProjectileParams& ProjectileParams,
+				FProjectileParamsRT& ProjectileParamsRT,
+				FLocated& Located,
+				FDirected& Directed,
+				FScaled& Scaled)
+			{
+				Located.PreLocation = Located.Location;
+				const auto NeighborGrid = IsValid(ProjectileParamsRT.NeighborGridComponent) ? ProjectileParamsRT.NeighborGridComponent : NeighborGrids[0];
+
+				const bool bIsInterped = Subject.HasTrait<FProjectileMove_Interped>(); // 插值
+				const bool bIsBallistic = Subject.HasTrait<FProjectileMove_Ballistic>(); // 抛物线
+				const bool bIsTracking = Subject.HasTrait<FProjectileMove_Tracking>(); // 追踪
+
+				const bool bIsPoint = Subject.HasTrait<FDamage_Point>() && Subject.HasTrait<FDebuff_Point>(); // 点伤害
+				const bool bIsRadial = Subject.HasTrait<FDamage_Radial>() && Subject.HasTrait<FDebuff_Radial>(); // 球形伤害
+				const bool bIsBeam = Subject.HasTrait<FDamage_Beam>() && Subject.HasTrait<FDebuff_Beam>(); // 球扫伤害
+				
+				// Movement
+				bool bArrived = false;
+				FVector NewLocation = FVector::ZeroVector;
+
+				if (bIsInterped)
+				{
+					auto& ProjectileMove_Interped = Subject.GetTraitRef<FProjectileMove_Interped>();
+					auto& ProjectileMoving_Interped = Subject.GetTraitRef<FProjectileMoving_Interped>();
+
+					UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Interped
+					(
+						bArrived,
+						NewLocation,
+						ProjectileMoving_Interped.FromPoint,
+						ProjectileMoving_Interped.ToPoint,
+						ProjectileMoving_Interped.Target,
+						ProjectileMove_Interped.XYOffset,
+						ProjectileMoving_Interped.XYOffsetMult,
+						ProjectileMove_Interped.ZOffset,
+						ProjectileMoving_Interped.ZOffsetMult,
+						ProjectileMoving_Interped.BirthTime,
+						CurrentWorld->GetTimeSeconds(),
+						ProjectileMoving_Interped.Speed
+					);
+				}
+				else if (bIsBallistic)
+				{
+					auto& ProjectileMove_Ballistic = Subject.GetTraitRef<FProjectileMove_Ballistic>();
+					auto& ProjectileMoving_Ballistic = Subject.GetTraitRef<FProjectileMoving_Ballistic>();
+
+					UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Ballistic
+					(
+						bArrived,
+						NewLocation,
+						ProjectileMoving_Ballistic.FromPoint,
+						ProjectileMoving_Ballistic.ToPoint,
+						ProjectileMoving_Ballistic.BirthTime,
+						CurrentWorld->GetTimeSeconds(),
+						ProjectileMove_Ballistic.Gravity, 
+						ProjectileMoving_Ballistic.InitialVelocity
+					);
+				}
+				else if (bIsTracking)
+				{
+					auto& ProjectileMove_Tracking = Subject.GetTraitRef<FProjectileMove_Tracking>();
+					auto& ProjectileMoving_Tracking = Subject.GetTraitRef<FProjectileMoving_Tracking>();
+
+					UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Tracking
+					(
+						bArrived,
+						NewLocation,
+						ProjectileMoving_Tracking.CurrentVelocity,
+						Located.Location,
+						ProjectileMoving_Tracking.ToPoint,
+						ProjectileMoving_Tracking.Target,
+						ProjectileMove_Tracking.Acceleration,
+						ProjectileMove_Tracking.MaxSpeed,
+						SafeDeltaTime,
+						ProjectileParams.Radius
+					);
+				}
+				
+				// Trace for Subject
+				float SubjectDistSqr = -1;
+				bool bHitSubject = false;
+				TArray<FTraceResult> HitSubjectResult;
+
+				if (IsValid(NeighborGrid))
+				{
+					if (!ProjectileParams.bTraceOnlyOnArrival || bArrived)
+					{
+						UBattleFrameFunctionLibraryRT::SphereSweepForSubjects
+						(
+							bHitSubject,
+							HitSubjectResult,
+							NeighborGrid,
+							1, // return the nearest one
+							Located.Location, // sweep start
+							NewLocation, // sweep end
+							ProjectileParams.Radius, // collider radius
+							false,// check obstacle
+							FVector::ZeroVector, // check from
+							0, // check sphere sweep radius
+							ESortMode::NearToFar,
+							Located.Location, // sort from
+							ProjectileParamsRT.IgnoreSubjects,
+							ProjectileParams.Filter,
+							FTraceDrawDebugConfig()
+						);
+
+						if (bHitSubject)
+						{
+							SubjectDistSqr = FVector::DistSquared(Located.Location, HitSubjectResult[0].HitLocation); // 与碰撞点的距离
+						}
+					}
+				}
+
+				// Trace for obstacle
+				float ObstacleDistSqr = -1;
+				bool bHitObstacle = false;
+				FHitResult HitObstacleResult;
+
+				if (ProjectileParams.bCheckObstacle)
+				{
+					if (!ProjectileParams.bTraceOnlyOnArrival || bArrived)
+					{
+						bHitObstacle = UKismetSystemLibrary::SphereTraceSingleForObjects
+						(
+							CurrentWorld,
+							Located.Location,
+							NewLocation,
+							ProjectileParams.Radius,
+							ProjectileParams.Filter.ObstacleObjectType,
+							true,
+							TArray<TObjectPtr<AActor>>(),
+							EDrawDebugTrace::None,
+							HitObstacleResult,
+							true,
+							FLinearColor::Gray,
+							FLinearColor::Red,
+							1
+						);
+
+						if (bHitObstacle)
+						{
+							ObstacleDistSqr = FVector::DistSquared(Located.Location, HitObstacleResult.ImpactPoint); // 与碰撞点的距离
+						}
+					}
+				}
+
+				// Get the nearest result
+				bool bCollided = true;
+
+				if (SubjectDistSqr == -1 && ObstacleDistSqr == -1)
+				{			
+					// no collision
+					Located.Location = NewLocation;
+					bCollided = false;
+				}
+				else if (SubjectDistSqr == -1)
+				{
+					// only collided with an obstacle
+					Located.Location = HitObstacleResult.Location;
+					ProjectileParams.Health--;
+				}
+				else if (ObstacleDistSqr == -1)
+				{
+					// only collided with a subject
+					Located.Location = HitSubjectResult[0].ShapeLocation;
+					ProjectileParams.Health--;
+				}
+				else
+				{
+					// collided with both a subject and an obstacle, so we choose the nearest result
+					if (SubjectDistSqr <= ObstacleDistSqr)
+					{
+						Located.Location = HitObstacleResult.Location;
+						ProjectileParams.Health--;
+						bHitObstacle = false;
+					}
+					else
+					{
+						Located.Location = HitSubjectResult[0].ShapeLocation;
+						ProjectileParams.Health--;
+						bHitSubject = false;
+					}
+				}
+
+				// 插值朝向
+				Directed.DesiredDirection = (Located.Location - Located.PreLocation).GetSafeNormal2D();
+
+				if (ProjectileParams.bRotationFollowVelocity)
+				{
+					Directed.Direction = Directed.DesiredDirection.Size() == 0 ? Directed.Direction : FMath::VInterpTo(Directed.Direction, Directed.DesiredDirection, SafeDeltaTime, 10);
+				}
+
+				bool bShouldDespawn = false;
+
+				// RemoveOnNoHealth
+				if (ProjectileParams.bRemoveOnNoHealth && ProjectileParams.Health <= 0)
+				{
+					bShouldDespawn = true;
+				}
+
+				// RemoveOnNoLifeSpan
+				if (!ProjectileParams.bRemoveOnNoLifeSpan || ProjectileParams.LifeSpan > 0)
+				{
+					ProjectileParams.LifeSpan -= SafeDeltaTime;
+				}
+				else
+				{
+					bShouldDespawn = true;
+				}
+
+				// RemoveOnHitObstacle
+				if (ProjectileParams.bRemoveOnHitObstacle && bHitObstacle)
+				{
+					bShouldDespawn = true;
+				}
+
+				// RemoveOnArrival
+				if (ProjectileParams.bRemoveOnArrival && bArrived)
+				{
+					bShouldDespawn = true;
+				}
+				
+				// Apply damage and debuff
+				float DmgRadius = 0;
+
+				if (bCollided || bArrived || bShouldDespawn)
+				{
+					// Clean ignore list
+					if (!ProjectileParams.bHurtTargetOnlyOnce)
+					{
+						for (const auto& IgnoreSubject : ProjectileParamsRT.IgnoreSubjects.Subjects)
+						{
+							// remove from ignore list on end overlap, so on next begin overlap the subject can get damaged again
+							const bool bShouldRemove = !IgnoreSubject.IsValid() || !IgnoreSubject.HasTrait<FLocated>() || FVector::DistSquared(IgnoreSubject.GetTrait<FLocated>().Location, Located.Location) > FMath::Square(ProjectileParams.Radius);
+
+							if (bShouldRemove)
+							{
+								ProjectileParamsRT.IgnoreSubjects.Subjects.Remove(IgnoreSubject);
+							}
+						}
+					}
+
+					// Get DmgRadius
+					if (bIsRadial)
+					{
+						DmgRadius = Subject.GetTraitRef<FDamage_Radial>().DmgRadius;
+					}
+					else if (bIsBeam)
+					{
+						DmgRadius = Subject.GetTraitRef<FDamage_Beam>().DmgRadius;
+					}
+
+					// Do apply dmg and debuff
+					TArray<FDmgResult> DamageResults;
+
+					if (bIsPoint)
+					{
+						const auto& Damage_Point = Subject.GetTraitRef<FDamage_Point>();
+						const auto& Debuff_Point = Subject.GetTraitRef<FDebuff_Point>();
+
+						FSubjectArray SubjectArray;
+						SubjectArray.Subjects.Add(HitSubjectResult[0].Subject);
+
+						ApplyPointDamageAndDebuffDeferred
+						(
+							SubjectArray,
+							ProjectileParamsRT.IgnoreSubjects,
+							ProjectileParamsRT.Instigator,
+							FSubjectHandle(Subject),
+							Located.Location,
+							Damage_Point,
+							Debuff_Point,
+							DamageResults
+						);
+					}
+					else if (bIsRadial)
+					{
+						const auto& Damage_Radial = Subject.GetTraitRef<FDamage_Radial>();
+						const auto& Debuff_Radial = Subject.GetTraitRef<FDebuff_Radial>();
+
+						ApplyRadialDamageAndDebuffDeferred
+						(
+							NeighborGrid,
+							-1,
+							Located.Location,
+							ProjectileParamsRT.IgnoreSubjects,
+							ProjectileParamsRT.Instigator,
+							FSubjectHandle(Subject),
+							Located.Location,
+							Damage_Radial,
+							Debuff_Radial,
+							DamageResults
+						);
+					}
+					else if (bIsBeam)
+					{
+						const auto& Damage_Beam = Subject.GetTraitRef<FDamage_Beam>();
+						const auto& Debuff_Beam = Subject.GetTraitRef<FDebuff_Beam>();
+
+						ApplyBeamDamageAndDebuffDeferred
+						(
+							NeighborGrid,
+							-1,
+							Located.Location,
+							Located.Location + Damage_Beam.DmgDirectionAndDistance,
+							ProjectileParamsRT.IgnoreSubjects,
+							ProjectileParamsRT.Instigator,
+							FSubjectHandle(Subject),
+							Located.Location,
+							Damage_Beam,
+							Debuff_Beam,
+							DamageResults
+						);
+					}
+
+					// Add to ignore list
+					for (const auto& DamageResult : DamageResults)
+					{
+						ProjectileParamsRT.IgnoreSubjects.Subjects.AddUnique(DamageResult.DamagedSubject);
+					}
+
+					// Hit particle burst
+					FSubjectRecord BurstFxRecord;
+					BurstFxRecord.SetTrait(FProjectile());
+					BurstFxRecord.SetTrait(FIsBurstFx());
+					BurstFxRecord.SetTrait(Located);
+					BurstFxRecord.SetTrait(Directed);
+					BurstFxRecord.SetTrait(Scaled);
+					UBattleFrameFunctionLibraryRT::SetRecordSubTypeTraitByIndex(SubType.Index, BurstFxRecord);
+					Mechanism->SpawnSubjectDeferred(BurstFxRecord);
+				}
+
+				if (bShouldDespawn)
+				{
+					Subject.DespawnDeferred();
+				}
+
+				// Draw Debug
+				if (ProjectileParams.bDrawDebugShape)
+				{
+					FDebugSphereConfig ColliderRadius;
+					ColliderRadius.Radius = ProjectileParams.Radius;
+					ColliderRadius.Location = Located.Location;
+					ColliderRadius.Color = FColor::Red;
+					ColliderRadius.LineThickness = 0.f;
+					DebugSphereQueue.Enqueue(ColliderRadius);
+
+					FDebugSphereConfig DamageRadius;
+					DamageRadius.Radius = DmgRadius;
+					DamageRadius.Location = Located.Location;
+					DamageRadius.Color = FColor::Red;
+					DamageRadius.LineThickness = 0.f;
+					DebugSphereQueue.Enqueue(DamageRadius);
+				}
+
+			}, ThreadsCount, BatchSize);
+	}
+	#pragma endregion
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4179,10 +4644,13 @@ void ABattleFrameBattleControl::DefineFilters()
 	SpawnFxFilter = FFilter::Make<FFxConfig_Final>();
 	PlaySoundFilter = FFilter::Make<FSoundConfig_Final>();
 
-	RenderBatchFilter = FFilter::Make<FRenderBatchData>();
+	RenderBatchFilter = FFilter::Make<FAgentRenderBatchData>();
 	SpeedLimitOverrideFilter = FFilter::Make<FCollider, FLocated, FSphereObstacle>();
+
+	ProjectileFilter = FFilter::Make<FProjectile, FProjectileParams, FProjectileParamsRT, FLocated, FDirected, FScaled, FActivated>();
 }
 
+// 这里缺一个GetRandomPointInNavigableRadius实现
 FVector ABattleFrameBattleControl::FindNewPatrolGoalLocation(const FPatrol Patrol, const FCollider Collider, const FTrace Trace, const FTracing Tracing, const FLocated Located, const FScaled Scaled, int32 MaxAttempts)
 {
 	// Early out if no neighbor grid available
@@ -4202,24 +4670,6 @@ FVector ABattleFrameBattleControl::FindNewPatrolGoalLocation(const FPatrol Patro
 		const float Angle = FMath::FRandRange(0.f, 2.f * PI);
 		const float Distance = FMath::FRandRange(Patrol.PatrolRadiusMin, Patrol.PatrolRadiusMax);
 		const FVector Candidate = Patrol.Origin + FVector(FMath::Cos(Angle) * Distance, FMath::Sin(Angle) * Distance, 0.f);
-
-		// Skip visibility check if not required
-		if (!Trace.SectorTrace.Patrol.bCheckVisibility)
-		{
-			return Candidate;
-		}
-
-		// Check visibility through neighbor grid
-		bool bHit = false;
-		FTraceResult Result;
-		FTraceDrawDebugConfig DebugConfig;
-		Tracing.NeighborGrid->SphereSweepForObstacle(Located.Location, Candidate, Collider.Radius * Scaled.Scale, DebugConfig, bHit, Result);
-
-		// Return first valid candidate found
-		if (!bHit)
-		{
-			return Candidate;
-		}
 
 		// Track farthest candidate as fallback
 		const float CurrentDistanceSq = (Candidate - Located.Location).SizeSquared();
@@ -4241,10 +4691,7 @@ bool ABattleFrameBattleControl::GetInterpedWorldLocation(AFlowField* flowField, 
 	outInterpolatedWorldLoc = FVector::ZeroVector;
 
 	// 检查是否已开始游戏
-	if (flowField->bIsBeginPlay)
-	{
-		return false;
-	}
+	if (flowField->bIsBeginPlay) return false;
 
 	// 计算相对位置
 	FVector relativeLocation = (location - flowField->actorLoc).RotateAngleAxis(-flowField->actorRot.Yaw, FVector(0, 0, 1)) + flowField->offsetLoc;
@@ -4780,7 +5227,6 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuff(const FSubjectArray& S
 				auto Moving = Overlapper.GetTrait<FMoving>();
 
 				FVector KnockbackForce = FVector(Debuff.LaunchParams.LaunchSpeed.X, Debuff.LaunchParams.LaunchSpeed.X, 1) * HitDirection + FVector(0, 0, Debuff.LaunchParams.LaunchSpeed.Y);
-				FVector CombinedForce = Moving.LaunchVelSum + KnockbackForce;
 				Moving.LaunchVelSum += KnockbackForce; // 累加击退力
 
 				Overlapper.SetTrait(Moving);
@@ -5136,7 +5582,6 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuffDeferred(const FSubject
 				auto& Moving = Overlapper.GetTraitRef<FMoving, EParadigm::Unsafe>();
 
 				FVector KnockbackForce = FVector(Debuff.LaunchParams.LaunchSpeed.X, Debuff.LaunchParams.LaunchSpeed.X, 1) * HitDirection + FVector(0, 0, Debuff.LaunchParams.LaunchSpeed.Y);
-				FVector CombinedForce = Moving.LaunchVelSum + KnockbackForce;
 
 				Moving.Lock();
 				Moving.LaunchVelSum += KnockbackForce; // 累加击退力
@@ -5269,27 +5714,43 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuffDeferred(const FSubject
 	}
 }
 
-void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(const FVector& Origin, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Radial& Damage, const FDebuff_Radial& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults)
+void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(UNeighborGridComponent* NeighborGridComponent, const int32 KeepCount, const FVector& Origin, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Radial& Damage, const FDebuff_Radial& Debuff, TArray<FDmgResult>& DamageResults)
 {
 	//TRACE_CPUPROFILER_EVENT_SCOPE_STR("ApplyRadialDamageAndDebuff");
 	// sphere trace at Origin
+	if (!IsValid(NeighborGridComponent))
+	{
+		if (UWorld* World = GetWorld())
+		{
+			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
+			{
+				ANeighborGridActor* NeighborGridActor = *It;
+				NeighborGridComponent = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
+				break;
+			}
+		}
+
+		if (!IsValid(NeighborGridComponent)) return;
+	}
+
 	bool bHit;
 	TArray<FTraceResult> TraceResults;
+
 	UBattleFrameFunctionLibraryRT::SphereTraceForSubjects
 	(
 		bHit,
 		TraceResults,
 		NeighborGridComponent,
-		-1,
+		KeepCount,
 		Origin,
 		Damage.DmgRadius,
-		Damage.bCheckVisibility,
+		!Damage.Filter.ObstacleObjectType.IsEmpty(),
 		Origin,
 		0.01,
 		ESortMode::None,
 		Origin,
 		IgnoreSubjects,
-		Filter,
+		Damage.Filter,
 		FTraceDrawDebugConfig()
 	);
 
@@ -5505,8 +5966,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(const FVector& Origin
 				auto Moving = Overlapper.GetTrait<FMoving>();
 
 				FVector KnockbackForce = FVector(Debuff.LaunchParams.LaunchSpeed.X, Debuff.LaunchParams.LaunchSpeed.X, 1) * HitDirection + FVector(0, 0, Debuff.LaunchParams.LaunchSpeed.Y);
-				FVector CombinedForce = Moving.LaunchVelSum + KnockbackForce * DebuffFalloffMult;
-				Moving.LaunchVelSum += KnockbackForce; // 累加击退力
+				Moving.LaunchVelSum += KnockbackForce * DebuffFalloffMult; // 累加击退力
 
 				Overlapper.SetTrait(Moving);
 			}
@@ -5522,8 +5982,6 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(const FVector& Origin
 			Slow.SlowStrength = Debuff.SlowParams.SlowStrength * DebuffFalloffMult;
 			Slow.SlowTimeout = Debuff.SlowParams.SlowTime;
 			Slow.DmgType = Damage.DmgType;
-			UE_LOG(LogTemp, Log, TEXT("Slowing.SlowStrength: %f"), Slow.SlowStrength);
-			UE_LOG(LogTemp, Log, TEXT("Slowing.SlowStrength: %f"), Slow.SlowTimeout);
 			Mechanism->SpawnSubject(Slow);
 		}
 
@@ -5639,27 +6097,31 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(const FVector& Origin
 	}
 }
 
-void ABattleFrameBattleControl::ApplyRadialDamageAndDebuffDeferred(const FVector& Origin, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Radial& Damage, const FDebuff_Radial& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults)
+void ABattleFrameBattleControl::ApplyRadialDamageAndDebuffDeferred(UNeighborGridComponent* NeighborGridComponent, const int32 KeepCount, const FVector& Origin, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Radial& Damage, const FDebuff_Radial& Debuff, TArray<FDmgResult>& DamageResults)
 {
 	//TRACE_CPUPROFILER_EVENT_SCOPE_STR("ApplyRadialDamageAndDebuff");
 	// sphere trace at Origin
+
+	if (!IsValid(NeighborGridComponent)) return;
+
 	bool bHit;
 	TArray<FTraceResult> TraceResults;
+
 	UBattleFrameFunctionLibraryRT::SphereTraceForSubjects
 	(
 		bHit,
 		TraceResults,
 		NeighborGridComponent,
-		-1,
+		KeepCount,
 		Origin,
 		Damage.DmgRadius,
-		Damage.bCheckVisibility,
+		!Damage.Filter.ObstacleObjectType.IsEmpty(),
 		Origin,
 		0.01,
 		ESortMode::None,
 		Origin,
 		IgnoreSubjects,
-		Filter,
+		Damage.Filter,
 		FTraceDrawDebugConfig()
 	);
 
@@ -5875,8 +6337,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuffDeferred(const FVector
 				auto Moving = Overlapper.GetTrait<FMoving>();
 
 				FVector KnockbackForce = FVector(Debuff.LaunchParams.LaunchSpeed.X, Debuff.LaunchParams.LaunchSpeed.X, 1) * HitDirection + FVector(0, 0, Debuff.LaunchParams.LaunchSpeed.Y);
-				FVector CombinedForce = Moving.LaunchVelSum + KnockbackForce * DebuffFalloffMult;
-				Moving.LaunchVelSum += KnockbackForce; // 累加击退力
+				Moving.LaunchVelSum += KnockbackForce * DebuffFalloffMult; // 累加击退力
 
 				Overlapper.SetTraitDeferred(Moving);
 			}
@@ -6008,28 +6469,44 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuffDeferred(const FVector
 	}
 }
 
-void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(const FVector& StartLocation, const FVector& EndLocation, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Beam& Damage, const FDebuff_Beam& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults)
+void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(UNeighborGridComponent* NeighborGridComponent, const int32 KeepCount, const FVector& StartLocation, const FVector& EndLocation, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Beam& Damage, const FDebuff_Beam& Debuff, TArray<FDmgResult>& DamageResults)
 {
 	//TRACE_CPUPROFILER_EVENT_SCOPE_STR("ApplyRadialDamageAndDebuff");
 	// sphere trace at Origin
+	if (!IsValid(NeighborGridComponent))
+	{
+		if (UWorld* World = GetWorld())
+		{
+			for (TActorIterator<ANeighborGridActor> It(World); It; ++It)
+			{
+				ANeighborGridActor* NeighborGridActor = *It;
+				NeighborGridComponent = NeighborGridActor->GetComponentByClass<UNeighborGridComponent>();
+				break;
+			}
+		}
+
+		if (!IsValid(NeighborGridComponent)) return;
+	}
+
 	bool bHit;
 	TArray<FTraceResult> TraceResults;
+
 	UBattleFrameFunctionLibraryRT::SphereSweepForSubjects
 	(
 		bHit,
 		TraceResults,
 		NeighborGridComponent,
-		-1,
+		KeepCount,
 		StartLocation,
 		EndLocation,
 		Damage.DmgRadius,
-		Damage.bCheckVisibility,
+		!Damage.Filter.ObstacleObjectType.IsEmpty(),
 		StartLocation,
 		0.01,
 		ESortMode::None,
 		StartLocation,
 		IgnoreSubjects,
-		Filter,
+		Damage.Filter,
 		FTraceDrawDebugConfig()
 	);
 
@@ -6077,6 +6554,12 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(const FVector& StartLoc
 		FVector HitDirection = FVector::OneVector;
 		if (bHasLocated) HitDirection = (Location - HitFromLocation).GetSafeNormal2D();
 
+		// 距离衰减
+		float Distance = FMath::PointDistToLine(StartLocation, EndLocation, Location);
+		TRange<float> InputRange(0, Damage.DmgRadius);
+		TRange<float> OutputRange(1, 0);
+		float DmgFalloffMult = Damage.bUseFalloff ? FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Distance) : 1;
+		float DebuffFalloffMult = Debuff.bUseFalloff ? FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Distance) : 1;
 
 		//-------------伤害和抗性------------
 
@@ -6125,7 +6608,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(const FVector& StartLoc
 			float PercentageDamage = Health.Maximum * Damage.PercentDmg * PercentDmgMult;
 
 			// 总伤害
-			float CombinedDamage = BaseDamage + PercentageDamage;
+			float CombinedDamage = (BaseDamage + PercentageDamage) * DmgFalloffMult;
 
 			// 考虑暴击后伤害
 			auto [bIsCrit, PostCritDamage] = ProcessCritDamage(CombinedDamage, Damage.CritDmgMult, Damage.CritProbability);
@@ -6205,7 +6688,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(const FVector& StartLoc
 					break;
 				}
 
-				TemporalDamage.TotalTemporalDamage = TotalTemporalDmg;
+				TemporalDamage.TotalTemporalDamage = TotalTemporalDmg * DebuffFalloffMult;
 
 				if (TemporalDamage.TotalTemporalDamage > 0)
 				{
@@ -6239,8 +6722,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(const FVector& StartLoc
 				auto Moving = Overlapper.GetTrait<FMoving>();
 
 				FVector KnockbackForce = FVector(Debuff.LaunchParams.LaunchSpeed.X, Debuff.LaunchParams.LaunchSpeed.X, 1) * HitDirection + FVector(0, 0, Debuff.LaunchParams.LaunchSpeed.Y);
-				FVector CombinedForce = Moving.LaunchVelSum + KnockbackForce;
-				Moving.LaunchVelSum += KnockbackForce; // 累加击退力
+				Moving.LaunchVelSum += KnockbackForce * DebuffFalloffMult; // 累加击退力
 
 				Overlapper.SetTrait(Moving);
 			}
@@ -6253,10 +6735,9 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(const FVector& StartLoc
 			FSlow Slow;
 
 			Slow.SlowTarget = Overlapper;
-			Slow.SlowStrength = Debuff.SlowParams.SlowStrength;
+			Slow.SlowStrength = Debuff.SlowParams.SlowStrength * DebuffFalloffMult;
 			Slow.SlowTimeout = Debuff.SlowParams.SlowTime;
 			Slow.DmgType = Damage.DmgType;
-
 			Mechanism->SpawnSubject(Slow);
 		}
 
@@ -6372,28 +6853,32 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(const FVector& StartLoc
 	}
 }
 
-void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(const FVector& StartLocation, const FVector& EndLocation, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Beam& Damage, const FDebuff_Beam& Debuff, const FFilter& Filter, UNeighborGridComponent* NeighborGridComponent, TArray<FDmgResult>& DamageResults)
+void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(UNeighborGridComponent* NeighborGridComponent, const int32 KeepCount, const FVector& StartLocation, const FVector& EndLocation, const FSubjectArray& IgnoreSubjects, const FSubjectHandle DmgInstigator, const FSubjectHandle DmgCauser, const FVector& HitFromLocation, const FDamage_Beam& Damage, const FDebuff_Beam& Debuff, TArray<FDmgResult>& DamageResults)
 {
 	//TRACE_CPUPROFILER_EVENT_SCOPE_STR("ApplyRadialDamageAndDebuff");
 	// sphere trace at Origin
+
+	if (!IsValid(NeighborGridComponent)) return;
+
 	bool bHit;
 	TArray<FTraceResult> TraceResults;
+
 	UBattleFrameFunctionLibraryRT::SphereSweepForSubjects
 	(
 		bHit,
 		TraceResults,
 		NeighborGridComponent,
-		-1,
+		KeepCount,
 		StartLocation,
 		EndLocation,
 		Damage.DmgRadius,
-		Damage.bCheckVisibility,
+		!Damage.Filter.ObstacleObjectType.IsEmpty(),
 		StartLocation,
 		0.01,
 		ESortMode::None,
 		StartLocation,
 		IgnoreSubjects,
-		Filter,
+		Damage.Filter,
 		FTraceDrawDebugConfig()
 	);
 
@@ -6440,6 +6925,13 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(const FVector& 
 		// 击退
 		FVector HitDirection = FVector::OneVector;
 		if (bHasLocated) HitDirection = (Location - HitFromLocation).GetSafeNormal2D();
+
+		// 距离衰减
+		float Distance = FMath::PointDistToLine(StartLocation, EndLocation, Location);
+		TRange<float> InputRange(0, Damage.DmgRadius);
+		TRange<float> OutputRange(1, 0);
+		float DmgFalloffMult = Damage.bUseFalloff ? FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Distance) : 1;
+		float DebuffFalloffMult = Debuff.bUseFalloff ? FMath::GetMappedRangeValueClamped(InputRange, OutputRange, Distance) : 1;
 
 
 		//-------------伤害和抗性------------
@@ -6489,7 +6981,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(const FVector& 
 			float PercentageDamage = Health.Maximum * Damage.PercentDmg * PercentDmgMult;
 
 			// 总伤害
-			float CombinedDamage = BaseDamage + PercentageDamage;
+			float CombinedDamage = (BaseDamage + PercentageDamage) * DmgFalloffMult;
 
 			// 考虑暴击后伤害
 			auto [bIsCrit, PostCritDamage] = ProcessCritDamage(CombinedDamage, Damage.CritDmgMult, Damage.CritProbability);
@@ -6569,7 +7061,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(const FVector& 
 					break;
 				}
 
-				TemporalDamage.TotalTemporalDamage = TotalTemporalDmg;
+				TemporalDamage.TotalTemporalDamage = TotalTemporalDmg * DebuffFalloffMult;
 
 				if (TemporalDamage.TotalTemporalDamage > 0)
 				{
@@ -6603,8 +7095,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(const FVector& 
 				auto Moving = Overlapper.GetTrait<FMoving>();
 
 				FVector KnockbackForce = FVector(Debuff.LaunchParams.LaunchSpeed.X, Debuff.LaunchParams.LaunchSpeed.X, 1) * HitDirection + FVector(0, 0, Debuff.LaunchParams.LaunchSpeed.Y);
-				FVector CombinedForce = Moving.LaunchVelSum + KnockbackForce;
-				Moving.LaunchVelSum += KnockbackForce; // 累加击退力
+				Moving.LaunchVelSum += KnockbackForce * DebuffFalloffMult; // 累加击退力
 
 				Overlapper.SetTraitDeferred(Moving);
 			}
@@ -6617,10 +7108,9 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(const FVector& 
 			FSlow Slow;
 
 			Slow.SlowTarget = Overlapper;
-			Slow.SlowStrength = Debuff.SlowParams.SlowStrength;
+			Slow.SlowStrength = Debuff.SlowParams.SlowStrength * DebuffFalloffMult;
 			Slow.SlowTimeout = Debuff.SlowParams.SlowTime;
 			Slow.DmgType = Damage.DmgType;
-
 			Mechanism->SpawnSubjectDeferred(Slow);
 		}
 

@@ -13,8 +13,10 @@ struct BATTLEFRAME_API FRendering
 
 public:
 
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 InstanceId = -1;
 
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
     FSubjectHandle Renderer = FSubjectHandle();
 
 };
