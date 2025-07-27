@@ -2325,6 +2325,52 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								}
 							}
 						}
+
+						// Spawn Projectile
+						FVector FromPoint = Located.Location + Directed.Direction * SelfRadius;
+						FVector ToPoint = Tracing.TraceResult.GetTrait<FLocated>().Location;
+						FVector TargetVelocity = Tracing.TraceResult.HasTrait<FMoving>() ? Tracing.TraceResult.GetTrait<FMoving>().CurrentVelocity : FVector::ZeroVector;
+
+						for (const auto& Config : Attack.SpawnProjectile)
+						{
+							auto DA = Config.ProjectileConfig.LoadSynchronous();
+
+							if (IsValid(DA))
+							{
+								bool Succeed;
+								FVector LaunchVelocity;
+
+								switch (DA->MovementMode)
+								{
+									case EProjectileMoveMode::Ballistic:
+										if (Config.Ballistic.SolveMode == EProjectileSolveMode::FromPitch)
+										{
+											UBattleFrameFunctionLibraryRT::SolveProjectileVelocityFromPitchWithPrediction(Succeed, LaunchVelocity, FromPoint, ToPoint, TargetVelocity, Config.Ballistic.Iterations, Config.Ballistic.Gravity, Config.Ballistic.PitchAngle);
+										}
+										else
+										{
+											UBattleFrameFunctionLibraryRT::SolveProjectileVelocityFromSpeedWithPrediction(Succeed, LaunchVelocity, FromPoint, ToPoint, TargetVelocity, Config.Ballistic.Iterations, Config.Ballistic.Gravity, Config.Ballistic.Speed, Config.Ballistic.bFavorHighArc);
+										}
+										if (Succeed)
+										{
+											UBattleFrameFunctionLibraryRT::SpawnProjectile_BallisticDeferred(Succeed, Config.ProjectileConfig, Config.Ballistic.ScaleMult, FromPoint, ToPoint, LaunchVelocity, FSubjectHandle(Subject), FSubjectArray(), Tracing.NeighborGrid);
+										}
+										break;
+
+									case EProjectileMoveMode::Interped:
+										UBattleFrameFunctionLibraryRT::SpawnProjectile_InterpedDeferred(Succeed, Config.ProjectileConfig, Config.Interped.ScaleMult, FromPoint, ToPoint, Tracing.TraceResult, Config.Interped.Speed, Config.Interped.XYOffsetMult, Config.Interped.ZOffsetMult, FSubjectHandle(Subject), FSubjectArray(), Tracing.NeighborGrid);
+										break;
+
+									case EProjectileMoveMode::Tracking:
+										UBattleFrameFunctionLibraryRT::SpawnProjectile_TrackingDeferred(Succeed, Config.ProjectileConfig, Config.Tracking.ScaleMult, FromPoint, ToPoint, Tracing.TraceResult, (ToPoint - FromPoint).GetSafeNormal() * Config.Tracking.Speed, FSubjectHandle(Subject), FSubjectArray(), Tracing.NeighborGrid);
+										break;
+
+									case EProjectileMoveMode::Static:
+										UBattleFrameFunctionLibraryRT::SpawnProjectile_StaticDeferred(Succeed, Config.ProjectileConfig, Config.Static.ScaleMult, FromPoint, FSubjectHandle(Subject), FSubjectArray(), Tracing.NeighborGrid);
+										break;
+								}
+							}
+						}
 					}
 
 					// Attack Hit Event

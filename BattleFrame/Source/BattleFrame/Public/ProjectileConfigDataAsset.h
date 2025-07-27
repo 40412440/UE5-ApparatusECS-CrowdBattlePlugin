@@ -35,13 +35,8 @@ public:
     FSubType SubType;
 
     // 无条件的通用参数
-    //UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Transform", meta = (ToolTip = "位置"))
     FLocated Located;
-
-    //UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Transform", meta = (ToolTip = "朝向"))
     FDirected Directed;
-
-    //UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Transform", meta = (ToolTip = "缩放"))
     FScaled Scaled;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "SharedParams", meta = (ToolTip = "通用参数"))

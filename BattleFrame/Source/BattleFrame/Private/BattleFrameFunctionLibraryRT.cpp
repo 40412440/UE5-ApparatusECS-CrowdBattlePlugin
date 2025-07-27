@@ -772,6 +772,86 @@ void UBattleFrameFunctionLibraryRT::SpawnProjectileByConfig(bool& Successful, FS
 	}
 }
 
+void UBattleFrameFunctionLibraryRT::SpawnProjectileByConfigDeferred(bool& Successful, FSubjectHandle& SpawnedProjectile, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset)
+{
+	UWorld* World = GEngine->GetCurrentPlayWorld();
+
+	if (!World)
+	{
+		Successful = false;
+		SpawnedProjectile = FSubjectHandle();
+		return;
+	}
+
+	UProjectileConfigDataAsset* Config = ProjectileConfigDataAsset.LoadSynchronous();
+
+	if (!Config)
+	{
+		Successful = false;
+		SpawnedProjectile = FSubjectHandle();
+		return;
+	}
+
+	FSubjectRecord Record;
+	Record.SetTrait(Config->Projectile);
+	Record.SetTrait(Config->SubType);
+	Record.SetTrait(Config->Located);
+	Record.SetTrait(Config->Directed);
+	Record.SetTrait(Config->Scaled);
+	Record.SetTrait(Config->ProjectileParams);
+	Record.SetTrait(Config->ProjectileParamsRT);
+	Record.SetTrait(FIsAttachedFx());
+
+	switch (Config->MovementMode)
+	{
+	case EProjectileMoveMode::Static:
+		Record.SetTrait(Config->ProjectileMove_Static);
+		break;
+	case EProjectileMoveMode::Interped:
+		Record.SetTrait(Config->ProjectileMove_Interped);
+		Record.SetTrait(Config->ProjectileMoving_Interped);
+		break;
+	case EProjectileMoveMode::Ballistic:
+		Record.SetTrait(Config->ProjectileMove_Ballistic);
+		Record.SetTrait(Config->ProjectileMoving_Ballistic);
+		break;
+	case EProjectileMoveMode::Tracking:
+		Record.SetTrait(Config->ProjectileMove_Tracking);
+		Record.SetTrait(Config->ProjectileMoving_Tracking);
+		break;
+	}
+
+	switch (Config->DamageMode)
+	{
+	case EProjectileDamageMode::Point:
+		Record.SetTrait(Config->Damage_Point);
+		Record.SetTrait(Config->Debuff_Point);
+		break;
+	case EProjectileDamageMode::Radial:
+		Record.SetTrait(Config->Damage_Radial);
+		Record.SetTrait(Config->Debuff_Radial);
+		break;
+	case EProjectileDamageMode::Beam:
+		Record.SetTrait(Config->Damage_Beam);
+		Record.SetTrait(Config->Debuff_Beam);
+		break;
+	}
+
+	SetRecordSubTypeTraitByIndex(Config->SubType.Index, Record);
+
+	AMechanism* Mechanism = UMachine::ObtainMechanism(World);
+
+	if (!Mechanism)
+	{
+		Successful = false;
+		SpawnedProjectile = FSubjectHandle();
+		return;
+	}
+
+	Mechanism->SpawnSubjectDeferred(Record);
+	Successful = true;
+}
+
 // Static Movement
 void UBattleFrameFunctionLibraryRT::SpawnProjectile_Static(bool& Successful, FSubjectHandle& ProjectileHandle, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent)
 {
@@ -797,6 +877,101 @@ void UBattleFrameFunctionLibraryRT::SpawnProjectile_Static(bool& Successful, FSu
 	ProjectileHandle.SetTrait(ProjectileParamsRT);
 
 	ProjectileHandle.SetTrait(FActivated());
+}
+
+void UBattleFrameFunctionLibraryRT::SpawnProjectile_StaticDeferred(bool& Successful, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent)
+{
+	UWorld* World = GEngine->GetCurrentPlayWorld();
+
+	if (!World)
+	{
+		Successful = false;
+		return;
+	}
+
+	AMechanism* Mechanism = UMachine::ObtainMechanism(World);
+
+	if (!Mechanism)
+	{
+		Successful = false;
+		return;
+	}
+
+	UProjectileConfigDataAsset* Config = ProjectileConfigDataAsset.LoadSynchronous();
+
+	if (!Config)
+	{
+		Successful = false;
+		return;
+	}
+
+	FSubjectRecord Record;
+	Record.SetTrait(Config->Projectile);
+	Record.SetTrait(Config->SubType);
+	Record.SetTrait(Config->Located);
+	Record.SetTrait(Config->Directed);
+	Record.SetTrait(Config->Scaled);
+	Record.SetTrait(Config->ProjectileParams);
+	Record.SetTrait(Config->ProjectileParamsRT);
+	Record.SetTrait(FIsAttachedFx());
+
+	switch (Config->MovementMode)
+	{
+	case EProjectileMoveMode::Static:
+		Record.SetTrait(Config->ProjectileMove_Static);
+		break;
+	case EProjectileMoveMode::Interped:
+		Record.SetTrait(Config->ProjectileMove_Interped);
+		Record.SetTrait(Config->ProjectileMoving_Interped);
+		break;
+	case EProjectileMoveMode::Ballistic:
+		Record.SetTrait(Config->ProjectileMove_Ballistic);
+		Record.SetTrait(Config->ProjectileMoving_Ballistic);
+		break;
+	case EProjectileMoveMode::Tracking:
+		Record.SetTrait(Config->ProjectileMove_Tracking);
+		Record.SetTrait(Config->ProjectileMoving_Tracking);
+		break;
+	}
+
+	switch (Config->DamageMode)
+	{
+	case EProjectileDamageMode::Point:
+		Record.SetTrait(Config->Damage_Point);
+		Record.SetTrait(Config->Debuff_Point);
+		break;
+	case EProjectileDamageMode::Radial:
+		Record.SetTrait(Config->Damage_Radial);
+		Record.SetTrait(Config->Debuff_Radial);
+		break;
+	case EProjectileDamageMode::Beam:
+		Record.SetTrait(Config->Damage_Beam);
+		Record.SetTrait(Config->Debuff_Beam);
+		break;
+	}
+
+	SetRecordSubTypeTraitByIndex(Config->SubType.Index, Record);
+
+	FProjectileParamsRT ProjectileParamsRT;
+	ProjectileParamsRT.IgnoreSubjects = IgnoreSubjects;
+	ProjectileParamsRT.Instigator = Instigator;
+	ProjectileParamsRT.NeighborGridComponent = NeighborGridComponent;
+
+	FLocated Located;
+	Located.Location = FromPoint;
+	Located.PreLocation = FromPoint;
+
+	FScaled Scaled;
+	Scaled.Scale *= ScaleMult;
+	Scaled.RenderScale *= ScaleMult;
+
+	Record.SetTrait(Located);
+	Record.SetTrait(Scaled);
+	Record.SetTrait(ProjectileParamsRT);
+	Record.SetTrait(FActivated());
+
+	Mechanism->SpawnSubjectDeferred(Record);
+	Successful = true;
 }
 
 // Interped Movement
@@ -853,6 +1028,123 @@ void UBattleFrameFunctionLibraryRT::SpawnProjectile_Interped(bool& Successful, F
 	ProjectileHandle.SetTrait(FActivated());
 }
 
+void UBattleFrameFunctionLibraryRT::SpawnProjectile_InterpedDeferred(bool& Successful, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, float Speed, float XYOffsetMult, float ZOffsetMult, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent)
+{
+	UWorld* World = GEngine->GetCurrentPlayWorld();
+
+	if (!World)
+	{
+		Successful = false;
+		return;
+	}
+
+	AMechanism* Mechanism = UMachine::ObtainMechanism(World);
+
+	if (!Mechanism)
+	{
+		Successful = false;
+		return;
+	}
+
+	UProjectileConfigDataAsset* Config = ProjectileConfigDataAsset.LoadSynchronous();
+
+	if (!Config)
+	{
+		Successful = false;
+		return;
+	}
+
+	FSubjectRecord Record;
+	Record.SetTrait(Config->Projectile);
+	Record.SetTrait(Config->SubType);
+	Record.SetTrait(Config->Located);
+	Record.SetTrait(Config->Directed);
+	Record.SetTrait(Config->Scaled);
+	Record.SetTrait(Config->ProjectileParams);
+	Record.SetTrait(Config->ProjectileParamsRT);
+	Record.SetTrait(FIsAttachedFx());
+
+	switch (Config->MovementMode)
+	{
+	case EProjectileMoveMode::Static:
+		Record.SetTrait(Config->ProjectileMove_Static);
+		break;
+	case EProjectileMoveMode::Interped:
+		Record.SetTrait(Config->ProjectileMove_Interped);
+		Record.SetTrait(Config->ProjectileMoving_Interped);
+		break;
+	case EProjectileMoveMode::Ballistic:
+		Record.SetTrait(Config->ProjectileMove_Ballistic);
+		Record.SetTrait(Config->ProjectileMoving_Ballistic);
+		break;
+	case EProjectileMoveMode::Tracking:
+		Record.SetTrait(Config->ProjectileMove_Tracking);
+		Record.SetTrait(Config->ProjectileMoving_Tracking);
+		break;
+	}
+
+	switch (Config->DamageMode)
+	{
+	case EProjectileDamageMode::Point:
+		Record.SetTrait(Config->Damage_Point);
+		Record.SetTrait(Config->Debuff_Point);
+		break;
+	case EProjectileDamageMode::Radial:
+		Record.SetTrait(Config->Damage_Radial);
+		Record.SetTrait(Config->Debuff_Radial);
+		break;
+	case EProjectileDamageMode::Beam:
+		Record.SetTrait(Config->Damage_Beam);
+		Record.SetTrait(Config->Debuff_Beam);
+		break;
+	}
+
+	SetRecordSubTypeTraitByIndex(Config->SubType.Index, Record);
+
+	bool bHasValidTarget = ToTarget.IsValid() && ToTarget.HasTrait<FLocated>();
+	ToPoint = bHasValidTarget ? ToTarget.GetTrait<FLocated>().Location : ToPoint;
+
+	FProjectileParamsRT ProjectileParamsRT;
+	ProjectileParamsRT.IgnoreSubjects = IgnoreSubjects;
+	ProjectileParamsRT.Instigator = Instigator;
+	ProjectileParamsRT.NeighborGridComponent = NeighborGridComponent;
+
+	FProjectileMoving_Interped ProjectileMoving;
+	ProjectileMoving.BirthTime = GEngine->GetCurrentPlayWorld()->GetTimeSeconds();
+	ProjectileMoving.FromPoint = FromPoint;
+	ProjectileMoving.ToPoint = ToPoint;
+	ProjectileMoving.Target = ToTarget;
+	ProjectileMoving.Speed = Speed;
+
+	FProjectileMove_Interped ProjectileMove = Record.GetTraitRef<FProjectileMove_Interped>();
+
+	float Distance = FVector::Dist(FromPoint, ToPoint);
+	ProjectileMoving.XYOffsetMult = XYOffsetMult * FMath::GetMappedRangeValueClamped(TRange<float>(ProjectileMove.XYScaleRangeMap[0], ProjectileMove.XYScaleRangeMap[2]), TRange<float>(ProjectileMove.XYScaleRangeMap[1], ProjectileMove.XYScaleRangeMap[3]), Distance);
+	ProjectileMoving.ZOffsetMult = ZOffsetMult * FMath::GetMappedRangeValueClamped(TRange<float>(ProjectileMove.ZScaleRangeMap[0], ProjectileMove.ZScaleRangeMap[2]), TRange<float>(ProjectileMove.ZScaleRangeMap[1], ProjectileMove.ZScaleRangeMap[3]), Distance);
+
+	FLocated Located;
+	Located.Location = FromPoint;
+	Located.PreLocation = FromPoint;
+
+	FDirected Directed;
+	Directed.Direction = (ToPoint - FromPoint).GetSafeNormal();
+	Directed.DesiredDirection = Directed.Direction;
+
+	FScaled Scaled;
+	Scaled.Scale *= ScaleMult;
+	Scaled.RenderScale *= ScaleMult;
+
+	Record.SetTrait(Located);
+	Record.SetTrait(Directed);
+	Record.SetTrait(Scaled);
+	Record.SetTrait(ProjectileParamsRT);
+	Record.SetTrait(ProjectileMoving);
+	Record.SetTrait(FActivated());
+
+	Mechanism->SpawnSubjectDeferred(Record);
+	Successful = true;
+}
+
 // Ballistic Movement
 void UBattleFrameFunctionLibraryRT::SpawnProjectile_Ballistic(bool& Successful, FSubjectHandle& ProjectileHandle, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FVector ToPoint, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent)
 {
@@ -890,6 +1182,113 @@ void UBattleFrameFunctionLibraryRT::SpawnProjectile_Ballistic(bool& Successful, 
 	ProjectileHandle.SetTrait(ProjectileMoving);
 
 	ProjectileHandle.SetTrait(FActivated());
+}
+
+void UBattleFrameFunctionLibraryRT::SpawnProjectile_BallisticDeferred(bool& Successful, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FVector ToPoint, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent)
+{
+	UWorld* World = GEngine->GetCurrentPlayWorld();
+
+	if (!World)
+	{
+		Successful = false;
+		return;
+	}
+
+	AMechanism* Mechanism = UMachine::ObtainMechanism(World);
+
+	if (!Mechanism)
+	{
+		Successful = false;
+		return;
+	}
+
+	UProjectileConfigDataAsset* Config = ProjectileConfigDataAsset.LoadSynchronous();
+
+	if (!Config)
+	{
+		Successful = false;
+		return;
+	}
+
+	FSubjectRecord Record;
+	Record.SetTrait(Config->Projectile);
+	Record.SetTrait(Config->SubType);
+	Record.SetTrait(Config->Located);
+	Record.SetTrait(Config->Directed);
+	Record.SetTrait(Config->Scaled);
+	Record.SetTrait(Config->ProjectileParams);
+	Record.SetTrait(Config->ProjectileParamsRT);
+	Record.SetTrait(FIsAttachedFx());
+
+	switch (Config->MovementMode)
+	{
+	case EProjectileMoveMode::Static:
+		Record.SetTrait(Config->ProjectileMove_Static);
+		break;
+	case EProjectileMoveMode::Interped:
+		Record.SetTrait(Config->ProjectileMove_Interped);
+		Record.SetTrait(Config->ProjectileMoving_Interped);
+		break;
+	case EProjectileMoveMode::Ballistic:
+		Record.SetTrait(Config->ProjectileMove_Ballistic);
+		Record.SetTrait(Config->ProjectileMoving_Ballistic);
+		break;
+	case EProjectileMoveMode::Tracking:
+		Record.SetTrait(Config->ProjectileMove_Tracking);
+		Record.SetTrait(Config->ProjectileMoving_Tracking);
+		break;
+	}
+
+	switch (Config->DamageMode)
+	{
+	case EProjectileDamageMode::Point:
+		Record.SetTrait(Config->Damage_Point);
+		Record.SetTrait(Config->Debuff_Point);
+		break;
+	case EProjectileDamageMode::Radial:
+		Record.SetTrait(Config->Damage_Radial);
+		Record.SetTrait(Config->Debuff_Radial);
+		break;
+	case EProjectileDamageMode::Beam:
+		Record.SetTrait(Config->Damage_Beam);
+		Record.SetTrait(Config->Debuff_Beam);
+		break;
+	}
+
+	SetRecordSubTypeTraitByIndex(Config->SubType.Index, Record);
+
+	FProjectileParamsRT ProjectileParamsRT;
+	ProjectileParamsRT.IgnoreSubjects = IgnoreSubjects;
+	ProjectileParamsRT.Instigator = Instigator;
+	ProjectileParamsRT.NeighborGridComponent = NeighborGridComponent;
+
+	FProjectileMoving_Ballistic ProjectileMoving;
+	ProjectileMoving.BirthTime = GEngine->GetCurrentPlayWorld()->GetTimeSeconds();
+	ProjectileMoving.FromPoint = FromPoint;
+	ProjectileMoving.ToPoint = ToPoint;
+	ProjectileMoving.InitialVelocity = InitialVelocity;
+
+	FLocated Located;
+	Located.Location = FromPoint;
+	Located.PreLocation = FromPoint;
+
+	FDirected Directed;
+	Directed.Direction = InitialVelocity.GetSafeNormal();
+	Directed.DesiredDirection = Directed.Direction;
+
+	FScaled Scaled;
+	Scaled.Scale *= ScaleMult;
+	Scaled.RenderScale *= ScaleMult;
+
+	Record.SetTrait(Located);
+	Record.SetTrait(Directed);
+	Record.SetTrait(Scaled);
+	Record.SetTrait(ProjectileParamsRT);
+	Record.SetTrait(ProjectileMoving);
+	Record.SetTrait(FActivated());
+
+	Mechanism->SpawnSubjectDeferred(Record);
+	Successful = true;
 }
 
 // Tracking Movement
@@ -937,6 +1336,118 @@ void UBattleFrameFunctionLibraryRT::SpawnProjectile_Tracking(bool& Successful, F
 	ProjectileHandle.SetTrait(FActivated());
 }
 
+void UBattleFrameFunctionLibraryRT::SpawnProjectile_TrackingDeferred(bool& Successful, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent)
+{
+	UWorld* World = GEngine->GetCurrentPlayWorld();
+
+	if (!World)
+	{
+		Successful = false;
+		return;
+	}
+
+	AMechanism* Mechanism = UMachine::ObtainMechanism(World);
+
+	if (!Mechanism)
+	{
+		Successful = false;
+		return;
+	}
+
+	UProjectileConfigDataAsset* Config = ProjectileConfigDataAsset.LoadSynchronous();
+
+	if (!Config)
+	{
+		Successful = false;
+		return;
+	}
+
+	FSubjectRecord Record;
+	Record.SetTrait(Config->Projectile);
+	Record.SetTrait(Config->SubType);
+	Record.SetTrait(Config->Located);
+	Record.SetTrait(Config->Directed);
+	Record.SetTrait(Config->Scaled);
+	Record.SetTrait(Config->ProjectileParams);
+	Record.SetTrait(Config->ProjectileParamsRT);
+	Record.SetTrait(FIsAttachedFx());
+
+	switch (Config->MovementMode)
+	{
+	case EProjectileMoveMode::Static:
+		Record.SetTrait(Config->ProjectileMove_Static);
+		break;
+	case EProjectileMoveMode::Interped:
+		Record.SetTrait(Config->ProjectileMove_Interped);
+		Record.SetTrait(Config->ProjectileMoving_Interped);
+		break;
+	case EProjectileMoveMode::Ballistic:
+		Record.SetTrait(Config->ProjectileMove_Ballistic);
+		Record.SetTrait(Config->ProjectileMoving_Ballistic);
+		break;
+	case EProjectileMoveMode::Tracking:
+		Record.SetTrait(Config->ProjectileMove_Tracking);
+		Record.SetTrait(Config->ProjectileMoving_Tracking);
+		break;
+	}
+
+	switch (Config->DamageMode)
+	{
+	case EProjectileDamageMode::Point:
+		Record.SetTrait(Config->Damage_Point);
+		Record.SetTrait(Config->Debuff_Point);
+		break;
+	case EProjectileDamageMode::Radial:
+		Record.SetTrait(Config->Damage_Radial);
+		Record.SetTrait(Config->Debuff_Radial);
+		break;
+	case EProjectileDamageMode::Beam:
+		Record.SetTrait(Config->Damage_Beam);
+		Record.SetTrait(Config->Debuff_Beam);
+		break;
+	}
+
+	SetRecordSubTypeTraitByIndex(Config->SubType.Index, Record);
+
+	bool bHasValidTarget = ToTarget.IsValid() && ToTarget.HasTrait<FLocated>();
+
+	ToPoint = bHasValidTarget ? ToTarget.GetTrait<FLocated>().Location : ToPoint;
+	FVector TargetV = bHasValidTarget && ToTarget.HasTrait<FMoving>() ? ToTarget.GetTrait<FMoving>().CurrentVelocity : FVector::ZeroVector;
+
+	FProjectileParamsRT ProjectileParamsRT;
+	ProjectileParamsRT.IgnoreSubjects = IgnoreSubjects;
+	ProjectileParamsRT.Instigator = Instigator;
+	ProjectileParamsRT.NeighborGridComponent = NeighborGridComponent;
+
+	FProjectileMoving_Tracking ProjectileMoving;
+	ProjectileMoving.FromPoint = FromPoint;
+	ProjectileMoving.ToPoint = ToPoint;
+	ProjectileMoving.Target = ToTarget;
+	ProjectileMoving.TargetVelocity = TargetV;
+	ProjectileMoving.CurrentVelocity = InitialVelocity;
+
+	FLocated Located;
+	Located.Location = FromPoint;
+	Located.PreLocation = FromPoint;
+
+	FDirected Directed;
+	Directed.Direction = InitialVelocity.GetSafeNormal();
+	Directed.DesiredDirection = Directed.Direction;
+
+	FScaled Scaled;
+	Scaled.Scale *= ScaleMult;
+	Scaled.RenderScale *= ScaleMult;
+
+	Record.SetTrait(Located);
+	Record.SetTrait(Directed);
+	Record.SetTrait(Scaled);
+	Record.SetTrait(ProjectileParamsRT);
+	Record.SetTrait(ProjectileMoving);
+	Record.SetTrait(FActivated());
+
+	Mechanism->SpawnSubjectDeferred(Record);
+	Successful = true;
+}
 
 //-------------------------------Sync Traces-------------------------------
 

@@ -8,6 +8,115 @@
 #include "ProjectileConfig.generated.h" 
 
 class UNeighborGridComponent;
+class UProjectileConfigDataAsset;
+
+UENUM(BlueprintType)
+enum class EProjectileSolveMode : uint8
+{
+	FromPitch UMETA(DisplayName = "FromPitch", Tooltip = ""),
+	FromSpeed UMETA(DisplayName = "FromSpeed", Tooltip = ""),
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FProjectileParamsRT_Ballistic
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	float ScaleMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	int32 Iterations = 3;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	float Gravity = -1000;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	EProjectileSolveMode SolveMode = EProjectileSolveMode::FromPitch;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	float PitchAngle = 35;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	float Speed = 3000;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	bool bFavorHighArc = false;
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FProjectileParamsRT_Interped
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	float ScaleMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	float Speed = 3000;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	float XYOffsetMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	float ZOffsetMult = 1;
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FProjectileParamsRT_Tracking
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	float ScaleMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	float Speed = 3000;
+
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FProjectileParamsRT_Static
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	float ScaleMult = 1;
+
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FProjectileParamsRT_DA
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfig;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	FProjectileParamsRT_Ballistic Ballistic;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	FProjectileParamsRT_Interped Interped;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	FProjectileParamsRT_Tracking Tracking;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	FProjectileParamsRT_Static Static;
+
+};
+
 
 USTRUCT(BlueprintType)
 struct BATTLEFRAME_API FProjectileParams
