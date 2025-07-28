@@ -68,6 +68,7 @@ Comprehensive crowd battle system. Demo maps are included in the plugin's conten
   - Setting trait values runtime to control agents' behaviors 
   - Trace for agents and apply damage and debuff
   - Spawning actor fx and sound on birth atk hit and death
+  - Event interface: OnAppear, OnAttack, OnHit, OnDeath...
   - Draw Debug Shapes
   
 ## Roadmap
@@ -152,6 +153,7 @@ In progress:
   - 运行时设置特征值控制AI行为
   - 检测实体并施加伤害/减益
   - 在出生/攻击/受击/死亡时生成Actor特效和音效
+  - 事件接口: OnAppear, OnAttack, OnHit, OnDeath...
   - 调试图形绘制
   
 ## 开发路线
