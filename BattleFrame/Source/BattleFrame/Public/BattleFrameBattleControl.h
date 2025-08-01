@@ -425,7 +425,7 @@ public:
 
 	bool FindPathAStar(AFlowField* FlowField, const FVector& StartLocation, const FVector& GoalLocation, TArray<FVector>& OutPath);
 
-	bool GetSteeringDirection(const FVector& CurrentLocation, const FVector& GoalLocation, const TArray<FVector>& PathPoints, float MoveSpeed, float LookAheadDistance, float PathRadius, float AcceptanceRadius, FVector& SteeringDirection);
+	void GetSteeringDirection(const FVector& CurrentLocation, const FVector& GoalLocation, const TArray<FVector>& PathPoints, float MoveSpeed, float LookAheadDistance, float PathRadius, float AcceptanceRadius, FVector& SteeringDirection, bool& bHasPath, bool& bIsCurrentNearPath, bool& bIsGoalNearEnd);
 
 	FVector FindClosestPointOnSegment(const FVector& Point, const FVector& SegmentStart, const FVector& SegmentEnd);
 

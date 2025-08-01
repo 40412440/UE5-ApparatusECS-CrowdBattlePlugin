@@ -14,6 +14,9 @@ public:
 
 	//---------------Yaw Movement-----------------//
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否启用转向"))
+	bool bEnable = true;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0", Tooltip = "转向角速度"))
 	float TurnSpeed = 1000;
 
@@ -33,6 +36,9 @@ struct BATTLEFRAME_API FXYMovement
 public:
 
 	//---------------XY Movement-----------------//
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否禁用主动移动"))
+	bool bStopActiveMovement = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ClampMin = "0", Tooltip = "移动速度"))
 	float MoveSpeed = 600.f;
@@ -54,7 +60,6 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "与移动目标点距离低于该值时停止移动"))
 	float AcceptanceRadius = 100.f;
-
 };
 
 USTRUCT(BlueprintType)
@@ -63,12 +68,9 @@ struct BATTLEFRAME_API FFall
 	GENERATED_BODY()
 
 public:
-	// 添加构造函数
-	FFall()
-	{
-		// 默认添加WorldStatic到GroundObjectType
-		GroundObjectType.Add(UEngineTypes::ConvertToObjectType(ECC_WorldStatic));
-	}
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否启用坠落"))
+	bool bEnable = true;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "是否可以飞行"))
 	bool bCanFly = false;
@@ -93,6 +95,13 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "地面碰撞类型"))
 	TArray<TEnumAsByte<EObjectTypeQuery>> GroundObjectType;
+
+	// 添加构造函数
+	FFall()
+	{
+		// 默认添加WorldStatic到GroundObjectType
+		GroundObjectType.Add(UEngineTypes::ConvertToObjectType(ECC_WorldStatic));
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -154,6 +163,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "想要抵达的位置"))
 	FVector Goal = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, meta = (Tooltip = "有移动目的地？"))
+	bool bHasGoal = true;
 
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, meta = (Tooltip = "正在下落？"))
 	bool bFalling = false;
@@ -229,6 +241,7 @@ public:
 		MoveSpeedMult = Moving.MoveSpeedMult;
 		TurnSpeedMult = Moving.TurnSpeedMult;
 		CurrentAngularVelocity = Moving.CurrentAngularVelocity;
+		bHasGoal = Moving.bHasGoal;
 		Goal = Moving.Goal;
 		MoveState = Moving.MoveState;
 
@@ -256,6 +269,7 @@ public:
 		MoveSpeedMult = Moving.MoveSpeedMult;
 		TurnSpeedMult = Moving.TurnSpeedMult;
 		CurrentAngularVelocity = Moving.CurrentAngularVelocity;
+		bHasGoal = Moving.bHasGoal;
 		Goal = Moving.Goal;
 		MoveState = Moving.MoveState;
 

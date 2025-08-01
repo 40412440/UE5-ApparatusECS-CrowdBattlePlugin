@@ -7,7 +7,10 @@ struct BATTLEFRAME_API FTeam
 {
     GENERATED_BODY()
 
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 index = 0;
+
+    UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 PreviousIndex = 0;
 };
 

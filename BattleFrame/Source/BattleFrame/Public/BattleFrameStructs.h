@@ -268,7 +268,7 @@ public:
 	FSubjectHandle SelfSubject = FSubjectHandle();
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
-	EMoveEventState State = EMoveEventState::ArrivedAtLocation;
+	EMoveEventState State = EMoveEventState::Approach_Arrived;
 
 };
 

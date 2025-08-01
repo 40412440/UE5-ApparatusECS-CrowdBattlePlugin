@@ -36,15 +36,13 @@ struct BATTLEFRAME_API FNavigating
 
 public:
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "路径"))
 	TArray<FVector> PathPoints;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "路径刷新剩余时间，设置为0可立刻触发刷新"))
 	float TimeLeft = 0;
 
-	TObjectPtr<AFlowField> FlowField = nullptr;
-
-	bool AStarArrived = false;
+	AFlowField* FlowField = nullptr;
 
 	ENavMode PreviousNavMode = ENavMode::None;
 

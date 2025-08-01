@@ -80,7 +80,7 @@ USTRUCT(BlueprintType) struct FCellStruct
 	FVector2D gridCoord = FVector2D(0, 0);
 
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "FFCanvas", meta = (DisplayName = "GroundNormal", ToolTip = "Which coord it will end up in"))
-	FVector2D goalCoord = FVector2D(0, 0);
+	FVector2D goalCoord = FVector2D(-1, -1);
 
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly, Category = "FFCanvas", meta = (DisplayName = "WorldLocation", ToolTip = "The world location of this cell's center point"))
 	FVector worldLoc = FVector(0, 0, 0);

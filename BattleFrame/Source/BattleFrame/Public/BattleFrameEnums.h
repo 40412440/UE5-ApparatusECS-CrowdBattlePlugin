@@ -57,13 +57,13 @@ UENUM(BlueprintType)
 enum class EMoveState : uint8
 {
 	Dirty UMETA(DisplayName = "Dirty", ToolTip = "无效数据"),
-	Sleeping UMETA(DisplayName = "Sleeping", ToolTip = "休眠中"),
-	Patrolling UMETA(DisplayName = "Patrolling", ToolTip = "巡逻中"),
-	PatrolWaiting UMETA(DisplayName = "PatrolWaiting", ToolTip = "在巡逻点位等待"),
-	ChasingTarget UMETA(DisplayName = "ChasingTarget", ToolTip = "正在追逐目标"),
-	ReachedTarget UMETA(DisplayName = "ReachedTarget", ToolTip = "已追到目标"),
-	MovingToLocation UMETA(DisplayName = "MovingToLocation", ToolTip = "移动到位置"),
-	ArrivedAtLocation UMETA(DisplayName = "ArrivedAtLocation", ToolTip = "已抵达目标位置")
+	Sleep_Sleeping UMETA(DisplayName = "Sleep_Sleeping", ToolTip = "休眠中"),
+	Patrol_Patrolling UMETA(DisplayName = "Patrol_Patrolling", ToolTip = "巡逻中"),
+	Patrol_Waiting UMETA(DisplayName = "PatrolWaiting", ToolTip = "在巡逻点位等待"),
+	Chase_Chasing UMETA(DisplayName = "Chase_Chasing", ToolTip = "正在追逐目标"),
+	Chase_Reached UMETA(DisplayName = "Chase_Reached", ToolTip = "已追到目标"),
+	Approach_Approaching UMETA(DisplayName = "Approach_Approaching", ToolTip = "移动到位置"),
+	Approach_Arrived UMETA(DisplayName = "Approach_Arrived", ToolTip = "已抵达目标位置")
 };
 
 UENUM(BlueprintType)
@@ -120,13 +120,13 @@ enum class ETraceEventState : uint8
 UENUM(BlueprintType)
 enum class EMoveEventState : uint8
 {
-	Sleeping UMETA(DisplayName = "Sleeping", ToolTip = "休眠中"),
-	Patrolling UMETA(DisplayName = "Patrolling", ToolTip = "巡逻中"),
-	PatrolWaiting UMETA(DisplayName = "PatrolWaiting", ToolTip = "在巡逻点位等待"),
-	ChasingTarget UMETA(DisplayName = "ChasingTarget", ToolTip = "正在追逐目标"),
-	ReachedTarget UMETA(DisplayName = "ReachedTarget", ToolTip = "已追到目标"),
-	MovingToLocation UMETA(DisplayName = "MovingToLocation", ToolTip = "移动到位置"),
-	ArrivedAtLocation UMETA(DisplayName = "ArrivedAtLocation", ToolTip = "已抵达目标位置")
+	Sleep_Sleeping UMETA(DisplayName = "Sleep_Sleeping", ToolTip = "休眠中"),
+	Patrol_Patrolling UMETA(DisplayName = "Patrol_Patrolling", ToolTip = "巡逻中"),
+	Patrol_Waiting UMETA(DisplayName = "PatrolWaiting", ToolTip = "在巡逻点位等待"),
+	Chase_Chasing UMETA(DisplayName = "Chase_Chasing", ToolTip = "正在追逐目标"),
+	Chase_Reached UMETA(DisplayName = "Chase_Reached", ToolTip = "已追到目标"),
+	Approach_Approaching UMETA(DisplayName = "Approach_Approaching", ToolTip = "移动到位置"),
+	Approach_Arrived UMETA(DisplayName = "Approach_Arrived", ToolTip = "已抵达目标位置")
 };
 
 UENUM(BlueprintType)
