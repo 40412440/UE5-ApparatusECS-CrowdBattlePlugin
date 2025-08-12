@@ -1236,7 +1236,10 @@ void USphereSweepForSubjectsAsyncAction::Activate()
 								FLinearColor::Red,
 								1);
 
-							VisibilityResults.Add(VisibilityResult);
+							if (DrawDebugConfig.bDrawDebugShape)
+							{
+								VisibilityResults.Add(VisibilityResult);
+							}
 
 							if (bVisibilityHit) continue;
 						}

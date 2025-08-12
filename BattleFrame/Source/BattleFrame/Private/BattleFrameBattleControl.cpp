@@ -1821,6 +1821,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 											const FVector SubjectSurfacePoint = PlayerLocation - (ToPlayerDir * PlayerRadius);
 												
 											FHitResult VisibilityResult;
+
 											bool Hit = UKismetSystemLibrary::SphereTraceSingleForObjects
 											(
 												GetWorld(),
@@ -1838,7 +1839,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 												1
 											);
 
-											VisibilityResults.Add(VisibilityResult);
+											if (Trace.bDrawDebugShape)
+											{
+												VisibilityResults.Add(VisibilityResult);
+											}
 
 											if (!Hit)
 											{
@@ -1854,48 +1858,51 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							}
 
 							// draw visibility check results
-							for (const auto& VisibilityResult : VisibilityResults)
+							if (Trace.bDrawDebugShape)
 							{
-								// 计算起点到终点的向量
-								FVector Direction = VisibilityResult.TraceEnd - VisibilityResult.TraceStart;
-								float TotalDistance = Direction.Size();
-
-								// 处理零距离情况（使用默认旋转）
-								FRotator ShapeRot = FRotator::ZeroRotator;
-
-								if (TotalDistance > 0)
+								for (const auto& VisibilityResult : VisibilityResults)
 								{
-									Direction /= TotalDistance;
-									ShapeRot = FRotationMatrix::MakeFromZ(Direction).Rotator();
+									// 计算起点到终点的向量
+									FVector Direction = VisibilityResult.TraceEnd - VisibilityResult.TraceStart;
+									float TotalDistance = Direction.Size();
+
+									// 处理零距离情况（使用默认旋转）
+									FRotator ShapeRot = FRotator::ZeroRotator;
+
+									if (TotalDistance > 0)
+									{
+										Direction /= TotalDistance;
+										ShapeRot = FRotationMatrix::MakeFromZ(Direction).Rotator();
+									}
+
+									// 计算圆柱部分高度（总高度减去两端的半球）
+									float CylinderHeight = 0;
+
+									// 计算胶囊体中心位置（两点中点）
+									FVector ShapeLoc = (VisibilityResult.TraceStart + VisibilityResult.TraceEnd) * 0.5f;
+
+									// 配置调试胶囊体参数
+									FDebugCapsuleConfig CapsuleConfig;
+									CapsuleConfig.Color = DebugConfig.Color;
+									CapsuleConfig.Location = ShapeLoc;
+									CapsuleConfig.Rotation = ShapeRot;
+									CapsuleConfig.Radius = 0;
+									CapsuleConfig.Height = CylinderHeight;
+									CapsuleConfig.LineThickness = DebugConfig.LineThickness;
+									CapsuleConfig.Duration = DebugConfig.Duration;
+
+									// 加入调试队列
+									ABattleFrameBattleControl::GetInstance()->DebugCapsuleQueue.Enqueue(CapsuleConfig);
+
+									// 绘制碰撞点
+									FDebugPointConfig PointConfig;
+									PointConfig.Color = VisibilityResult.bBlockingHit ? FColor::Red : FColor::Green;
+									PointConfig.Duration = DebugConfig.Duration;
+									PointConfig.Location = VisibilityResult.bBlockingHit ? VisibilityResult.ImpactPoint : VisibilityResult.TraceEnd;
+									PointConfig.Size = DebugConfig.HitPointSize;
+
+									ABattleFrameBattleControl::GetInstance()->DebugPointQueue.Enqueue(PointConfig);
 								}
-
-								// 计算圆柱部分高度（总高度减去两端的半球）
-								float CylinderHeight = 0;
-
-								// 计算胶囊体中心位置（两点中点）
-								FVector ShapeLoc = (VisibilityResult.TraceStart + VisibilityResult.TraceEnd) * 0.5f;
-
-								// 配置调试胶囊体参数
-								FDebugCapsuleConfig CapsuleConfig;
-								CapsuleConfig.Color = DebugConfig.Color;
-								CapsuleConfig.Location = ShapeLoc;
-								CapsuleConfig.Rotation = ShapeRot;
-								CapsuleConfig.Radius = 0;
-								CapsuleConfig.Height = CylinderHeight;
-								CapsuleConfig.LineThickness = DebugConfig.LineThickness;
-								CapsuleConfig.Duration = DebugConfig.Duration;
-
-								// 加入调试队列
-								ABattleFrameBattleControl::GetInstance()->DebugCapsuleQueue.Enqueue(CapsuleConfig);
-
-								// 绘制碰撞点
-								FDebugPointConfig PointConfig;
-								PointConfig.Color = VisibilityResult.bBlockingHit ? FColor::Red : FColor::Green;
-								PointConfig.Duration = DebugConfig.Duration;
-								PointConfig.Location = VisibilityResult.bBlockingHit ? VisibilityResult.ImpactPoint : VisibilityResult.TraceEnd;
-								PointConfig.Size = DebugConfig.HitPointSize;
-
-								ABattleFrameBattleControl::GetInstance()->DebugPointQueue.Enqueue(PointConfig);
 							}
 						}
 
