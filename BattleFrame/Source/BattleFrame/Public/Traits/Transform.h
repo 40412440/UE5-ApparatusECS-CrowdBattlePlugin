@@ -58,7 +58,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "实际尺寸"))
 	float Scale = 1;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "模型渲染尺寸,Jiggle逻辑靠修改这个值来起作用"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "模型渲染尺寸,实际尺寸为RenderScale * JiggleMultiplier"))
 	FVector RenderScale = FVector::OneVector;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "Jiggle乘数"))
+	FVector JiggleMultiplier = FVector::OneVector;
 
 };

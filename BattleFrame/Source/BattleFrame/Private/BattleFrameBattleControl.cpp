@@ -69,7 +69,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 	//UE_LOG(LogTemp, Warning, TEXT("bIsHitAnim: %d"), bIsHitAnim);
 
-	//--------------------数据统计 | Statistics-------------------
+	//------------------- 数据统计 | Statistics ---------------------
 
 	// 数据统计统计 | Statistics
 	#pragma region
@@ -114,7 +114,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//------------------------出生 | Appear-----------------------
+	//----------------------- 出生 | Appear -------------------------
 
 	// 出生 | Appear
 	#pragma region
@@ -247,7 +247,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//------------------------移动 | Move------------------------
+	//----------------------- 移动 | Move ---------------------------
 
 	// 休眠 | Sleep
 	#pragma region
@@ -1464,7 +1464,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//------------------------攻击 | Attack-----------------------
+	//----------------------- 攻击 | Attack -------------------------
 
 	// 索敌 | Trace
 	#pragma region
@@ -2492,7 +2492,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//--------------------- 投射物 | Projectile --------------------
+	//-------------------- 投射物 | Projectile ----------------------
 
 	// 生成投射物 | Spawn Projectile
 	#pragma region
@@ -2625,7 +2625,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	// 投射物运动与伤害 | Projectile Move and Dmg 
 	#pragma region
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("Projectile");
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("Projectile Move and Dmg");
 
 		auto Chain = Mechanism->EnchainSolid(ProjectileFilter);
 		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
@@ -2997,7 +2997,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//----------------------- 受击 | Hit -------------------------
+	//------------------------ 受击 | Hit ---------------------------
 
 	// 受击反馈 | Hit Reaction
 	#pragma region
@@ -3016,7 +3016,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 			{
 				bool bCanRemoveBeingHit = true;
 
-				// 统计并结算伤害
+				// 结算伤害
 				while (!Health.DamageToTake.IsEmpty() && !Health.DamageInstigator.IsEmpty())
 				{
 					// 如果怪物死了，跳出循环
@@ -3193,9 +3193,9 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						const auto JiggleEndTime = JiggleCurve->GetLastKey().Time;
 
 						// 受击变形
-						Scaled.RenderScale.X = FMath::Lerp(Scaled.Scale, Scaled.Scale * JiggleCurve->Eval(BeingHit.JiggleTime), Hit.JiggleStr);
-						Scaled.RenderScale.Y = FMath::Lerp(Scaled.Scale, Scaled.Scale * JiggleCurve->Eval(BeingHit.JiggleTime), Hit.JiggleStr);
-						Scaled.RenderScale.Z = FMath::Lerp(Scaled.Scale, Scaled.Scale * (2.f - JiggleCurve->Eval(BeingHit.JiggleTime)), Hit.JiggleStr);
+						Scaled.JiggleMultiplier.X = (JiggleCurve->Eval(BeingHit.JiggleTime) - 1) * -Hit.JiggleStr * 0.5 + 1;
+						Scaled.JiggleMultiplier.Y = (JiggleCurve->Eval(BeingHit.JiggleTime) - 1) * -Hit.JiggleStr * 0.5 + 1;
+						Scaled.JiggleMultiplier.Z = (JiggleCurve->Eval(BeingHit.JiggleTime) - 1) * -Hit.JiggleStr *  -1 + 1;
 
 						// 更新形变时间
 						if (BeingHit.JiggleTime < JiggleEndTime)
@@ -3206,7 +3206,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						// 计时器完成后删除 Trait
 						if (BeingHit.JiggleTime >= JiggleEndTime)
 						{
-							Scaled.RenderScale = FVector(Scaled.Scale); // 恢复原始比例
 							Subject.SetFlag(HitJiggleFlag, false);
 						}
 						else
@@ -3712,7 +3711,670 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//---------------------- 渲染 | Rendering ------------------------
+	//-------------- 游戏线程逻辑 | Game Thread Logic ---------------
+
+	// 生成Actor | Spawn Actor
+	#pragma region
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("SpawnActors");
+
+		Mechanism->Operate<FUnsafeChain>(SpawnActorFilter,
+			[&](FSubjectHandle Subject,
+				FActorSpawnConfig_Final& Config)
+			{
+				// delay to spawn actors
+				if (!Config.bSpawned && Config.Delay == 0)
+				{
+					// Spawn actors
+					if (Config.bEnable && Config.Quantity > 0)
+					{
+						if (!IsValid(Config.ActorClass)) Config.ActorClass = Config.SoftActorClass.LoadSynchronous();
+
+						if (IsValid(Config.ActorClass))
+						{
+							FActorSpawnParameters SpawnParams;
+							SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+							// 存储生成时的世界变换（用于后续相对位置计算）
+							const FTransform SpawnWorldTransform = Config.SpawnTransform;
+
+							for (int32 i = 0; i < Config.Quantity; ++i)
+							{
+								AActor* Actor = CurrentWorld->SpawnActor<AActor>(Config.ActorClass, SpawnWorldTransform, SpawnParams);
+
+								if (IsValid(Actor))
+								{
+									Config.SpawnedActors.Add(Actor);
+									Actor->SetActorScale3D(SpawnWorldTransform.GetScale3D());
+
+									// 直接设置Owner关系
+									if (USubjectiveActorComponent* SubjectiveComponent = Actor->FindComponentByClass<USubjectiveActorComponent>())
+									{
+										FSubjectHandle Subjective = SubjectiveComponent->GetHandle();
+										if (Subjective.HasTrait<FOwnerSubject>())
+										{
+											auto& OwnerTrait = Subjective.GetTraitRef<FOwnerSubject, EParadigm::Unsafe>();
+											OwnerTrait.Owner = Config.OwnerSubject;
+											OwnerTrait.Host = Subject;
+										}
+									}
+								}
+							}
+						}
+					}
+					Config.bSpawned = true;
+				}
+
+				// 更新附着对象位置
+				bool bShouldUpdateAttachment = !Config.bSpawned || Config.bAttached;
+
+				if (bShouldUpdateAttachment)
+				{
+					bool bCanUpdateAttachment = Config.AttachToSubject.IsValid() && Config.AttachToSubject.HasTrait<FDirected>() && Config.AttachToSubject.HasTrait<FLocated>();
+
+					if (bCanUpdateAttachment)
+					{
+						// 获取宿主当前世界变换
+						const FTransform CurrentAttachTransform(Config.AttachToSubject.GetTrait<FDirected>().Direction.ToOrientationQuat(), Config.AttachToSubject.GetTrait<FLocated>().Location);
+
+						// 计算新的世界变换 = 初始相对变换 * 宿主当前变换
+						Config.SpawnTransform = Config.InitialRelativeTransform * CurrentAttachTransform;
+
+						// 更新所有生成的Actor
+						if (Config.bSpawned)
+						{
+							for (AActor* Actor : Config.SpawnedActors)
+							{
+								if (IsValid(Actor))
+								{
+									Actor->SetActorTransform(Config.SpawnTransform);
+								}
+							}
+						}
+					}
+				}
+
+				// 检查生命周期
+				if (Config.bSpawned)
+				{
+					bool bHasValidChild = false;
+					for (AActor* Actor : Config.SpawnedActors)
+					{
+						if (IsValid(Actor))
+						{
+							bHasValidChild = true;
+							break;
+						}
+					}
+
+					const bool bLifeIsInfinite = Config.LifeSpan < 0;
+
+					if (!bLifeIsInfinite)
+					{
+						const bool bLifeExpired = Config.LifeSpan == 0;
+						const bool bInvalidAttachment = Config.bAttached && !Config.AttachToSubject.IsValid();
+
+						if (!bHasValidChild || bLifeExpired || bInvalidAttachment)
+						{
+							for (AActor* Actor : Config.SpawnedActors)
+							{
+								if (IsValid(Actor)) Actor->Destroy();
+							}
+							Subject.Despawn();
+						}
+					}
+				}
+
+				// 更新计时器
+				if (Config.Delay > 0)
+				{
+					Config.Delay = FMath::Max(0.f, Config.Delay - SafeDeltaTime);
+				}
+				else if (Config.LifeSpan > 0)
+				{
+					Config.LifeSpan = FMath::Max(0.f, Config.LifeSpan - SafeDeltaTime);
+				}
+
+			});
+	}
+	#pragma endregion
+
+	// 生成粒子 | Spawn Fx
+	#pragma region
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("SpawnFx");
+
+		Mechanism->Operate<FUnsafeChain>(SpawnFxFilter,
+			[&](FSubjectHandle Subject,
+				FFxConfig_Final& Config)
+			{
+				// delay to spawn Fx
+				if (!Config.bSpawned && Config.Delay == 0)
+				{
+					// 存储生成时的世界变换（用于后续相对位置计算）
+					const FTransform SpawnWorldTransform = Config.SpawnTransform;
+
+					// 合批情况下的SubType
+					if (Config.SubType != EESubType::None)
+					{
+						FLocated FxLocated = { SpawnWorldTransform.GetLocation() };
+						FDirected FxDirected = { SpawnWorldTransform.GetRotation().GetForwardVector() * Config.LaunchSpeed };
+						FScaled FxScaled = { 1, SpawnWorldTransform.GetScale3D() };
+
+						FSubjectRecord FxRecord;
+						FxRecord.SetTrait(FSpawningFx());
+						FxRecord.SetTrait(FIsBurstFx());
+						FxRecord.SetTrait(FxLocated);
+						FxRecord.SetTrait(FxDirected);
+						FxRecord.SetTrait(FxScaled);
+
+						UBattleFrameFunctionLibraryRT::SetRecordSubTypeTraitByEnum(Config.SubType, FxRecord);
+
+						for (int32 i = 0; i < Config.Quantity; ++i)
+						{
+							Mechanism->SpawnSubject(FxRecord);
+						}
+					}
+
+					// 处理非合批情况
+					if (!IsValid(Config.NiagaraAsset)) Config.NiagaraAsset = Config.SoftNiagaraAsset.LoadSynchronous();
+					if (!IsValid(Config.CascadeAsset)) Config.CascadeAsset = Config.SoftCascadeAsset.LoadSynchronous();
+
+					for (int32 i = 0; i < Config.Quantity; ++i)
+					{
+						if (IsValid(Config.NiagaraAsset))
+						{
+							auto NS = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+								CurrentWorld,
+								Config.NiagaraAsset,
+								SpawnWorldTransform.GetLocation(),
+								SpawnWorldTransform.GetRotation().Rotator(),
+								SpawnWorldTransform.GetScale3D(),
+								true,  // bAutoDestroy
+								true,  // bAutoActivate
+								ENCPoolMethod::AutoRelease);
+
+							Config.SpawnedNiagaraSystems.Add(NS);
+						}
+
+						if (IsValid(Config.CascadeAsset))
+						{
+							auto CS = UGameplayStatics::SpawnEmitterAtLocation(
+								CurrentWorld,
+								Config.CascadeAsset,
+								SpawnWorldTransform.GetLocation(),
+								SpawnWorldTransform.GetRotation().Rotator(),
+								SpawnWorldTransform.GetScale3D(),
+								true,  // bAutoDestroy
+								EPSCPoolMethod::AutoRelease);
+
+							Config.SpawnedCascadeSystems.Add(CS);
+						}
+					}
+
+					Config.bSpawned = true;
+				}
+
+				// 更新附着对象位置
+				bool bShouldUpdateAttachment = !Config.bSpawned || Config.bAttached;
+
+				if (bShouldUpdateAttachment)
+				{
+					bool bCanUpdateAttachment = Config.AttachToSubject.IsValid() && Config.AttachToSubject.HasTrait<FDirected>() && Config.AttachToSubject.HasTrait<FLocated>();
+
+					if (bCanUpdateAttachment)
+					{
+						// 获取宿主当前世界变换
+						const FTransform CurrentAttachTransform(Config.AttachToSubject.GetTrait<FDirected>().Direction.Rotation(), Config.AttachToSubject.GetTrait<FLocated>().Location);
+
+						// 计算新的世界变换 = 初始相对变换 * 宿主当前变换
+						Config.SpawnTransform = Config.InitialRelativeTransform * CurrentAttachTransform;
+
+						// 更新所有生成的粒子系统
+						if (Config.bSpawned)
+						{
+							for (auto Fx : Config.SpawnedNiagaraSystems)
+							{
+								if (IsValid(Fx))
+								{
+									Fx->SetWorldTransform(Config.SpawnTransform);
+								}
+							}
+
+							for (auto Fx : Config.SpawnedCascadeSystems)
+							{
+								if (IsValid(Fx))
+								{
+									Fx->SetWorldTransform(Config.SpawnTransform);
+								}
+							}
+						}
+					}
+				}
+
+				// 检查生命周期
+				if (Config.bSpawned)
+				{
+					bool bHasValidChild = false;
+					for (auto Fx : Config.SpawnedNiagaraSystems)
+					{
+						if (IsValid(Fx))
+						{
+							bHasValidChild = true;
+							break;
+						}
+					}
+
+					if (!bHasValidChild)
+					{
+						for (auto Fx : Config.SpawnedCascadeSystems)
+						{
+							if (IsValid(Fx))
+							{
+								bHasValidChild = true;
+								break;
+							}
+						}
+					}
+
+					const bool bLifeIsInfinite = Config.LifeSpan < 0;
+
+					if (!bLifeIsInfinite)
+					{
+						const bool bLifeExpired = Config.LifeSpan == 0;
+						const bool bInvalidAttachment = Config.bAttached && !Config.AttachToSubject.IsValid();
+
+						if (!bHasValidChild || bLifeExpired || bInvalidAttachment)
+						{
+							for (auto Fx : Config.SpawnedNiagaraSystems)
+							{
+								if (IsValid(Fx)) Fx->DestroyComponent();
+							}
+							for (auto Fx : Config.SpawnedCascadeSystems)
+							{
+								if (IsValid(Fx)) Fx->DestroyComponent();
+							}
+							Subject.Despawn();
+						}
+					}
+				}
+
+				// 更新计时器
+				if (Config.Delay > 0)
+				{
+					Config.Delay = FMath::Max(0.f, Config.Delay - SafeDeltaTime);
+				}
+				else if (Config.LifeSpan > 0)
+				{
+					Config.LifeSpan = FMath::Max(0.f, Config.LifeSpan - SafeDeltaTime);
+				}
+			});
+	}
+	#pragma endregion
+
+	// 播放音效 | Play Sound
+	#pragma region
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("PlaySound");
+
+		Mechanism->Operate<FUnsafeChain>(PlaySoundFilter,
+			[&](FSubjectHandle Subject,
+				FSoundConfig_Final& Config)
+			{
+				// delay to play sound
+				if (!Config.bSpawned && Config.Delay <= 0)
+				{
+					if (Config.Sound && Config.bEnable)
+					{
+						// 存储生成时的世界变换（用于后续相对位置计算）
+						const FTransform SpawnWorldTransform = Config.SpawnTransform;
+
+						// 播放加载完成的音效
+						StreamableManager.RequestAsyncLoad(Config.Sound.ToSoftObjectPath(), FStreamableDelegate::CreateLambda([this, &Config, SpawnWorldTransform, Subject]()
+							{
+								if (Config.SpawnOrigin == EPlaySoundOrigin::PlaySound2D)
+								{
+									// 2D音效直接播放，不处理附着
+									UAudioComponent* AudioComp = UGameplayStatics::CreateSound2D(
+										GetWorld(),
+										Config.Sound.Get(),
+										Config.Volume);
+									Config.SpawnedSounds.Add(AudioComp);
+								}
+								else
+								{
+									// 3D音效处理位置和附着
+									FTransform PlayTransform = SpawnWorldTransform;
+
+									if (Config.bAttached && Config.AttachToSubject.IsValid())
+									{
+										const FTransform CurrentAttachTransform(Config.AttachToSubject.GetTrait<FDirected>().Direction.Rotation(), Config.AttachToSubject.GetTrait<FLocated>().Location);
+										PlayTransform = Config.InitialRelativeTransform * CurrentAttachTransform;
+									}
+
+									UAudioComponent* AudioComp = UGameplayStatics::SpawnSoundAtLocation(
+										GetWorld(),
+										Config.Sound.Get(),
+										PlayTransform.GetLocation(),
+										PlayTransform.Rotator(),
+										Config.Volume);
+									Config.SpawnedSounds.Add(AudioComp);
+								}
+							}));
+					}
+					Config.bSpawned = true;
+				}
+
+				// 更新附着对象位置（仅对3D音效有效）
+				bool bShouldUpdateAttachment = !Config.bSpawned || Config.bAttached;
+
+				if (bShouldUpdateAttachment)
+				{
+					bool bCanUpdateAttachment = Config.AttachToSubject.IsValid() && Config.AttachToSubject.HasTrait<FDirected>() && Config.AttachToSubject.HasTrait<FLocated>();
+
+					if (bCanUpdateAttachment)
+					{
+						// 获取宿主当前世界变换
+						const FTransform CurrentAttachTransform(Config.AttachToSubject.GetTrait<FDirected>().Direction.Rotation(), Config.AttachToSubject.GetTrait<FLocated>().Location);
+
+						// 计算新的世界变换 = 初始相对变换 * 宿主当前变换
+						Config.SpawnTransform = Config.InitialRelativeTransform * CurrentAttachTransform;
+
+						// 更新所有生成的音效位置
+						if (Config.bSpawned)
+						{
+							for (UAudioComponent* AudioComp : Config.SpawnedSounds)
+							{
+								if (IsValid(AudioComp))
+								{
+									AudioComp->SetWorldLocationAndRotation(Config.SpawnTransform.GetLocation(), Config.SpawnTransform.Rotator());
+								}
+							}
+						}
+					}
+				}
+
+				// 检查生命周期
+				if (Config.bSpawned)
+				{
+					bool bHasValidChild = false;
+
+					for (UAudioComponent* AudioComp : Config.SpawnedSounds)
+					{
+						if (IsValid(AudioComp) && AudioComp->IsPlaying())
+						{
+							bHasValidChild = true;
+							break;
+						}
+					}
+
+					const bool bLifeIsInfinite = Config.LifeSpan < 0;
+
+					if (!bLifeIsInfinite)
+					{
+						const bool bLifeExpired = Config.LifeSpan == 0;
+						const bool bInvalidAttachment = Config.bAttached && Config.bDespawnWhenNoParent && !Config.AttachToSubject.IsValid();
+
+						if (!bHasValidChild || bLifeExpired || bInvalidAttachment)
+						{
+							for (UAudioComponent* AudioComp : Config.SpawnedSounds)
+							{
+								if (IsValid(AudioComp))
+								{
+									AudioComp->Stop();
+									AudioComp->DestroyComponent();
+								}
+							}
+							Subject.Despawn();
+						}
+					}
+				}
+
+				// 更新计时器
+				if (Config.Delay > 0)
+				{
+					Config.Delay = FMath::Max(0.f, Config.Delay - SafeDeltaTime);
+				}
+				else if (Config.LifeSpan > 0)
+				{
+					Config.LifeSpan = FMath::Max(0.f, Config.LifeSpan - SafeDeltaTime);
+				}
+			});
+	}
+	#pragma endregion
+
+	// 事件接口 | Event Interface
+	#pragma region
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("EventInterface");
+
+		while (!OnAppearQueue.IsEmpty())
+		{
+			FAppearData Data;
+			OnAppearQueue.Dequeue(Data);
+
+			if (Data.SelfSubject.IsValid())
+			{
+				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+
+				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
+				{
+					IBattleFrameInterface::Execute_OnAppear(DmgActor, Data);
+				}
+			}
+		}
+
+		while (!OnTraceQueue.IsEmpty())
+		{
+			FTraceData Data;
+			OnTraceQueue.Dequeue(Data);
+
+			if (Data.SelfSubject.IsValid())
+			{
+				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+
+				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
+				{
+					IBattleFrameInterface::Execute_OnTrace(DmgActor, Data);
+				}
+			}
+		}
+
+		while (!OnMoveQueue.IsEmpty())
+		{
+			FMoveData Data;
+			OnMoveQueue.Dequeue(Data);
+
+			if (Data.SelfSubject.IsValid())
+			{
+				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+
+				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
+				{
+					IBattleFrameInterface::Execute_OnMove(DmgActor, Data);
+				}
+			}
+		}
+
+		while (!OnAttackQueue.IsEmpty())
+		{
+			FAttackData Data;
+			OnAttackQueue.Dequeue(Data);
+
+			if (Data.SelfSubject.IsValid())
+			{
+				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+
+				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
+				{
+					IBattleFrameInterface::Execute_OnAttack(DmgActor, Data);
+				}
+			}
+		}
+
+		while (!OnHitQueue.IsEmpty())
+		{
+			FHitData Data;
+			OnHitQueue.Dequeue(Data);
+
+			if (Data.SelfSubject.IsValid())
+			{
+				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+
+				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
+				{
+					IBattleFrameInterface::Execute_OnHit(DmgActor, Data);
+				}
+			}
+		}
+
+		while (!OnDeathQueue.IsEmpty())
+		{
+			FDeathData Data;
+			OnDeathQueue.Dequeue(Data);
+
+			if (Data.SelfSubject.IsValid())
+			{
+				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+
+				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
+				{
+					IBattleFrameInterface::Execute_OnDeath(DmgActor, Data);
+				}
+			}
+		}
+	}
+	#pragma endregion
+
+	// 调试图形 | Draw Debug Shapes
+	#pragma region
+	{
+		// 绘制点队列
+		while (!DebugPointQueue.IsEmpty())
+		{
+			FDebugPointConfig Config;
+			DebugPointQueue.Dequeue(Config);
+
+			DrawDebugPoint(
+				CurrentWorld,
+				Config.Location,
+				Config.Size,
+				Config.Color,
+				false,
+				Config.Duration,
+				3
+			);
+		}
+
+		// 绘制胶囊体队列
+		while (!DebugCapsuleQueue.IsEmpty())
+		{
+			FDebugCapsuleConfig Config;
+			DebugCapsuleQueue.Dequeue(Config);
+
+			// 计算胶囊体半高（从中心到顶部/底部的距离）
+			const float HalfHeight = FMath::Max(0.0f, Config.Height * 0.5f);
+
+			DrawDebugCapsule(
+				CurrentWorld,
+				Config.Location,          // 胶囊体中心位置
+				HalfHeight,               // 半高（从中心到端点的距离）
+				Config.Radius,            // 半径
+				Config.Rotation.Quaternion(), // 转换为四元数
+				Config.Color,             // 配置的颜色
+				false,                    // 非持久
+				Config.Duration,          // 生命周期0=只持续1帧
+				0,
+				Config.LineThickness      // 线宽（胶囊体通常需要较细的线）
+			);
+		}
+
+		// 绘制线队列
+		while (!DebugLineQueue.IsEmpty())
+		{
+			FDebugLineConfig Config;
+			DebugLineQueue.Dequeue(Config);
+
+			DrawDebugLine(
+				CurrentWorld,
+				Config.StartLocation,
+				Config.EndLocation,
+				Config.Color,
+				false,
+				Config.Duration,
+				3,
+				Config.LineThickness
+			);
+		}
+
+		// 绘制球队列
+		while (!DebugSphereQueue.IsEmpty())
+		{
+			FDebugSphereConfig Config;
+			DebugSphereQueue.Dequeue(Config);
+
+			DrawDebugSphere(
+				CurrentWorld,
+				Config.Location,
+				Config.Radius,
+				12,
+				Config.Color,
+				false,
+				Config.Duration,
+				0,
+				Config.LineThickness
+			);
+		}
+
+		// 绘制扇形队列
+		while (!DebugSectorQueue.IsEmpty())
+		{
+			FDebugSectorConfig Config;
+			DebugSectorQueue.Dequeue(Config);
+
+			DrawDebugSector(
+				CurrentWorld,
+				Config.Location,
+				Config.Direction,
+				Config.Radius,
+				Config.Angle, // 扇形角度
+				Config.Height,
+				Config.Color, // 橙色扇形
+				false, // 非持久
+				Config.Duration, // 显示0.1秒
+				Config.DepthPriority, // 深度优先级
+				Config.LineThickness // 线宽
+			);
+
+			//UE_LOG(LogTemp, Log, TEXT("Dequeue"));
+		}
+
+		// 绘制圆队列
+		while (!DebugCircleQueue.IsEmpty())
+		{
+			FDebugCircleConfig Config;
+			DebugCircleQueue.Dequeue(Config);
+
+			// 绘制圆形（XY平面）
+			DrawDebugCircle(
+				CurrentWorld,
+				Config.Location,  // 圆心位置
+				Config.Radius,    // 圆半径
+				36,               // 分段数（足够平滑）
+				Config.Color,     // 配置的颜色
+				false,            // 非持久
+				Config.Duration,  // 生命周期0=只持续1帧
+				3,                // 深度优先级
+				Config.LineThickness,// 线宽
+				FVector(1, 0, 0), // X轴
+				FVector(0, 1, 0), // Y轴
+				false             // 不绘制坐标轴
+			);
+		}
+	}
+	#pragma endregion
+
+	//---------------------- 渲染 | Rendering -----------------------
 
 	// 动画状态机 | Anim State Machine
 	#pragma region
@@ -3988,12 +4650,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				Rotation = Directed.Direction.Rotation().Quaternion();
 
 				FVector FinalScale(Data.Scale);
-				FinalScale *= Scaled.RenderScale;
+				FinalScale = FinalScale * Scaled.RenderScale * Scaled.JiggleMultiplier;
 
-				float Radius = Collider.Radius * Scaled.Scale;
+				float FinalRadius = Collider.Radius * Scaled.Scale;
 
 				// 在计算转换时减去Radius
-				FTransform SubjectTransform(Rotation * Data.OffsetRotation.Quaternion(), Located.Location + Data.OffsetLocation - FVector(0, 0, Radius), FinalScale); // 减去Z轴上的Radius			
+				FTransform SubjectTransform(Rotation * Data.OffsetRotation.Quaternion(), Located.Location + Data.OffsetLocation - FVector(0, 0, FinalRadius), FinalScale); // 减去Z轴上的Radius			
 
 				int32 InstanceId = Rendering.InstanceId;
 
@@ -4150,669 +4812,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					Data.InsidePool_Array
 				);
 			});
-	}
-	#pragma endregion
-
-	//---------- 其它游戏线程逻辑 | Other Game Thread Logic -----------
-
-	// 生成Actor | Spawn Actor
-	#pragma region
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("SpawnActors");
-
-		Mechanism->Operate<FUnsafeChain>(SpawnActorFilter,
-			[&](FSubjectHandle Subject,
-				FActorSpawnConfig_Final& Config)
-			{
-				// delay to spawn actors
-				if (!Config.bSpawned && Config.Delay == 0)
-				{
-					// Spawn actors
-					if (Config.bEnable && Config.Quantity > 0)
-					{
-						if (!IsValid(Config.ActorClass)) Config.ActorClass = Config.SoftActorClass.LoadSynchronous();
-
-						if (IsValid(Config.ActorClass))
-						{
-							FActorSpawnParameters SpawnParams;
-							SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-							// 存储生成时的世界变换（用于后续相对位置计算）
-							const FTransform SpawnWorldTransform = Config.SpawnTransform;
-
-							for (int32 i = 0; i < Config.Quantity; ++i)
-							{
-								AActor* Actor = CurrentWorld->SpawnActor<AActor>(Config.ActorClass, SpawnWorldTransform, SpawnParams);
-
-								if (IsValid(Actor))
-								{
-									Config.SpawnedActors.Add(Actor);
-									Actor->SetActorScale3D(SpawnWorldTransform.GetScale3D());
-
-									// 直接设置Owner关系
-									if (USubjectiveActorComponent* SubjectiveComponent = Actor->FindComponentByClass<USubjectiveActorComponent>())
-									{
-										FSubjectHandle Subjective = SubjectiveComponent->GetHandle();
-										if (Subjective.HasTrait<FOwnerSubject>())
-										{
-											auto& OwnerTrait = Subjective.GetTraitRef<FOwnerSubject, EParadigm::Unsafe>();
-											OwnerTrait.Owner = Config.OwnerSubject;
-											OwnerTrait.Host = Subject;
-										}
-									}
-								}
-							}
-						}
-					}
-					Config.bSpawned = true;
-				}
-
-				// 更新附着对象位置
-				bool bShouldUpdateAttachment = !Config.bSpawned || Config.bAttached;
-
-				if (bShouldUpdateAttachment)
-				{
-					bool bCanUpdateAttachment = Config.AttachToSubject.IsValid() && Config.AttachToSubject.HasTrait<FDirected>() && Config.AttachToSubject.HasTrait<FLocated>();
-
-					if (bCanUpdateAttachment)
-					{
-						// 获取宿主当前世界变换
-						const FTransform CurrentAttachTransform(Config.AttachToSubject.GetTrait<FDirected>().Direction.ToOrientationQuat(), Config.AttachToSubject.GetTrait<FLocated>().Location);
-
-						// 计算新的世界变换 = 初始相对变换 * 宿主当前变换
-						Config.SpawnTransform = Config.InitialRelativeTransform * CurrentAttachTransform;
-
-						// 更新所有生成的Actor
-						if (Config.bSpawned)
-						{
-							for (AActor* Actor : Config.SpawnedActors)
-							{
-								if (IsValid(Actor))
-								{
-									Actor->SetActorTransform(Config.SpawnTransform);
-								}
-							}
-						}
-					}
-				}
-
-				// 检查生命周期
-				if (Config.bSpawned)
-				{
-					bool bHasValidChild = false;
-					for (AActor* Actor : Config.SpawnedActors)
-					{
-						if (IsValid(Actor))
-						{
-							bHasValidChild = true;
-							break;
-						}
-					}
-
-					const bool bLifeIsInfinite = Config.LifeSpan < 0;
-
-					if (!bLifeIsInfinite)
-					{
-						const bool bLifeExpired = Config.LifeSpan == 0;
-						const bool bInvalidAttachment = Config.bAttached && !Config.AttachToSubject.IsValid();
-
-						if (!bHasValidChild || bLifeExpired || bInvalidAttachment)
-						{
-							for (AActor* Actor : Config.SpawnedActors)
-							{
-								if (IsValid(Actor)) Actor->Destroy();
-							}
-							Subject.Despawn();
-						}
-					}
-				}
-
-				// 更新计时器
-				if (Config.Delay > 0)
-				{
-					Config.Delay = FMath::Max(0.f, Config.Delay - SafeDeltaTime);
-				}
-				else if (Config.LifeSpan > 0)
-				{
-					Config.LifeSpan = FMath::Max(0.f, Config.LifeSpan - SafeDeltaTime);
-				}
-
-			});
-	}
-	#pragma endregion
-
-	// 生成粒子 | Spawn Fx
-	#pragma region
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("SpawnFx");
-
-		Mechanism->Operate<FUnsafeChain>(SpawnFxFilter,
-			[&](FSubjectHandle Subject,
-				FFxConfig_Final& Config)
-			{
-				// delay to spawn Fx
-				if (!Config.bSpawned && Config.Delay == 0)
-				{
-					// 存储生成时的世界变换（用于后续相对位置计算）
-					const FTransform SpawnWorldTransform = Config.SpawnTransform;	
-
-					// 合批情况下的SubType
-					if (Config.SubType != EESubType::None)
-					{
-						FLocated FxLocated = { SpawnWorldTransform.GetLocation() };
-						FDirected FxDirected = { SpawnWorldTransform.GetRotation().GetForwardVector() * Config.LaunchSpeed };
-						FScaled FxScaled = { 1, SpawnWorldTransform.GetScale3D() };
-
-						FSubjectRecord FxRecord;
-						FxRecord.SetTrait(FSpawningFx());
-						FxRecord.SetTrait(FIsBurstFx());
-						FxRecord.SetTrait(FxLocated);
-						FxRecord.SetTrait(FxDirected);
-						FxRecord.SetTrait(FxScaled);
-
-						UBattleFrameFunctionLibraryRT::SetRecordSubTypeTraitByEnum(Config.SubType, FxRecord);
-
-						for (int32 i = 0; i < Config.Quantity; ++i)
-						{
-							Mechanism->SpawnSubject(FxRecord);
-						}
-					}
-
-					// 处理非合批情况
-					if (!IsValid(Config.NiagaraAsset)) Config.NiagaraAsset = Config.SoftNiagaraAsset.LoadSynchronous();
-					if (!IsValid(Config.CascadeAsset)) Config.CascadeAsset = Config.SoftCascadeAsset.LoadSynchronous();
-
-					for (int32 i = 0; i < Config.Quantity; ++i)
-					{
-						if (IsValid(Config.NiagaraAsset))
-						{
-							auto NS = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-								CurrentWorld,
-								Config.NiagaraAsset,
-								SpawnWorldTransform.GetLocation(),
-								SpawnWorldTransform.GetRotation().Rotator(),
-								SpawnWorldTransform.GetScale3D(),
-								true,  // bAutoDestroy
-								true,  // bAutoActivate
-								ENCPoolMethod::AutoRelease);
-
-							Config.SpawnedNiagaraSystems.Add(NS);
-						}
-
-						if (IsValid(Config.CascadeAsset))
-						{
-							auto CS = UGameplayStatics::SpawnEmitterAtLocation(
-								CurrentWorld,
-								Config.CascadeAsset,
-								SpawnWorldTransform.GetLocation(),
-								SpawnWorldTransform.GetRotation().Rotator(),
-								SpawnWorldTransform.GetScale3D(),
-								true,  // bAutoDestroy
-								EPSCPoolMethod::AutoRelease);
-
-							Config.SpawnedCascadeSystems.Add(CS);
-						}
-					}
-
-					Config.bSpawned = true;
-				}
-
-				// 更新附着对象位置
-				bool bShouldUpdateAttachment = !Config.bSpawned || Config.bAttached;
-
-				if (bShouldUpdateAttachment)
-				{
-					bool bCanUpdateAttachment = Config.AttachToSubject.IsValid() && Config.AttachToSubject.HasTrait<FDirected>() && Config.AttachToSubject.HasTrait<FLocated>();
-
-					if (bCanUpdateAttachment)
-					{
-						// 获取宿主当前世界变换
-						const FTransform CurrentAttachTransform(Config.AttachToSubject.GetTrait<FDirected>().Direction.Rotation(), Config.AttachToSubject.GetTrait<FLocated>().Location);
-
-						// 计算新的世界变换 = 初始相对变换 * 宿主当前变换
-						Config.SpawnTransform = Config.InitialRelativeTransform * CurrentAttachTransform;
-
-						// 更新所有生成的粒子系统
-						if (Config.bSpawned)
-						{
-							for (auto Fx : Config.SpawnedNiagaraSystems)
-							{
-								if (IsValid(Fx))
-								{
-									Fx->SetWorldTransform(Config.SpawnTransform);
-								}
-							}
-
-							for (auto Fx : Config.SpawnedCascadeSystems)
-							{
-								if (IsValid(Fx))
-								{
-									Fx->SetWorldTransform(Config.SpawnTransform);
-								}
-							}
-						}
-					}
-				}
-
-				// 检查生命周期
-				if (Config.bSpawned)
-				{
-					bool bHasValidChild = false;
-					for (auto Fx : Config.SpawnedNiagaraSystems)
-					{
-						if (IsValid(Fx))
-						{
-							bHasValidChild = true;
-							break;
-						}
-					}
-
-					if (!bHasValidChild)
-					{
-						for (auto Fx : Config.SpawnedCascadeSystems)
-						{
-							if (IsValid(Fx))
-							{
-								bHasValidChild = true;
-								break;
-							}
-						}
-					}
-
-					const bool bLifeIsInfinite = Config.LifeSpan < 0;
-
-					if (!bLifeIsInfinite)
-					{
-						const bool bLifeExpired = Config.LifeSpan == 0;
-						const bool bInvalidAttachment = Config.bAttached && !Config.AttachToSubject.IsValid();
-
-						if (!bHasValidChild || bLifeExpired || bInvalidAttachment)
-						{
-							for (auto Fx : Config.SpawnedNiagaraSystems)
-							{
-								if (IsValid(Fx)) Fx->DestroyComponent();
-							}
-							for (auto Fx : Config.SpawnedCascadeSystems)
-							{
-								if (IsValid(Fx)) Fx->DestroyComponent();
-							}
-							Subject.Despawn();
-						}
-					}
-				}
-
-				// 更新计时器
-				if (Config.Delay > 0)
-				{
-					Config.Delay = FMath::Max(0.f, Config.Delay - SafeDeltaTime);
-				}
-				else if (Config.LifeSpan > 0)
-				{
-					Config.LifeSpan = FMath::Max(0.f, Config.LifeSpan - SafeDeltaTime);
-				}
-			});
-	}
-	#pragma endregion
-
-	// 播放音效 | Play Sound
-	#pragma region
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("PlaySound");
-
-		Mechanism->Operate<FUnsafeChain>(PlaySoundFilter,
-			[&](FSubjectHandle Subject,
-				FSoundConfig_Final& Config)
-			{
-				// delay to play sound
-				if (!Config.bSpawned && Config.Delay <= 0)
-				{
-					if (Config.Sound && Config.bEnable)
-					{
-						// 存储生成时的世界变换（用于后续相对位置计算）
-						const FTransform SpawnWorldTransform = Config.SpawnTransform;
-
-						// 播放加载完成的音效
-						StreamableManager.RequestAsyncLoad(Config.Sound.ToSoftObjectPath(),FStreamableDelegate::CreateLambda([this, &Config, SpawnWorldTransform, Subject]()
-						{
-							if (Config.SpawnOrigin == EPlaySoundOrigin::PlaySound2D)
-							{
-								// 2D音效直接播放，不处理附着
-								UAudioComponent* AudioComp = UGameplayStatics::CreateSound2D(
-									GetWorld(),
-									Config.Sound.Get(),
-									Config.Volume);
-								Config.SpawnedSounds.Add(AudioComp);
-							}
-							else
-							{
-								// 3D音效处理位置和附着
-								FTransform PlayTransform = SpawnWorldTransform;
-
-								if (Config.bAttached && Config.AttachToSubject.IsValid())
-								{
-									const FTransform CurrentAttachTransform(Config.AttachToSubject.GetTrait<FDirected>().Direction.Rotation(),Config.AttachToSubject.GetTrait<FLocated>().Location);
-									PlayTransform = Config.InitialRelativeTransform * CurrentAttachTransform;
-								}
-
-								UAudioComponent* AudioComp = UGameplayStatics::SpawnSoundAtLocation(
-									GetWorld(),
-									Config.Sound.Get(),
-									PlayTransform.GetLocation(),
-									PlayTransform.Rotator(),
-									Config.Volume);
-								Config.SpawnedSounds.Add(AudioComp);
-							}
-						}));
-					}
-					Config.bSpawned = true;
-				}
-
-				// 更新附着对象位置（仅对3D音效有效）
-				bool bShouldUpdateAttachment = !Config.bSpawned || Config.bAttached;
-
-				if (bShouldUpdateAttachment)
-				{
-					bool bCanUpdateAttachment = Config.AttachToSubject.IsValid() && Config.AttachToSubject.HasTrait<FDirected>() && Config.AttachToSubject.HasTrait<FLocated>();
-
-					if (bCanUpdateAttachment)
-					{
-						// 获取宿主当前世界变换
-						const FTransform CurrentAttachTransform(Config.AttachToSubject.GetTrait<FDirected>().Direction.Rotation(), Config.AttachToSubject.GetTrait<FLocated>().Location);
-
-						// 计算新的世界变换 = 初始相对变换 * 宿主当前变换
-						Config.SpawnTransform = Config.InitialRelativeTransform * CurrentAttachTransform;
-
-						// 更新所有生成的音效位置
-						if (Config.bSpawned)
-						{
-							for (UAudioComponent* AudioComp : Config.SpawnedSounds)
-							{
-								if (IsValid(AudioComp))
-								{
-									AudioComp->SetWorldLocationAndRotation(Config.SpawnTransform.GetLocation(), Config.SpawnTransform.Rotator());
-								}
-							}
-						}
-					}
-				}
-
-				// 检查生命周期
-				if (Config.bSpawned)
-				{
-					bool bHasValidChild = false;
-
-					for (UAudioComponent* AudioComp : Config.SpawnedSounds)
-					{
-						if (IsValid(AudioComp) && AudioComp->IsPlaying())
-						{
-							bHasValidChild = true;
-							break;
-						}
-					}
-
-					const bool bLifeIsInfinite = Config.LifeSpan < 0;
-
-					if (!bLifeIsInfinite)
-					{
-						const bool bLifeExpired = Config.LifeSpan == 0;
-						const bool bInvalidAttachment = Config.bAttached && Config.bDespawnWhenNoParent && !Config.AttachToSubject.IsValid();
-
-						if (!bHasValidChild || bLifeExpired || bInvalidAttachment)
-						{
-							for (UAudioComponent* AudioComp : Config.SpawnedSounds)
-							{
-								if (IsValid(AudioComp))
-								{
-									AudioComp->Stop();
-									AudioComp->DestroyComponent();
-								}
-							}
-							Subject.Despawn();
-						}
-					}
-				}
-
-				// 更新计时器
-				if (Config.Delay > 0)
-				{
-					Config.Delay = FMath::Max(0.f, Config.Delay - SafeDeltaTime);
-				}
-				else if (Config.LifeSpan > 0)
-				{
-					Config.LifeSpan = FMath::Max(0.f, Config.LifeSpan - SafeDeltaTime);
-				}
-			});
-	}
-	#pragma endregion
-
-	// 事件接口 | Event Interface
-	#pragma region
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("EventInterface");
-
-		while (!OnAppearQueue.IsEmpty())
-		{
-			FAppearData Data;
-			OnAppearQueue.Dequeue(Data);
-
-			if (Data.SelfSubject.IsValid())
-			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
-
-				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
-				{
-					IBattleFrameInterface::Execute_OnAppear(DmgActor, Data);
-				}
-			}
-		}
-
-		while (!OnTraceQueue.IsEmpty())
-		{
-			FTraceData Data;
-			OnTraceQueue.Dequeue(Data);
-
-			if (Data.SelfSubject.IsValid())
-			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
-
-				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
-				{
-					IBattleFrameInterface::Execute_OnTrace(DmgActor, Data);
-				}
-			}
-		}
-
-		while (!OnMoveQueue.IsEmpty())
-		{
-			FMoveData Data;
-			OnMoveQueue.Dequeue(Data);
-
-			if (Data.SelfSubject.IsValid())
-			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
-
-				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
-				{
-					IBattleFrameInterface::Execute_OnMove(DmgActor, Data);
-				}
-			}
-		}
-
-		while (!OnAttackQueue.IsEmpty())
-		{
-			FAttackData Data;
-			OnAttackQueue.Dequeue(Data);
-
-			if (Data.SelfSubject.IsValid())
-			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
-
-				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
-				{
-					IBattleFrameInterface::Execute_OnAttack(DmgActor, Data);
-				}
-			}
-		}
-
-		while (!OnHitQueue.IsEmpty())
-		{
-			FHitData Data;
-			OnHitQueue.Dequeue(Data);
-
-			if (Data.SelfSubject.IsValid())
-			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
-
-				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
-				{
-					IBattleFrameInterface::Execute_OnHit(DmgActor, Data);
-				}
-			}
-		}
-
-		while (!OnDeathQueue.IsEmpty())
-		{
-			FDeathData Data;
-			OnDeathQueue.Dequeue(Data);
-
-			if (Data.SelfSubject.IsValid())
-			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
-
-				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
-				{
-					IBattleFrameInterface::Execute_OnDeath(DmgActor, Data);
-				}
-			}
-		}
-	}
-	#pragma endregion
-
-	// 调试图形 | Draw Debug Shapes
-	#pragma region
-	{
-		// 绘制点队列
-		while (!DebugPointQueue.IsEmpty())
-		{
-			FDebugPointConfig Config;
-			DebugPointQueue.Dequeue(Config);
-
-			DrawDebugPoint(
-				CurrentWorld,
-				Config.Location,
-				Config.Size,
-				Config.Color,
-				false,
-				Config.Duration,
-				3
-			);
-		}
-
-		// 绘制胶囊体队列
-		while (!DebugCapsuleQueue.IsEmpty())
-		{
-			FDebugCapsuleConfig Config;
-			DebugCapsuleQueue.Dequeue(Config);
-
-			// 计算胶囊体半高（从中心到顶部/底部的距离）
-			const float HalfHeight = FMath::Max(0.0f, Config.Height * 0.5f);
-
-			DrawDebugCapsule(
-				CurrentWorld,
-				Config.Location,          // 胶囊体中心位置
-				HalfHeight,               // 半高（从中心到端点的距离）
-				Config.Radius,            // 半径
-				Config.Rotation.Quaternion(), // 转换为四元数
-				Config.Color,             // 配置的颜色
-				false,                    // 非持久
-				Config.Duration,          // 生命周期0=只持续1帧
-				0,						  
-				Config.LineThickness      // 线宽（胶囊体通常需要较细的线）
-			);
-		}
-
-		// 绘制线队列
-		while (!DebugLineQueue.IsEmpty())
-		{
-			FDebugLineConfig Config;
-			DebugLineQueue.Dequeue(Config);
-
-			DrawDebugLine(
-				CurrentWorld,
-				Config.StartLocation,
-				Config.EndLocation,
-				Config.Color,
-				false,
-				Config.Duration,
-				3,
-				Config.LineThickness
-			);
-		}
-
-		// 绘制球队列
-		while (!DebugSphereQueue.IsEmpty())
-		{
-			FDebugSphereConfig Config;
-			DebugSphereQueue.Dequeue(Config);
-
-			DrawDebugSphere(
-				CurrentWorld,
-				Config.Location,
-				Config.Radius,
-				12,
-				Config.Color,
-				false,
-				Config.Duration,
-				0,
-				Config.LineThickness
-			);
-		}
-
-		// 绘制扇形队列
-		while (!DebugSectorQueue.IsEmpty())
-		{
-			FDebugSectorConfig Config;
-			DebugSectorQueue.Dequeue(Config);
-
-			DrawDebugSector(
-				CurrentWorld,
-				Config.Location,
-				Config.Direction,
-				Config.Radius,
-				Config.Angle, // 扇形角度
-				Config.Height,
-				Config.Color, // 橙色扇形
-				false, // 非持久
-				Config.Duration, // 显示0.1秒
-				Config.DepthPriority, // 深度优先级
-				Config.LineThickness // 线宽
-			);
-
-			//UE_LOG(LogTemp, Log, TEXT("Dequeue"));
-		}
-
-		// 绘制圆队列
-		while (!DebugCircleQueue.IsEmpty())
-		{
-			FDebugCircleConfig Config;
-			DebugCircleQueue.Dequeue(Config);
-
-			// 绘制圆形（XY平面）
-			DrawDebugCircle(
-				CurrentWorld,
-				Config.Location,  // 圆心位置
-				Config.Radius,    // 圆半径
-				36,               // 分段数（足够平滑）
-				Config.Color,     // 配置的颜色
-				false,            // 非持久
-				Config.Duration,  // 生命周期0=只持续1帧
-				3,                // 深度优先级
-				Config.LineThickness,// 线宽
-				FVector(1, 0, 0), // X轴
-				FVector(0, 1, 0), // Y轴
-				false             // 不绘制坐标轴
-			);
-		}
 	}
 	#pragma endregion
 
