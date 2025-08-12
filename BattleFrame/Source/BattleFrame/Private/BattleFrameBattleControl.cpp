@@ -3686,8 +3686,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						Subject.SetFlag(DeathDisableCollisionFlag);
 					}
 
-					// 死亡消融
-					
+					// 死亡消融					
 					if (Subject.HasFlag(DeathDissolveFlag))
 					{
 						// 获取曲线
