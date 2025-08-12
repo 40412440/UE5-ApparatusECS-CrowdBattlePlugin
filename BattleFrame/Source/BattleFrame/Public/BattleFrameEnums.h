@@ -70,8 +70,8 @@ UENUM(BlueprintType)
 enum class EOrientMode : uint8
 {
 	ToPath UMETA(DisplayName = "ToPath", Tooltip = "面朝移动路径"),
-	ToMovement UMETA(DisplayName = "ToMovement", Tooltip = "面朝实际运动方向"),
-	ToMovementForwardAndBackward UMETA(DisplayName = "ToMovementForwardAndBackward", Tooltip = "面朝或背对实际运动方向"),
+	ToMovement UMETA(DisplayName = "OrientToMovement", Tooltip = "面朝实际运动方向"),
+	ToMovementForwardAndBackward UMETA(DisplayName = "AlignToMovement", Tooltip = "面朝或背对实际运动方向"),
 	ToCustom UMETA(DisplayName = "ToCustom", Tooltip = "面朝自定义方向"),
 };
 

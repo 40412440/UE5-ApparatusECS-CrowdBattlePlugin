@@ -630,10 +630,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 				//--------------------- Desired Direction XY (Nav) -----------------------
 
-				FVector DesiredMoveDirection = FVector::ZeroVector;
+				FVector DesiredMoveDirection = Directed.Direction;
 
 				// 不需要寻路的情况
-				const bool bShouldStopPathfinding = !Move.bEnable || !Moving.bHasGoal || bIsAppearing || bIsSleeping || bIsAttacking || bIsDying;
+				const bool bShouldStopPathfinding = !Move.bEnable/* || !Moving.bHasGoal*/ || bIsAppearing || bIsSleeping || bIsAttacking || bIsDying;
 
 				if (!bShouldStopPathfinding)
 				{
@@ -754,24 +754,25 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				// Cases that should stop moving
 				const bool bIsAttackingNotColling = bIsAttacking ? Subject.GetTrait<FAttacking>().State != EAttackState::Cooling : false; // Stop when attacking and not cooling
 				const bool bIsTimeToBrake = DistanceToGoal < (FMath::Square(Moving.CurrentVelocity.Size2D())) / (2.0f * Move.XY.MoveDeceleration); // 计算最小距离: S_min = V^2 / (2A)
-
 				const bool bShouldStopMoving = Move.XY.bStopActiveMovement || Moving.bLaunching || Moving.bPushedBack || bIsTimeToBrake || bIsInAcceptanceRadius || bIsAppearing || bIsSleeping || bIsAttackingNotColling || bIsDying;
+
+				float DesiredSpeedMultiplier = 0;
 
 				// Calculate MoveSpeedMult
 				if (!bShouldStopMoving)
 				{
 					// adjust speed during patrol
-					Moving.MoveSpeedMult = Moving.MoveState == EMoveState::Patrol_Patrolling || Moving.MoveState == EMoveState::Patrol_Waiting ? Patrol.MoveSpeedMult : 1;
+					DesiredSpeedMultiplier = Moving.MoveState == EMoveState::Patrol_Patrolling || Moving.MoveState == EMoveState::Patrol_Waiting ? Patrol.MoveSpeedMult : 1;
 
 					// adjust speed during chase
-					Moving.MoveSpeedMult = Moving.MoveState == EMoveState::Chase_Chasing || Moving.MoveState == EMoveState::Chase_Reached ? Chase.MoveSpeedMult : 1;
+					DesiredSpeedMultiplier = Moving.MoveState == EMoveState::Chase_Chasing || Moving.MoveState == EMoveState::Chase_Reached ? Chase.MoveSpeedMult : 1;
 
 					// 减速效果累加
 					Slowing.CombinedSlowMult = 1;
 					for (const auto& Slow : Slowing.Slows) Slowing.CombinedSlowMult *= 1 - Slow.GetTrait<FSlow>().SlowStrength;
 					Slowing.CombinedSlowMult = FMath::Lerp(Slowing.CombinedSlowMult, 1, Defence.SlowImmune);// 减速抗性
 
-					Moving.MoveSpeedMult *= Slowing.CombinedSlowMult;
+					DesiredSpeedMultiplier *= Slowing.CombinedSlowMult;
 
 					// 朝向-移动方向夹角 插值
 					float DotProduct = FVector::DotProduct(Directed.Direction, Moving.CurrentVelocity.GetSafeNormal2D());
@@ -780,7 +781,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					const TRange<float> TurnInputRange(Move.XY.MoveSpeedRangeMapByAngle.X, Move.XY.MoveSpeedRangeMapByAngle.Z);
 					const TRange<float> TurnOutputRange(Move.XY.MoveSpeedRangeMapByAngle.Y, Move.XY.MoveSpeedRangeMapByAngle.W);
 
-					Moving.MoveSpeedMult *= FMath::GetMappedRangeValueClamped(TurnInputRange, TurnOutputRange, AngleDegrees);
+					DesiredSpeedMultiplier *= FMath::GetMappedRangeValueClamped(TurnInputRange, TurnOutputRange, AngleDegrees);
 
 					// 速度-与目标距离二次方插值，离目标越近变化率越大
 					const float MinDist = Move.XY.MoveSpeedRangeMapByDist.X;
@@ -796,16 +797,12 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					float FactorSquared = FMath::Square(NormalizedFactor);
 					float MappedValue = OutputAtMax + (OutputAtMin - OutputAtMax) * FactorSquared;
 
-					Moving.MoveSpeedMult *= MappedValue;
-				}
-				else
-				{
-					Moving.MoveSpeedMult = 0;
+					DesiredSpeedMultiplier *= MappedValue;
 				}
 
 				//----------------------- Desired Velocity XY ----------------------------
 
-				float DesiredSpeed = Move.XY.MoveSpeed * Moving.MoveSpeedMult;
+				float DesiredSpeed = Move.XY.MoveSpeed * DesiredSpeedMultiplier;
 				FVector DesiredVelocity = DesiredSpeed * DesiredMoveDirection;
 				Moving.DesiredVelocity = DesiredVelocity * FVector(1, 1, 0);
 
@@ -895,6 +892,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 				if (LIKELY(Avoidance.bEnable) && LIKELY(IsValid(NeighborGrid)))
 				{
+					const float AvoidSpeedMultiplier = bIsAttacking ? 0.25 : 1;
 					const auto AvoidingRadius = Avoiding.Radius;
 					const auto TraceDist = Avoidance.TraceDist;
 					const float CombinedRadiusSqr = FMath::Square(AvoidingRadius + TraceDist);
@@ -980,7 +978,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 
 					//TRACE_CPUPROFILER_EVENT_SCOPE_STR("CalVelAgents");
-					Avoidance.MaxSpeed = Moving.DesiredVelocity.Size2D();
+					Avoidance.MaxSpeed = bIsAttacking ? Move.XY.MoveSpeed * 0.25 : Moving.DesiredVelocity.Size2D();
 					Avoidance.DesiredVelocity = RVO::Vector2(Moving.DesiredVelocity.X, Moving.DesiredVelocity.Y);
 					Avoiding.CurrentVelocity = RVO::Vector2(Moving.CurrentVelocity.X, Moving.CurrentVelocity.Y);
 
@@ -4385,7 +4383,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	// 动画状态机 | Anim State Machine
 	#pragma region
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("AgentStateMachine");
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("Agent Anim State Machine");
 
 		auto Chain = Mechanism->EnchainSolid(AgentStateMachineFilter);
 		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
