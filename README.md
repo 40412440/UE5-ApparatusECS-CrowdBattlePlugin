@@ -29,8 +29,8 @@ This plugin is open source, but has the following dependencies:
   - Windows
   - UE5.3, UE5.4, UE5.5
 - **Performance**: 
-  - 60 fps with 30,000 agents
-  - 30 fps with 60,000 agents
+  - 60 fps with 25,000 agents
+  - 30 fps with 50,000 agents
   - (AMD Ryzen 5900X + RTX 4080S, CPU capped. Shipping Package)
 - **Technology Stack**:
   - ECS for logic
@@ -114,8 +114,8 @@ In progress:
   - Windows
   - UE5.3/UE5.4/UE5.5
 - **性能表现**： 
-  - 30,000个实体时60帧
-  - 60,000个实体时30帧
+  - 25,000个实体时60帧
+  - 50,000个实体时30帧
   - (AMD Ryzen 5900X + RTX 4080S配置，CPU瓶颈，Shipping包)
 - **技术栈**：
   - ECS逻辑架构
