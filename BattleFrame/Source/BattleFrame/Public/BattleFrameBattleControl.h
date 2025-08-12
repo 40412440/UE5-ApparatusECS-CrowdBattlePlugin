@@ -120,7 +120,13 @@ public:
 	EFlagmarkBit DeathAnimFlag = EFlagmarkBit::L;
 	EFlagmarkBit FallAnimFlag = EFlagmarkBit::M;
 
-	// Event Interface
+	// Spawn Config Queue
+	TQueue<FProjectileConfig, EQueueMode::Mpsc> ProjectileConfigQueue;
+	TQueue<FActorSpawnConfig_Final, EQueueMode::Mpsc> ActorSpawnConfigQueue;
+	TQueue<FFxConfig_Final, EQueueMode::Mpsc> FxConfigQueue;
+	TQueue<FSoundConfig_Final, EQueueMode::Mpsc> SoundConfigQueue;
+
+	// Event Interface Queue
 	TQueue<FAppearData, EQueueMode::Mpsc> OnAppearQueue;
 	TQueue<FTraceData, EQueueMode::Mpsc> OnTraceQueue;
 	TQueue<FMoveData, EQueueMode::Mpsc> OnMoveQueue;
@@ -135,7 +141,6 @@ public:
 	TQueue<FDebugCapsuleConfig, EQueueMode::Mpsc> DebugCapsuleQueue;
 	TQueue<FDebugSectorConfig, EQueueMode::Mpsc> DebugSectorQueue;
 	TQueue<FDebugCircleConfig, EQueueMode::Mpsc> DebugCircleQueue;
-
 
 private:
 
@@ -167,11 +172,11 @@ private:
 	FFilter RenderBatchFilter;
 	FFilter AgentRenderFilter;
 	FFilter TextRenderFilter;
-	FFilter SpawnActorsFilter;
+	FFilter SpawnProjectileFilter;
+	FFilter SpawnActorFilter;
 	FFilter SpawnFxFilter;
 	FFilter PlaySoundFilter;
 	FFilter SubjectFilterBase;
-
 	FFilter ProjectileFilter;
 
 

@@ -64,7 +64,7 @@ public:
 	bool bCanPlayAnim = true;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	TArray<FProjectileParamsRT_DA> SpawnProjectile;
+	TArray<FProjectileConfig> SpawnProjectile;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
 	TArray<FActorSpawnConfig_Attack> SpawnActor;

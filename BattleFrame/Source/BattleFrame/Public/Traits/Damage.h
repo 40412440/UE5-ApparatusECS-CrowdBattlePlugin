@@ -72,8 +72,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "暴击概率"))
 	float CritProbability = 0.1f;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "伤害过滤器"))
-	FBFFilter Filter = FBFFilter();
+	//UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "伤害过滤器"))
+	//FBFFilter Filter = FBFFilter();
 
 	// 默认构造函数
 	FDamage_Point() = default;
@@ -184,31 +184,6 @@ public:
 
 	// 从FDamage构造
 	FDamage_Beam(const FDamage& InDamage)
-	{
-		DmgType = InDamage.DmgType;
-		Damage = InDamage.Damage;
-		PercentDmg = InDamage.PercentDmg;
-		CritDmgMult = InDamage.CritDmgMult;
-		CritProbability = InDamage.CritProbability;
-		DmgRadius = InDamage.DmgRadius;
-		bUseFalloff = InDamage.bUseFalloff;
-		bCheckObstacle = InDamage.bCheckObstacle;
-		Filter = InDamage.Filter;
-	}
-
-	// 从FDamage_Point构造
-	FDamage_Beam(const FDamage_Point& InDamage)
-	{
-		DmgType = InDamage.DmgType;
-		Damage = InDamage.Damage;
-		PercentDmg = InDamage.PercentDmg;
-		CritDmgMult = InDamage.CritDmgMult;
-		CritProbability = InDamage.CritProbability;
-		Filter = InDamage.Filter;
-	}
-
-	// 从FDamage_Radial构造
-	FDamage_Beam(const FDamage_Radial& InDamage)
 	{
 		DmgType = InDamage.DmgType;
 		Damage = InDamage.Damage;

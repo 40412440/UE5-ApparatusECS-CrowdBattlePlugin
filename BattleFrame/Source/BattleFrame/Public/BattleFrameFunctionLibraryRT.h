@@ -242,27 +242,21 @@ public:
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | Projectile", meta = (Keywords = "Solve, Projectile, Speed, Prediction"))
     static void SolveProjectileVelocityFromSpeedWithPrediction(bool& Succeed, FVector& LaunchVelocity, FVector FromPoint, FVector ToPoint, FVector TargetVelocity, int32 Iterations, float Gravity, float Speed, bool bFavorHighArc);
 
-    //UFUNCTION(BlueprintCallable, Category = "BattleFrame | Projectile", meta = (Keywords = ""))
-    static void SpawnProjectileByConfig(bool& Successful, FSubjectHandle& SpawnedProjectile, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset);
-    static void SpawnProjectileByConfigDeferred(bool& Successful, FSubjectHandle& SpawnedProjectile, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset);
+    static void SpawnProjectileByConfig(bool& Successful, FSubjectHandle& SpawnedProjectile, UProjectileConfigDataAsset* ProjectileConfigDataAsset);
 
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | Projectile", meta = (Keywords = "Set,Projectile,Movement,RuntimeData,Static"))
-    static void SpawnProjectile_Static(bool& Successful, FSubjectHandle& ProjectileHandle, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent);
-    static void SpawnProjectile_StaticDeferred(bool& Successful, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent);
+    static void SpawnProjectile_Static(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects);
 
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | Projectile", meta = (Keywords = "Set,Projectile,Movement,RuntimeData,Interped"))
-    static void SpawnProjectile_Interped(bool& Successful, FSubjectHandle& ProjectileHandle, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, float Speed, float XYOffsetMult, float ZOffsetMult, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent);
-    static void SpawnProjectile_InterpedDeferred(bool& Successful, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, float Speed, float XYOffsetMult, float ZOffsetMult, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent);
+    static void SpawnProjectile_Interped(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, float XOffsetMult, float YOffsetMult, float ZOffsetMult, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects);
 
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | Projectile", meta = (Keywords = "Set,Projectile,Movement,RuntimeData,Ballistic"))
-    static void SpawnProjectile_Ballistic(bool& Successful, FSubjectHandle& ProjectileHandle, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FVector ToPoint, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent);
-    static void SpawnProjectile_BallisticDeferred(bool& Successful, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FVector ToPoint, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent);
+    static void SpawnProjectile_Ballistic(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects);
 
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | Projectile", meta = (Keywords = "Set,Projectile,Movement,RuntimeData,Tracking"))
-    static void SpawnProjectile_Tracking(bool& Successful, FSubjectHandle& ProjectileHandle, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent);
-    static void SpawnProjectile_TrackingDeferred(bool& Successful, TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset, float ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects, UNeighborGridComponent* NeighborGridComponent);
+    static void SpawnProjectile_Tracking(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects);
 
-    static void GetProjectilePositionAtTime_Interped(bool& bHasArrived, FVector& CurrentLocation, FVector FromPoint, FVector& ToPoint, FSubjectHandle ToTarget, FRuntimeFloatCurve XYOffset, float XYOffsetMult, FRuntimeFloatCurve ZOffset, float ZOffsetMult, float InitialTime, float CurrentTime, float Speed);
+    static void GetProjectilePositionAtTime_Interped(bool& bHasArrived, FVector& CurrentLocation, FVector FromPoint, FVector& ToPoint, FSubjectHandle ToTarget, FRuntimeFloatCurve XOffset, float XOffsetMult, FRuntimeFloatCurve YOffset, float YOffsetMult, FRuntimeFloatCurve ZOffset, float ZOffsetMult, float InitialTime, float CurrentTime, float Speed);
 
     static void GetProjectilePositionAtTime_Ballistic(bool& bHasArrived, FVector& CurrentLocation, FVector FromPoint, FVector ToPoint, float InitialTime, float CurrentTime, float Gravity, FVector InitialVelocity);
 

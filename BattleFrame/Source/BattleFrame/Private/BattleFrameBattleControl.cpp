@@ -69,7 +69,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 	//UE_LOG(LogTemp, Warning, TEXT("bIsHitAnim: %d"), bIsHitAnim);
 
-	//------------------数据统计 | Statistics-------------------
+	//--------------------数据统计 | Statistics-------------------
 
 	// 数据统计统计 | Statistics
 	#pragma region
@@ -114,7 +114,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//-----------------------出生 | Appear-----------------------
+	//------------------------出生 | Appear-----------------------
 
 	// 出生 | Appear
 	#pragma region
@@ -247,7 +247,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//-----------------------移动 | Move------------------------
+	//------------------------移动 | Move------------------------
 
 	// 休眠 | Sleep
 	#pragma region
@@ -888,7 +888,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 				}
 
-				//---------------------- Velocity XY (Avoidance) --------------------------------
+				//------------------- Final Velocity XY (Avoidance) --------------------------------
 
 				// 计算避障速度
 				const auto NeighborGrid = Tracing.NeighborGrid;
@@ -1464,7 +1464,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//-----------------------攻击 | Attack-----------------------
+	//------------------------攻击 | Attack-----------------------
 
 	// 索敌 | Trace
 	#pragma region
@@ -2185,11 +2185,15 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					FVector SpawnLocation = Located.Location;
 					FQuat SpawnRotation = Directed.Direction.ToOrientationQuat();
 
-					// Actor
-					for (const FActorSpawnConfig_Attack& Config : Attack.SpawnActor)
+					// Projectile
+					for (const auto& Config : Attack.SpawnProjectile)
 					{
-						FActorSpawnConfig_Final NewConfig(Config);
+						FProjectileConfig_Final NewConfig(Config);
 						NewConfig.OwnerSubject = FSubjectHandle(Subject);
+						NewConfig.TargetSubject = Tracing.TraceResult;
+						NewConfig.FromPoint = Located.Location + Directed.Direction * Collider.Radius * Scaled.Scale;
+						NewConfig.ToPoint = Tracing.TraceResult.GetTrait<FLocated>().Location;
+						NewConfig.TargetVelocity = Tracing.TraceResult.HasTrait<FMoving>() ? Tracing.TraceResult.GetTrait<FMoving>().CurrentVelocity : FVector::ZeroVector;
 
 						switch (Config.SpawnOrigin)
 						{
@@ -2198,6 +2202,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							NewConfig.AttachToSubject = FSubjectHandle(Subject);
 							NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
 							NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(SpawnRotation, SpawnLocation));
+
 							Mechanism->SpawnSubjectDeferred(NewConfig);
 							break;
 
@@ -2210,14 +2215,50 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								FQuat TargetRotation = Tracing.TraceResult.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.ToOrientationQuat();
 								NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
 								NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(TargetRotation, SpawnLocation));
+
 								Mechanism->SpawnSubjectDeferred(NewConfig);
 							}
 							break;
 						}
 					}
 
+					// Actor
+					for (const auto& Config : Attack.SpawnActor)
+					{
+						FActorSpawnConfig_Final NewConfig(Config);
+						NewConfig.OwnerSubject = FSubjectHandle(Subject);
+
+						switch (Config.SpawnOrigin)
+						{
+							case ESpawnOrigin::AtSelf:
+							{
+								NewConfig.AttachToSubject = FSubjectHandle(Subject);
+								NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
+								NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(SpawnRotation, SpawnLocation));
+
+								Mechanism->SpawnSubjectDeferred(NewConfig);
+								break;
+							}
+
+							case ESpawnOrigin::AtTarget:
+							{
+								if (Tracing.TraceResult.IsValid())
+								{
+									NewConfig.AttachToSubject = Tracing.TraceResult;
+									SpawnLocation = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
+									FQuat TargetRotation = Tracing.TraceResult.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.ToOrientationQuat();
+									NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
+									NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(TargetRotation, SpawnLocation));
+
+									Mechanism->SpawnSubjectDeferred(NewConfig);
+								}
+								break;
+							}
+						}
+					}
+
 					// Fx
-					for (const FFxConfig_Attack& Config : Attack.SpawnFx)
+					for (const auto& Config : Attack.SpawnFx)
 					{
 						FFxConfig_Final NewConfig(Config);
 						NewConfig.OwnerSubject = FSubjectHandle(Subject);
@@ -2229,6 +2270,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							NewConfig.AttachToSubject = FSubjectHandle(Subject);
 							NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
 							NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(SpawnRotation, SpawnLocation));
+
 							Mechanism->SpawnSubjectDeferred(NewConfig);
 							break;
 
@@ -2241,6 +2283,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								FQuat TargetRotation = Tracing.TraceResult.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.ToOrientationQuat();
 								NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
 								NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(TargetRotation, SpawnLocation));
+
 								Mechanism->SpawnSubjectDeferred(NewConfig);
 							}
 							break;
@@ -2248,7 +2291,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 
 					// Sound
-					for (const FSoundConfig_Attack& Config : Attack.PlaySound)
+					for (const auto& Config : Attack.PlaySound)
 					{
 						FSoundConfig_Final NewConfig(Config);
 						NewConfig.OwnerSubject = FSubjectHandle(Subject);
@@ -2260,6 +2303,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							NewConfig.AttachToSubject = FSubjectHandle(Subject);
 							NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
 							NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(SpawnRotation, SpawnLocation));
+
 							Mechanism->SpawnSubjectDeferred(NewConfig);
 							break;
 
@@ -2272,6 +2316,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								FQuat TargetRotation = Tracing.TraceResult.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.ToOrientationQuat();
 								NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(SpawnRotation, SpawnLocation, NewConfig.Transform);
 								NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(TargetRotation, SpawnLocation));
+
 								Mechanism->SpawnSubjectDeferred(NewConfig);
 							}
 							break;
@@ -2297,90 +2342,59 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					TArray<FDmgResult> DmgResults;
 
 					bool bIsTargetValid = Tracing.TraceResult.IsValid() && !Tracing.TraceResult.HasTrait<FDying>() && Tracing.TraceResult.HasTrait<FLocated>() && Tracing.TraceResult.HasTrait<FHealth>() && Tracing.TraceResult.GetTrait<FHealth>().Current > 0;
+					bool bCanApplyDmg = Attack.TimeOfHitAction == EAttackMode::ApplyDMG || Attack.TimeOfHitAction == EAttackMode::SuicideATK;
 
-					if (bIsTargetValid)
+					if (bIsTargetValid && bCanApplyDmg)
 					{
-						// 获取双方位置信息
-						FVector AttackerPos = Located.Location;
-						FVector TargetPos = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
-
-						// 计算距离
-						const float SelfRadius = Collider.Radius * Scaled.Scale;
-						float OtherRadius = Tracing.TraceResult.HasTrait<FGridData>() ? Tracing.TraceResult.GetTraitRef<FGridData, EParadigm::Unsafe>().Radius : 0;
-						float Distance = FMath::Clamp(FVector::Distance(AttackerPos, TargetPos) - SelfRadius - OtherRadius, 0, FLT_MAX);
-
-						// 计算夹角
-						FVector AttackerForward = Subject.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.GetSafeNormal2D();
-						FVector ToTargetDir = (TargetPos - AttackerPos).GetSafeNormal2D();
-						float Angle = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(AttackerForward, ToTargetDir)));
-
-						// Deal Dmg
 						if (Attack.TimeOfHitAction == EAttackMode::ApplyDMG || Attack.TimeOfHitAction == EAttackMode::SuicideATK)
 						{
-							if (!Tracing.TraceResult.HasTrait<FDying>())
+							// 获取双方位置信息
+							FVector AttackerPos = Located.Location;
+							FVector TargetPos = Tracing.TraceResult.GetTraitRef<FLocated, EParadigm::Unsafe>().Location;
+
+							// 计算距离
+							const float SelfRadius = Collider.Radius * Scaled.Scale;
+							float OtherRadius = Tracing.TraceResult.HasTrait<FGridData>() ? Tracing.TraceResult.GetTraitRef<FGridData, EParadigm::Unsafe>().Radius : 0;
+							float Distance = FMath::Clamp(FVector::Distance(AttackerPos, TargetPos) - SelfRadius - OtherRadius, 0, FLT_MAX);
+
+							// 计算夹角
+							FVector AttackerForward = Subject.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction.GetSafeNormal2D();
+							FVector ToTargetDir = (TargetPos - AttackerPos).GetSafeNormal2D();
+							float Angle = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(AttackerForward, ToTargetDir)));
+
+							// Deal Dmg
+							if (Distance <= Attack.RangeToleranceHit && Angle <= Attack.AngleToleranceHit)
 							{
-								if (Distance <= Attack.RangeToleranceHit && Angle <= Attack.AngleToleranceHit)
+								if (Damage.DmgRadius == 0)
 								{
 									// 范围伤害
-									ApplyRadialDamageAndDebuffDeferred
+									ApplyPointDamageAndDebuffDeferred
 									(
-										Tracing.NeighborGrid, 
-										-1, 
-										TargetPos, 
-										FSubjectArray(), 
-										FSubjectHandle{ Subject }, 
-										FSubjectHandle{ Subject }, 
-										Located.Location, 
-										FDamage_Radial(Damage), 
-										FDebuff_Radial(Debuff), 
+										FSubjectArray(TArray<FSubjectHandle>{Tracing.TraceResult}),
+										FSubjectArray(),
+										FSubjectHandle{ Subject },
+										FSubjectHandle{ Subject },
+										Located.Location,
+										FDamage_Point(Damage),
+										FDebuff_Point(Debuff),
 										DmgResults
 									);
 								}
-							}
-						}
-
-						// Spawn Projectile
-						FVector FromPoint = Located.Location + Directed.Direction * SelfRadius;
-						FVector ToPoint = Tracing.TraceResult.GetTrait<FLocated>().Location;
-						FVector TargetVelocity = Tracing.TraceResult.HasTrait<FMoving>() ? Tracing.TraceResult.GetTrait<FMoving>().CurrentVelocity : FVector::ZeroVector;
-
-						for (const auto& Config : Attack.SpawnProjectile)
-						{
-							auto DA = Config.ProjectileConfig.LoadSynchronous();
-
-							if (IsValid(DA))
-							{
-								bool Succeed;
-								FVector LaunchVelocity;
-
-								switch (DA->MovementMode)
+								else
 								{
-									case EProjectileMoveMode::Ballistic:
-										if (Config.Ballistic.SolveMode == EProjectileSolveMode::FromPitch)
-										{
-											UBattleFrameFunctionLibraryRT::SolveProjectileVelocityFromPitchWithPrediction(Succeed, LaunchVelocity, FromPoint, ToPoint, TargetVelocity, Config.Ballistic.Iterations, Config.Ballistic.Gravity, Config.Ballistic.PitchAngle);
-										}
-										else
-										{
-											UBattleFrameFunctionLibraryRT::SolveProjectileVelocityFromSpeedWithPrediction(Succeed, LaunchVelocity, FromPoint, ToPoint, TargetVelocity, Config.Ballistic.Iterations, Config.Ballistic.Gravity, Config.Ballistic.Speed, Config.Ballistic.bFavorHighArc);
-										}
-										if (Succeed)
-										{
-											UBattleFrameFunctionLibraryRT::SpawnProjectile_BallisticDeferred(Succeed, Config.ProjectileConfig, Config.Ballistic.ScaleMult, FromPoint, ToPoint, LaunchVelocity, FSubjectHandle(Subject), FSubjectArray(), Tracing.NeighborGrid);
-										}
-										break;
-
-									case EProjectileMoveMode::Interped:
-										UBattleFrameFunctionLibraryRT::SpawnProjectile_InterpedDeferred(Succeed, Config.ProjectileConfig, Config.Interped.ScaleMult, FromPoint, ToPoint, Tracing.TraceResult, Config.Interped.Speed, Config.Interped.XYOffsetMult, Config.Interped.ZOffsetMult, FSubjectHandle(Subject), FSubjectArray(), Tracing.NeighborGrid);
-										break;
-
-									case EProjectileMoveMode::Tracking:
-										UBattleFrameFunctionLibraryRT::SpawnProjectile_TrackingDeferred(Succeed, Config.ProjectileConfig, Config.Tracking.ScaleMult, FromPoint, ToPoint, Tracing.TraceResult, (ToPoint - FromPoint).GetSafeNormal() * Config.Tracking.Speed, FSubjectHandle(Subject), FSubjectArray(), Tracing.NeighborGrid);
-										break;
-
-									case EProjectileMoveMode::Static:
-										UBattleFrameFunctionLibraryRT::SpawnProjectile_StaticDeferred(Succeed, Config.ProjectileConfig, Config.Static.ScaleMult, FromPoint, FSubjectHandle(Subject), FSubjectArray(), Tracing.NeighborGrid);
-										break;
+									ApplyRadialDamageAndDebuffDeferred
+									(
+										Tracing.NeighborGrid,
+										-1,
+										TargetPos,
+										FSubjectArray(),
+										FSubjectHandle{ Subject },
+										FSubjectHandle{ Subject },
+										Located.Location,
+										FDamage_Radial(Damage),
+										FDebuff_Radial(Debuff),
+										DmgResults
+									);
 								}
 							}
 						}
@@ -2478,7 +2492,512 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//-----------------------受击 | Hit-------------------------
+	//--------------------- 投射物 | Projectile --------------------
+
+	// 生成投射物 | Spawn Projectile
+	#pragma region
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("SpawnProjectile");
+
+		Mechanism->Operate<FUnsafeChain>(SpawnProjectileFilter,
+			[&](FSubjectHandle Subject,
+				FProjectileConfig_Final& Config)
+			{
+				// delay to spawn projectile
+				if (!Config.bSpawned && Config.Delay == 0)
+				{
+					// 获取Data Asset
+					auto DataAsset = Config.ProjectileConfigDataAsset.LoadSynchronous();
+
+					if (!IsValid(DataAsset))
+					{
+						Subject.Despawn();
+						return;
+					}
+
+					// 存储生成时的世界变换（用于后续相对位置计算）
+					const FTransform SpawnWorldTransform = Config.SpawnTransform;
+
+					// 生成子弹
+					for (int32 i = 0; i < Config.Quantity; ++i)
+					{
+						bool Succeed;
+						FSubjectHandle ProjectileHandle;
+						FVector LaunchVelocity;
+
+						switch (DataAsset->MovementMode)
+						{
+							case EProjectileMoveMode::Ballistic:
+							{
+								if (DataAsset->ProjectileMove_Ballistic.SolveMode == EProjectileSolveMode::FromPitch)
+								{
+									UBattleFrameFunctionLibraryRT::SolveProjectileVelocityFromPitchWithPrediction(Succeed, LaunchVelocity, Config.FromPoint, Config.ToPoint, Config.TargetVelocity, DataAsset->ProjectileMove_Ballistic.Iterations, DataAsset->ProjectileMove_Ballistic.Gravity, DataAsset->ProjectileMove_Ballistic.Pitch);
+								}
+								else
+								{
+									UBattleFrameFunctionLibraryRT::SolveProjectileVelocityFromSpeedWithPrediction(Succeed, LaunchVelocity, Config.FromPoint, Config.ToPoint, Config.TargetVelocity, DataAsset->ProjectileMove_Ballistic.Iterations, DataAsset->ProjectileMove_Ballistic.Gravity, DataAsset->ProjectileMove_Ballistic.Speed, DataAsset->ProjectileMove_Ballistic.bFavorHighArc);
+								}
+								if (Succeed)
+								{
+									UBattleFrameFunctionLibraryRT::SpawnProjectile_Ballistic(Succeed, ProjectileHandle, Config.NeighborGrid, Config.ProjectileConfigDataAsset.LoadSynchronous(), SpawnWorldTransform.GetScale3D()* Config.Multipliers.Ballistic.ScaleMult, Config.FromPoint, Config.ToPoint, LaunchVelocity, FSubjectHandle(Subject), FSubjectArray());
+								}
+								break;
+							}
+
+							case EProjectileMoveMode::Interped:
+								UBattleFrameFunctionLibraryRT::SpawnProjectile_Interped(Succeed, ProjectileHandle, Config.NeighborGrid, Config.ProjectileConfigDataAsset.LoadSynchronous(), SpawnWorldTransform.GetScale3D() * Config.Multipliers.Interped.ScaleMult, Config.FromPoint, Config.ToPoint, Config.TargetSubject, Config.Multipliers.Interped.XOffsetMult, Config.Multipliers.Interped.YOffsetMult, Config.Multipliers.Interped.ZOffsetMult, Config.OwnerSubject, FSubjectArray());
+								break;
+
+							case EProjectileMoveMode::Tracking:
+								UBattleFrameFunctionLibraryRT::SpawnProjectile_Tracking(Succeed, ProjectileHandle, Config.NeighborGrid, Config.ProjectileConfigDataAsset.LoadSynchronous(), SpawnWorldTransform.GetScale3D() * Config.Multipliers.Tracking.ScaleMult, Config.FromPoint, Config.ToPoint, Config.TargetSubject, (Config.ToPoint - Config.FromPoint).GetSafeNormal() * DataAsset->ProjectileMove_Tracking.Speed, Config.OwnerSubject, FSubjectArray());
+								break;
+
+							case EProjectileMoveMode::Static:
+								UBattleFrameFunctionLibraryRT::SpawnProjectile_Static(Succeed, ProjectileHandle, Config.NeighborGrid, Config.ProjectileConfigDataAsset.LoadSynchronous(), SpawnWorldTransform.GetScale3D() * Config.Multipliers.Static.ScaleMult, Config.FromPoint, Config.OwnerSubject, FSubjectArray());
+								break;
+						}
+
+						Config.SpawnedProjectiles.Add(ProjectileHandle);
+					}
+
+					Config.bSpawned = true;
+				}
+
+				// 更新附着对象位置
+				bool bShouldUpdateAttachment = !Config.bSpawned || Config.bAttached;
+
+				if (bShouldUpdateAttachment)
+				{
+					bool bCanUpdateAttachment = Config.AttachToSubject.IsValid() && Config.AttachToSubject.HasTrait<FDirected>() && Config.AttachToSubject.HasTrait<FLocated>();
+
+					if (bCanUpdateAttachment)
+					{
+						// 获取宿主当前世界变换
+						const FTransform CurrentAttachTransform(Config.AttachToSubject.GetTrait<FDirected>().Direction.Rotation(), Config.AttachToSubject.GetTrait<FLocated>().Location);
+
+						// 计算新的世界变换 = 初始相对变换 * 宿主当前变换
+						Config.SpawnTransform = Config.InitialRelativeTransform * CurrentAttachTransform;
+
+						// 更新所有生成的粒子系统
+						if (Config.bSpawned)
+						{
+							for (auto ProjectileHandle : Config.SpawnedProjectiles)
+							{
+								if (ProjectileHandle.IsValid())
+								{
+									ProjectileHandle.GetTraitRef<FLocated, EParadigm::Unsafe>().Location = Config.SpawnTransform.GetLocation();
+									ProjectileHandle.GetTraitRef<FDirected, EParadigm::Unsafe>().Direction = Config.SpawnTransform.GetRotation().Vector();
+								}
+							}
+						}
+					}
+				}
+
+				// 检查生命周期
+				if (Config.bSpawned)
+				{
+					bool bHasValidChild = false;
+
+					for (auto ProjectileHandle : Config.SpawnedProjectiles)
+					{
+						if (ProjectileHandle.IsValid())
+						{
+							bHasValidChild = true;
+							break;
+						}
+					}
+
+					if (!bHasValidChild)
+					{
+						Subject.Despawn();
+					}
+				}
+
+				// 更新计时器
+				if (Config.Delay > 0)
+				{
+					Config.Delay = FMath::Max(0.f, Config.Delay - SafeDeltaTime);
+				}
+			});
+	}
+	#pragma endregion
+
+	// 投射物运动与伤害 | Projectile Move and Dmg 
+	#pragma region
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE_STR("Projectile");
+
+		auto Chain = Mechanism->EnchainSolid(ProjectileFilter);
+		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
+
+		Chain->OperateConcurrently(
+			[&](FSolidSubjectHandle Subject,
+				FSubType& SubType,
+				FProjectileParams& ProjectileParams,
+				FProjectileParamsRT& ProjectileParamsRT,
+				FLocated& Located,
+				FDirected& Directed,
+				FScaled& Scaled)
+			{
+				Located.PreLocation = Located.Location;
+
+				const auto NeighborGrid = IsValid(ProjectileParamsRT.NeighborGridComponent) ? ProjectileParamsRT.NeighborGridComponent : NeighborGrids[0];
+
+				const bool bIsInterped = Subject.HasTrait<FProjectileMove_Interped>(); // 插值
+				const bool bIsBallistic = Subject.HasTrait<FProjectileMove_Ballistic>(); // 抛物线
+				const bool bIsTracking = Subject.HasTrait<FProjectileMove_Tracking>(); // 追踪
+
+				const bool bIsPoint = Subject.HasTrait<FDamage_Point>() && Subject.HasTrait<FDebuff_Point>(); // 点伤害
+				const bool bIsRadial = Subject.HasTrait<FDamage_Radial>() && Subject.HasTrait<FDebuff_Radial>(); // 球形伤害
+				const bool bIsBeam = Subject.HasTrait<FDamage_Beam>() && Subject.HasTrait<FDebuff_Beam>(); // 球扫伤害
+
+				// Movement
+				bool bArrived = false;
+				FVector NewLocation = FVector::ZeroVector;
+
+				if (bIsInterped)
+				{
+					auto& ProjectileMove_Interped = Subject.GetTraitRef<FProjectileMove_Interped>();
+					auto& ProjectileMoving_Interped = Subject.GetTraitRef<FProjectileMoving_Interped>();
+
+					UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Interped
+					(
+						bArrived,
+						NewLocation,
+						ProjectileMoving_Interped.FromPoint,
+						ProjectileMoving_Interped.ToPoint,
+						ProjectileMoving_Interped.Target,
+						ProjectileMove_Interped.XOffset,
+						ProjectileMoving_Interped.XOffsetMult,
+						ProjectileMove_Interped.YOffset,
+						ProjectileMoving_Interped.YOffsetMult,
+						ProjectileMove_Interped.ZOffset,
+						ProjectileMoving_Interped.ZOffsetMult,
+						ProjectileMoving_Interped.BirthTime,
+						CurrentWorld->GetTimeSeconds(),
+						ProjectileMove_Interped.Speed
+					);
+				}
+				else if (bIsBallistic)
+				{
+					auto& ProjectileMove_Ballistic = Subject.GetTraitRef<FProjectileMove_Ballistic>();
+					auto& ProjectileMoving_Ballistic = Subject.GetTraitRef<FProjectileMoving_Ballistic>();
+
+					UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Ballistic
+					(
+						bArrived,
+						NewLocation,
+						ProjectileMoving_Ballistic.FromPoint,
+						ProjectileMoving_Ballistic.ToPoint,
+						ProjectileMoving_Ballistic.BirthTime,
+						CurrentWorld->GetTimeSeconds(),
+						ProjectileMove_Ballistic.Gravity,
+						ProjectileMoving_Ballistic.InitialVelocity
+					);
+				}
+				else if (bIsTracking)
+				{
+					auto& ProjectileMove_Tracking = Subject.GetTraitRef<FProjectileMove_Tracking>();
+					auto& ProjectileMoving_Tracking = Subject.GetTraitRef<FProjectileMoving_Tracking>();
+
+					UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Tracking
+					(
+						bArrived,
+						NewLocation,
+						ProjectileMoving_Tracking.CurrentVelocity,
+						Located.Location,
+						ProjectileMoving_Tracking.ToPoint,
+						ProjectileMoving_Tracking.Target,
+						ProjectileMove_Tracking.Acceleration,
+						ProjectileMove_Tracking.MaxSpeed,
+						SafeDeltaTime,
+						ProjectileParams.Radius
+					);
+				}
+
+				// Trace for Subject
+				float SubjectDistSqr = -1;
+				bool bHitSubject = false;
+				TArray<FTraceResult> HitSubjectResult;
+
+				if (IsValid(NeighborGrid))
+				{
+					if (!ProjectileParams.bTraceOnlyOnArrival || bArrived)
+					{
+						UBattleFrameFunctionLibraryRT::SphereSweepForSubjects
+						(
+							bHitSubject,
+							HitSubjectResult,
+							NeighborGrid,
+							1, // return the nearest one
+							Located.Location, // sweep start
+							NewLocation, // sweep end
+							ProjectileParams.Radius, // collider radius
+							false,// check obstacle
+							FVector::ZeroVector, // check from
+							0, // check sphere sweep radius
+							ESortMode::NearToFar,
+							Located.Location, // sort from
+							ProjectileParamsRT.IgnoreSubjects,
+							ProjectileParams.Filter,
+							FTraceDrawDebugConfig()
+						);
+
+						if (bHitSubject)
+						{
+							SubjectDistSqr = FVector::DistSquared(Located.Location, HitSubjectResult[0].HitLocation); // 与碰撞点的距离
+						}
+					}
+				}
+
+				// Trace for obstacle
+				float ObstacleDistSqr = -1;
+				bool bHitObstacle = false;
+				FHitResult HitObstacleResult;
+
+				if (ProjectileParams.bCheckObstacle)
+				{
+					if (!ProjectileParams.bTraceOnlyOnArrival || bArrived)
+					{
+						bHitObstacle = UKismetSystemLibrary::SphereTraceSingleForObjects
+						(
+							CurrentWorld,
+							Located.Location,
+							NewLocation,
+							ProjectileParams.Radius,
+							ProjectileParams.Filter.ObstacleObjectType,
+							true,
+							TArray<TObjectPtr<AActor>>(),
+							EDrawDebugTrace::None,
+							HitObstacleResult,
+							true,
+							FLinearColor::Gray,
+							FLinearColor::Red,
+							1
+						);
+
+						if (bHitObstacle)
+						{
+							ObstacleDistSqr = FVector::DistSquared(Located.Location, HitObstacleResult.ImpactPoint); // 与碰撞点的距离
+						}
+					}
+				}
+
+				// Get the nearest result
+				bool bCollided = true;
+
+				if (SubjectDistSqr == -1 && ObstacleDistSqr == -1)
+				{
+					// no collision
+					Located.Location = NewLocation;
+					bCollided = false;
+				}
+				else if (SubjectDistSqr == -1)
+				{
+					// only collided with an obstacle
+					Located.Location = HitObstacleResult.Location;
+					ProjectileParams.Health--;
+				}
+				else if (ObstacleDistSqr == -1)
+				{
+					// only collided with a subject
+					Located.Location = HitSubjectResult[0].ShapeLocation;
+					ProjectileParams.Health--;
+				}
+				else
+				{
+					// collided with both a subject and an obstacle, so we choose the nearest result
+					if (SubjectDistSqr <= ObstacleDistSqr)
+					{
+						Located.Location = HitObstacleResult.Location;
+						ProjectileParams.Health--;
+						bHitObstacle = false;
+					}
+					else
+					{
+						Located.Location = HitSubjectResult[0].ShapeLocation;
+						ProjectileParams.Health--;
+						bHitSubject = false;
+					}
+				}
+
+				// 插值朝向
+				Directed.DesiredDirection = (Located.Location - Located.PreLocation).GetSafeNormal2D();
+
+				if (ProjectileParams.bRotationFollowVelocity)
+				{
+					Directed.Direction = Directed.DesiredDirection.Size() == 0 ? Directed.Direction : FMath::VInterpTo(Directed.Direction, Directed.DesiredDirection, SafeDeltaTime, 10);
+				}
+
+				bool bShouldDespawn = false;
+
+				// RemoveOnNoHealth
+				if (ProjectileParams.bRemoveOnNoHealth && ProjectileParams.Health <= 0)
+				{
+					bShouldDespawn = true;
+				}
+
+				// RemoveOnNoLifeSpan
+				if (!ProjectileParams.bRemoveOnNoLifeSpan || ProjectileParams.LifeSpan > 0)
+				{
+					ProjectileParams.LifeSpan -= SafeDeltaTime;
+				}
+				else
+				{
+					bShouldDespawn = true;
+				}
+
+				// RemoveOnHitObstacle
+				if (ProjectileParams.bRemoveOnHitObstacle && bHitObstacle)
+				{
+					bShouldDespawn = true;
+				}
+
+				// RemoveOnArrival
+				if (ProjectileParams.bRemoveOnArrival && bArrived)
+				{
+					bShouldDespawn = true;
+				}
+
+				// Apply damage and debuff
+				float DmgRadius = 0;
+
+				if (bCollided || bArrived || bShouldDespawn)
+				{
+					// Clean ignore list
+					if (!ProjectileParams.bHurtTargetOnlyOnce)
+					{
+						for (const auto& IgnoreSubject : ProjectileParamsRT.IgnoreSubjects.Subjects)
+						{
+							// remove from ignore list on end overlap, so on next begin overlap the subject can get damaged again
+							const bool bShouldRemove = !IgnoreSubject.IsValid() || !IgnoreSubject.HasTrait<FLocated>() || FVector::DistSquared(IgnoreSubject.GetTrait<FLocated>().Location, Located.Location) > FMath::Square(ProjectileParams.Radius);
+
+							if (bShouldRemove)
+							{
+								ProjectileParamsRT.IgnoreSubjects.Subjects.Remove(IgnoreSubject);
+							}
+						}
+					}
+
+					// Get DmgRadius
+					if (bIsRadial)
+					{
+						DmgRadius = Subject.GetTraitRef<FDamage_Radial>().DmgRadius;
+					}
+					else if (bIsBeam)
+					{
+						DmgRadius = Subject.GetTraitRef<FDamage_Beam>().DmgRadius;
+					}
+
+					// Do apply dmg and debuff
+					TArray<FDmgResult> DamageResults;
+
+					if (bIsPoint)
+					{
+						const auto& Damage_Point = Subject.GetTraitRef<FDamage_Point>();
+						const auto& Debuff_Point = Subject.GetTraitRef<FDebuff_Point>();
+
+						FSubjectArray SubjectArray;
+						SubjectArray.Subjects.Add(HitSubjectResult[0].Subject);
+
+						ApplyPointDamageAndDebuffDeferred
+						(
+							SubjectArray,
+							ProjectileParamsRT.IgnoreSubjects,
+							ProjectileParamsRT.Instigator,
+							FSubjectHandle(Subject),
+							Located.Location,
+							Damage_Point,
+							Debuff_Point,
+							DamageResults
+						);
+					}
+					else if (bIsRadial)
+					{
+						const auto& Damage_Radial = Subject.GetTraitRef<FDamage_Radial>();
+						const auto& Debuff_Radial = Subject.GetTraitRef<FDebuff_Radial>();
+
+						ApplyRadialDamageAndDebuffDeferred
+						(
+							NeighborGrid,
+							-1,
+							Located.Location,
+							ProjectileParamsRT.IgnoreSubjects,
+							ProjectileParamsRT.Instigator,
+							FSubjectHandle(Subject),
+							Located.Location,
+							Damage_Radial,
+							Debuff_Radial,
+							DamageResults
+						);
+					}
+					else if (bIsBeam)
+					{
+						const auto& Damage_Beam = Subject.GetTraitRef<FDamage_Beam>();
+						const auto& Debuff_Beam = Subject.GetTraitRef<FDebuff_Beam>();
+
+						ApplyBeamDamageAndDebuffDeferred
+						(
+							NeighborGrid,
+							-1,
+							Located.Location,
+							Located.Location + Damage_Beam.DmgDirectionAndDistance,
+							ProjectileParamsRT.IgnoreSubjects,
+							ProjectileParamsRT.Instigator,
+							FSubjectHandle(Subject),
+							Located.Location,
+							Damage_Beam,
+							Debuff_Beam,
+							DamageResults
+						);
+					}
+
+					// Add to ignore list
+					for (const auto& DamageResult : DamageResults)
+					{
+						ProjectileParamsRT.IgnoreSubjects.Subjects.AddUnique(DamageResult.DamagedSubject);
+					}
+
+					// Hit particle burst
+					FSubjectRecord BurstFxRecord;
+					BurstFxRecord.SetTrait(FProjectile());
+					BurstFxRecord.SetTrait(FIsBurstFx());
+					BurstFxRecord.SetTrait(Located);
+					BurstFxRecord.SetTrait(Directed);
+					BurstFxRecord.SetTrait(Scaled);
+					UBattleFrameFunctionLibraryRT::SetRecordSubTypeTraitByIndex(SubType.Index, BurstFxRecord);
+
+					Mechanism->SpawnSubjectDeferred(BurstFxRecord);
+				}
+
+				if (bShouldDespawn)
+				{
+					Subject.DespawnDeferred();
+				}
+
+				// Draw Debug
+				if (ProjectileParams.bDrawDebugShape)
+				{
+					FDebugSphereConfig ColliderRadius;
+					ColliderRadius.Radius = ProjectileParams.Radius;
+					ColliderRadius.Location = Located.Location;
+					ColliderRadius.Color = FColor::Red;
+					ColliderRadius.LineThickness = 0.f;
+					DebugSphereQueue.Enqueue(ColliderRadius);
+
+					FDebugSphereConfig DamageRadius;
+					DamageRadius.Radius = DmgRadius;
+					DamageRadius.Location = Located.Location;
+					DamageRadius.Color = FColor::Red;
+					DamageRadius.LineThickness = 0.f;
+					DebugSphereQueue.Enqueue(DamageRadius);
+				}
+
+			}, ThreadsCount, BatchSize);
+	}
+	#pragma endregion
+
+	//----------------------- 受击 | Hit -------------------------
 
 	// 受击反馈 | Hit Reaction
 	#pragma region
@@ -3095,7 +3614,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						NewConfig.AttachToSubject = FSubjectHandle(Subject);
 						NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Dying.HitDirection.ToOrientationQuat(), Located.Location, NewConfig.Transform);
 						NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(Directed.Direction.ToOrientationQuat(), Located.Location));
-
+						
 						Mechanism->SpawnSubjectDeferred(NewConfig);
 					}
 
@@ -3108,7 +3627,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Dying.HitDirection.ToOrientationQuat(), Located.Location, NewConfig.Transform);
 						NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(Directed.Direction.ToOrientationQuat(), Located.Location));
 						NewConfig.LaunchSpeed = Dying.HitDirection.Size();
-
+						
 						Mechanism->SpawnSubjectDeferred(NewConfig);
 					}
 
@@ -3120,7 +3639,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						NewConfig.AttachToSubject = FSubjectHandle(Subject);
 						NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Dying.HitDirection.ToOrientationQuat(), Located.Location, NewConfig.Transform);
 						NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(FTransform(Directed.Direction.ToOrientationQuat(), Located.Location));
-
+						
 						Mechanism->SpawnSubjectDeferred(NewConfig);
 					}
 
@@ -3193,7 +3712,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//--------------------- 渲染 | Rendering ------------------------
+	//---------------------- 渲染 | Rendering ------------------------
 
 	// 动画状态机 | Anim State Machine
 	#pragma region
@@ -3634,14 +4153,14 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//------------------游戏线程逻辑 | Game Thread Logic-----------------
+	//---------- 其它游戏线程逻辑 | Other Game Thread Logic -----------
 
 	// 生成Actor | Spawn Actor
 	#pragma region
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE_STR("SpawnActors");
 
-		Mechanism->Operate<FUnsafeChain>(SpawnActorsFilter,
+		Mechanism->Operate<FUnsafeChain>(SpawnActorFilter,
 			[&](FSubjectHandle Subject,
 				FActorSpawnConfig_Final& Config)
 			{
@@ -4297,378 +4816,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 	}
 	#pragma endregion
 
-	//------------------- 投射物 | Projectile --------------------
-
-	// 投射物 | Projectile
-	#pragma region
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE_STR("Projectile");
-
-		auto Chain = Mechanism->EnchainSolid(ProjectileFilter);
-		UBattleFrameFunctionLibraryRT::CalculateThreadsCountAndBatchSize(Chain->IterableNum(), MaxThreadsAllowed, MinBatchSizeAllowed, ThreadsCount, BatchSize);
-
-		Chain->OperateConcurrently(
-			[&](FSolidSubjectHandle Subject,
-				FSubType& SubType,
-				FProjectileParams& ProjectileParams,
-				FProjectileParamsRT& ProjectileParamsRT,
-				FLocated& Located,
-				FDirected& Directed,
-				FScaled& Scaled)
-			{
-				Located.PreLocation = Located.Location;
-				const auto NeighborGrid = IsValid(ProjectileParamsRT.NeighborGridComponent) ? ProjectileParamsRT.NeighborGridComponent : NeighborGrids[0];
-
-				const bool bIsInterped = Subject.HasTrait<FProjectileMove_Interped>(); // 插值
-				const bool bIsBallistic = Subject.HasTrait<FProjectileMove_Ballistic>(); // 抛物线
-				const bool bIsTracking = Subject.HasTrait<FProjectileMove_Tracking>(); // 追踪
-
-				const bool bIsPoint = Subject.HasTrait<FDamage_Point>() && Subject.HasTrait<FDebuff_Point>(); // 点伤害
-				const bool bIsRadial = Subject.HasTrait<FDamage_Radial>() && Subject.HasTrait<FDebuff_Radial>(); // 球形伤害
-				const bool bIsBeam = Subject.HasTrait<FDamage_Beam>() && Subject.HasTrait<FDebuff_Beam>(); // 球扫伤害
-				
-				// Movement
-				bool bArrived = false;
-				FVector NewLocation = FVector::ZeroVector;
-
-				if (bIsInterped)
-				{
-					auto& ProjectileMove_Interped = Subject.GetTraitRef<FProjectileMove_Interped>();
-					auto& ProjectileMoving_Interped = Subject.GetTraitRef<FProjectileMoving_Interped>();
-
-					UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Interped
-					(
-						bArrived,
-						NewLocation,
-						ProjectileMoving_Interped.FromPoint,
-						ProjectileMoving_Interped.ToPoint,
-						ProjectileMoving_Interped.Target,
-						ProjectileMove_Interped.XYOffset,
-						ProjectileMoving_Interped.XYOffsetMult,
-						ProjectileMove_Interped.ZOffset,
-						ProjectileMoving_Interped.ZOffsetMult,
-						ProjectileMoving_Interped.BirthTime,
-						CurrentWorld->GetTimeSeconds(),
-						ProjectileMoving_Interped.Speed
-					);
-				}
-				else if (bIsBallistic)
-				{
-					auto& ProjectileMove_Ballistic = Subject.GetTraitRef<FProjectileMove_Ballistic>();
-					auto& ProjectileMoving_Ballistic = Subject.GetTraitRef<FProjectileMoving_Ballistic>();
-
-					UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Ballistic
-					(
-						bArrived,
-						NewLocation,
-						ProjectileMoving_Ballistic.FromPoint,
-						ProjectileMoving_Ballistic.ToPoint,
-						ProjectileMoving_Ballistic.BirthTime,
-						CurrentWorld->GetTimeSeconds(),
-						ProjectileMove_Ballistic.Gravity, 
-						ProjectileMoving_Ballistic.InitialVelocity
-					);
-				}
-				else if (bIsTracking)
-				{
-					auto& ProjectileMove_Tracking = Subject.GetTraitRef<FProjectileMove_Tracking>();
-					auto& ProjectileMoving_Tracking = Subject.GetTraitRef<FProjectileMoving_Tracking>();
-
-					UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Tracking
-					(
-						bArrived,
-						NewLocation,
-						ProjectileMoving_Tracking.CurrentVelocity,
-						Located.Location,
-						ProjectileMoving_Tracking.ToPoint,
-						ProjectileMoving_Tracking.Target,
-						ProjectileMove_Tracking.Acceleration,
-						ProjectileMove_Tracking.MaxSpeed,
-						SafeDeltaTime,
-						ProjectileParams.Radius
-					);
-				}
-				
-				// Trace for Subject
-				float SubjectDistSqr = -1;
-				bool bHitSubject = false;
-				TArray<FTraceResult> HitSubjectResult;
-
-				if (IsValid(NeighborGrid))
-				{
-					if (!ProjectileParams.bTraceOnlyOnArrival || bArrived)
-					{
-						UBattleFrameFunctionLibraryRT::SphereSweepForSubjects
-						(
-							bHitSubject,
-							HitSubjectResult,
-							NeighborGrid,
-							1, // return the nearest one
-							Located.Location, // sweep start
-							NewLocation, // sweep end
-							ProjectileParams.Radius, // collider radius
-							false,// check obstacle
-							FVector::ZeroVector, // check from
-							0, // check sphere sweep radius
-							ESortMode::NearToFar,
-							Located.Location, // sort from
-							ProjectileParamsRT.IgnoreSubjects,
-							ProjectileParams.Filter,
-							FTraceDrawDebugConfig()
-						);
-
-						if (bHitSubject)
-						{
-							SubjectDistSqr = FVector::DistSquared(Located.Location, HitSubjectResult[0].HitLocation); // 与碰撞点的距离
-						}
-					}
-				}
-
-				// Trace for obstacle
-				float ObstacleDistSqr = -1;
-				bool bHitObstacle = false;
-				FHitResult HitObstacleResult;
-
-				if (ProjectileParams.bCheckObstacle)
-				{
-					if (!ProjectileParams.bTraceOnlyOnArrival || bArrived)
-					{
-						bHitObstacle = UKismetSystemLibrary::SphereTraceSingleForObjects
-						(
-							CurrentWorld,
-							Located.Location,
-							NewLocation,
-							ProjectileParams.Radius,
-							ProjectileParams.Filter.ObstacleObjectType,
-							true,
-							TArray<TObjectPtr<AActor>>(),
-							EDrawDebugTrace::None,
-							HitObstacleResult,
-							true,
-							FLinearColor::Gray,
-							FLinearColor::Red,
-							1
-						);
-
-						if (bHitObstacle)
-						{
-							ObstacleDistSqr = FVector::DistSquared(Located.Location, HitObstacleResult.ImpactPoint); // 与碰撞点的距离
-						}
-					}
-				}
-
-				// Get the nearest result
-				bool bCollided = true;
-
-				if (SubjectDistSqr == -1 && ObstacleDistSqr == -1)
-				{			
-					// no collision
-					Located.Location = NewLocation;
-					bCollided = false;
-				}
-				else if (SubjectDistSqr == -1)
-				{
-					// only collided with an obstacle
-					Located.Location = HitObstacleResult.Location;
-					ProjectileParams.Health--;
-				}
-				else if (ObstacleDistSqr == -1)
-				{
-					// only collided with a subject
-					Located.Location = HitSubjectResult[0].ShapeLocation;
-					ProjectileParams.Health--;
-				}
-				else
-				{
-					// collided with both a subject and an obstacle, so we choose the nearest result
-					if (SubjectDistSqr <= ObstacleDistSqr)
-					{
-						Located.Location = HitObstacleResult.Location;
-						ProjectileParams.Health--;
-						bHitObstacle = false;
-					}
-					else
-					{
-						Located.Location = HitSubjectResult[0].ShapeLocation;
-						ProjectileParams.Health--;
-						bHitSubject = false;
-					}
-				}
-
-				// 插值朝向
-				Directed.DesiredDirection = (Located.Location - Located.PreLocation).GetSafeNormal2D();
-
-				if (ProjectileParams.bRotationFollowVelocity)
-				{
-					Directed.Direction = Directed.DesiredDirection.Size() == 0 ? Directed.Direction : FMath::VInterpTo(Directed.Direction, Directed.DesiredDirection, SafeDeltaTime, 10);
-				}
-
-				bool bShouldDespawn = false;
-
-				// RemoveOnNoHealth
-				if (ProjectileParams.bRemoveOnNoHealth && ProjectileParams.Health <= 0)
-				{
-					bShouldDespawn = true;
-				}
-
-				// RemoveOnNoLifeSpan
-				if (!ProjectileParams.bRemoveOnNoLifeSpan || ProjectileParams.LifeSpan > 0)
-				{
-					ProjectileParams.LifeSpan -= SafeDeltaTime;
-				}
-				else
-				{
-					bShouldDespawn = true;
-				}
-
-				// RemoveOnHitObstacle
-				if (ProjectileParams.bRemoveOnHitObstacle && bHitObstacle)
-				{
-					bShouldDespawn = true;
-				}
-
-				// RemoveOnArrival
-				if (ProjectileParams.bRemoveOnArrival && bArrived)
-				{
-					bShouldDespawn = true;
-				}
-				
-				// Apply damage and debuff
-				float DmgRadius = 0;
-
-				if (bCollided || bArrived || bShouldDespawn)
-				{
-					// Clean ignore list
-					if (!ProjectileParams.bHurtTargetOnlyOnce)
-					{
-						for (const auto& IgnoreSubject : ProjectileParamsRT.IgnoreSubjects.Subjects)
-						{
-							// remove from ignore list on end overlap, so on next begin overlap the subject can get damaged again
-							const bool bShouldRemove = !IgnoreSubject.IsValid() || !IgnoreSubject.HasTrait<FLocated>() || FVector::DistSquared(IgnoreSubject.GetTrait<FLocated>().Location, Located.Location) > FMath::Square(ProjectileParams.Radius);
-
-							if (bShouldRemove)
-							{
-								ProjectileParamsRT.IgnoreSubjects.Subjects.Remove(IgnoreSubject);
-							}
-						}
-					}
-
-					// Get DmgRadius
-					if (bIsRadial)
-					{
-						DmgRadius = Subject.GetTraitRef<FDamage_Radial>().DmgRadius;
-					}
-					else if (bIsBeam)
-					{
-						DmgRadius = Subject.GetTraitRef<FDamage_Beam>().DmgRadius;
-					}
-
-					// Do apply dmg and debuff
-					TArray<FDmgResult> DamageResults;
-
-					if (bIsPoint)
-					{
-						const auto& Damage_Point = Subject.GetTraitRef<FDamage_Point>();
-						const auto& Debuff_Point = Subject.GetTraitRef<FDebuff_Point>();
-
-						FSubjectArray SubjectArray;
-						SubjectArray.Subjects.Add(HitSubjectResult[0].Subject);
-
-						ApplyPointDamageAndDebuffDeferred
-						(
-							SubjectArray,
-							ProjectileParamsRT.IgnoreSubjects,
-							ProjectileParamsRT.Instigator,
-							FSubjectHandle(Subject),
-							Located.Location,
-							Damage_Point,
-							Debuff_Point,
-							DamageResults
-						);
-					}
-					else if (bIsRadial)
-					{
-						const auto& Damage_Radial = Subject.GetTraitRef<FDamage_Radial>();
-						const auto& Debuff_Radial = Subject.GetTraitRef<FDebuff_Radial>();
-
-						ApplyRadialDamageAndDebuffDeferred
-						(
-							NeighborGrid,
-							-1,
-							Located.Location,
-							ProjectileParamsRT.IgnoreSubjects,
-							ProjectileParamsRT.Instigator,
-							FSubjectHandle(Subject),
-							Located.Location,
-							Damage_Radial,
-							Debuff_Radial,
-							DamageResults
-						);
-					}
-					else if (bIsBeam)
-					{
-						const auto& Damage_Beam = Subject.GetTraitRef<FDamage_Beam>();
-						const auto& Debuff_Beam = Subject.GetTraitRef<FDebuff_Beam>();
-
-						ApplyBeamDamageAndDebuffDeferred
-						(
-							NeighborGrid,
-							-1,
-							Located.Location,
-							Located.Location + Damage_Beam.DmgDirectionAndDistance,
-							ProjectileParamsRT.IgnoreSubjects,
-							ProjectileParamsRT.Instigator,
-							FSubjectHandle(Subject),
-							Located.Location,
-							Damage_Beam,
-							Debuff_Beam,
-							DamageResults
-						);
-					}
-
-					// Add to ignore list
-					for (const auto& DamageResult : DamageResults)
-					{
-						ProjectileParamsRT.IgnoreSubjects.Subjects.AddUnique(DamageResult.DamagedSubject);
-					}
-
-					// Hit particle burst
-					FSubjectRecord BurstFxRecord;
-					BurstFxRecord.SetTrait(FProjectile());
-					BurstFxRecord.SetTrait(FIsBurstFx());
-					BurstFxRecord.SetTrait(Located);
-					BurstFxRecord.SetTrait(Directed);
-					BurstFxRecord.SetTrait(Scaled);
-					UBattleFrameFunctionLibraryRT::SetRecordSubTypeTraitByIndex(SubType.Index, BurstFxRecord);
-					Mechanism->SpawnSubjectDeferred(BurstFxRecord);
-				}
-
-				if (bShouldDespawn)
-				{
-					Subject.DespawnDeferred();
-				}
-
-				// Draw Debug
-				if (ProjectileParams.bDrawDebugShape)
-				{
-					FDebugSphereConfig ColliderRadius;
-					ColliderRadius.Radius = ProjectileParams.Radius;
-					ColliderRadius.Location = Located.Location;
-					ColliderRadius.Color = FColor::Red;
-					ColliderRadius.LineThickness = 0.f;
-					DebugSphereQueue.Enqueue(ColliderRadius);
-
-					FDebugSphereConfig DamageRadius;
-					DamageRadius.Radius = DmgRadius;
-					DamageRadius.Location = Located.Location;
-					DamageRadius.Color = FColor::Red;
-					DamageRadius.LineThickness = 0.f;
-					DebugSphereQueue.Enqueue(DamageRadius);
-				}
-
-			}, ThreadsCount, BatchSize);
-	}
-	#pragma endregion
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4702,7 +4849,8 @@ void ABattleFrameBattleControl::DefineFilters()
 	TemporalDamageFilter = FFilter::Make<FTemporalDamage>();
 	SlowFilter = FFilter::Make<FSlow>();
 
-	SpawnActorsFilter = FFilter::Make<FActorSpawnConfig_Final>();
+	SpawnProjectileFilter = FFilter::Make<FProjectileConfig_Final>();
+	SpawnActorFilter = FFilter::Make<FActorSpawnConfig_Final>();
 	SpawnFxFilter = FFilter::Make<FFxConfig_Final>();
 	PlaySoundFilter = FFilter::Make<FSoundConfig_Final>();
 
@@ -5339,7 +5487,7 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuff(const FSubjectArray& S
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(),WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubject(NewConfig);
 			}
 
@@ -5352,7 +5500,7 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuff(const FSubjectArray& S
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubject(NewConfig);
 			}
 
@@ -5365,7 +5513,7 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuff(const FSubjectArray& S
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubject(NewConfig);
 			}
 
@@ -5694,7 +5842,7 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuffDeferred(const FSubject
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubjectDeferred(NewConfig);
 			}
 
@@ -5707,7 +5855,7 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuffDeferred(const FSubject
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubjectDeferred(NewConfig);
 			}
 
@@ -5720,7 +5868,7 @@ void ABattleFrameBattleControl::ApplyPointDamageAndDebuffDeferred(const FSubject
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubjectDeferred(NewConfig);
 			}
 
@@ -6077,7 +6225,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(UNeighborGridComponen
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubject(NewConfig);
 			}
 
@@ -6090,7 +6238,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(UNeighborGridComponen
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubject(NewConfig);
 			}
 
@@ -6103,7 +6251,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuff(UNeighborGridComponen
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubject(NewConfig);
 			}
 
@@ -6449,7 +6597,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuffDeferred(UNeighborGrid
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubjectDeferred(NewConfig);
 			}
 
@@ -6462,7 +6610,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuffDeferred(UNeighborGrid
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubjectDeferred(NewConfig);
 			}
 
@@ -6475,7 +6623,7 @@ void ABattleFrameBattleControl::ApplyRadialDamageAndDebuffDeferred(UNeighborGrid
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubjectDeferred(NewConfig);
 			}
 
@@ -6833,7 +6981,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(UNeighborGridComponent*
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubject(NewConfig);
 			}
 
@@ -6846,7 +6994,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(UNeighborGridComponent*
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubject(NewConfig);
 			}
 
@@ -6859,7 +7007,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuff(UNeighborGridComponent*
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubject(NewConfig);
 			}
 
@@ -7206,7 +7354,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(UNeighborGridCo
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubjectDeferred(NewConfig);
 			}
 
@@ -7219,7 +7367,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(UNeighborGridCo
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubjectDeferred(NewConfig);
 			}
 
@@ -7232,7 +7380,7 @@ void ABattleFrameBattleControl::ApplyBeamDamageAndDebuffDeferred(UNeighborGridCo
 				const FTransform WorldTransform(HitDirection.ToOrientationQuat(), Location);
 				NewConfig.SpawnTransform = ABattleFrameBattleControl::LocalOffsetToWorld(Direction.ToOrientationQuat(), WorldTransform.GetLocation(), NewConfig.Transform);
 				NewConfig.InitialRelativeTransform = NewConfig.SpawnTransform.GetRelativeTransform(WorldTransform);
-
+				
 				Mechanism->SpawnSubjectDeferred(NewConfig);
 			}
 
@@ -7572,7 +7720,7 @@ FVector ABattleFrameBattleControl::FindClosestPointOnSegment(const FVector& Poin
 }
 
 
-//-------------------------------RVO2D Copyright 2023, EastFoxStudio. All Rights Reserved-------------------------------
+//-------------------------------RVO2-2D Copyright 2023, EastFoxStudio. All Rights Reserved-------------------------------
 
 void ABattleFrameBattleControl::ComputeAvoidingVelocity(FAvoidance& Avoidance, FAvoiding& Avoiding, const TArray<FGridData>& SubjectNeighbors, const TArray<FGridData>& ObstacleNeighbors, float TimeStep)
 {

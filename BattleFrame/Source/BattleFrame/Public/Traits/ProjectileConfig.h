@@ -18,105 +18,25 @@ enum class EProjectileSolveMode : uint8
 };
 
 USTRUCT(BlueprintType)
-struct BATTLEFRAME_API FProjectileParamsRT_Ballistic
+struct BATTLEFRAME_API FIsAttachedFx
 {
 	GENERATED_BODY()
 
 public:
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	float ScaleMult = 1;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	int32 Iterations = 3;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	float Gravity = -1000;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	EProjectileSolveMode SolveMode = EProjectileSolveMode::FromPitch;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	float PitchAngle = 35;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	float Speed = 3000;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	bool bFavorHighArc = false;
-};
-
-USTRUCT(BlueprintType)
-struct BATTLEFRAME_API FProjectileParamsRT_Interped
-{
-	GENERATED_BODY()
-
-public:
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	float ScaleMult = 1;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	float Speed = 3000;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	float XYOffsetMult = 1;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	float ZOffsetMult = 1;
-};
-
-USTRUCT(BlueprintType)
-struct BATTLEFRAME_API FProjectileParamsRT_Tracking
-{
-	GENERATED_BODY()
-
-public:
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	float ScaleMult = 1;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	float Speed = 3000;
 
 };
 
 USTRUCT(BlueprintType)
-struct BATTLEFRAME_API FProjectileParamsRT_Static
+struct BATTLEFRAME_API FIsBurstFx
 {
 	GENERATED_BODY()
 
 public:
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	float ScaleMult = 1;
-
 };
 
-USTRUCT(BlueprintType)
-struct BATTLEFRAME_API FProjectileParamsRT_DA
-{
-	GENERATED_BODY()
 
-public:
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfig;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	FProjectileParamsRT_Ballistic Ballistic;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	FProjectileParamsRT_Interped Interped;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	FProjectileParamsRT_Tracking Tracking;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
-	FProjectileParamsRT_Static Static;
-
-};
-
+//------------------Common Params----------------------
 
 USTRUCT(BlueprintType)
 struct BATTLEFRAME_API FProjectileParams
@@ -124,9 +44,6 @@ struct BATTLEFRAME_API FProjectileParams
 	GENERATED_BODY()
 
 public:
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "绘制调试图形"))
-	bool bDrawDebugShape = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "碰撞检测半径"))
 	float Radius = 100;
@@ -136,6 +53,12 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "血量，每发生一次碰撞，血量-1，归零后不再造成伤害"))
 	int32 Health = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "碰撞条件"))
+	FBFFilter Filter = FBFFilter();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "绘制调试图形"))
+	bool bDrawDebugShape = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "朝向运动方向"))
 	bool bRotationFollowVelocity = true;
@@ -148,9 +71,6 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "能否与环境碰撞"))
 	bool bCheckObstacle = false;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (ToolTip = "碰撞条件"))
-	FBFFilter Filter = FBFFilter();
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "寿命归零后销毁"))
 	bool bRemoveOnNoLifeSpan = true;
@@ -184,6 +104,9 @@ public:
 
 };
 
+
+//--------------------Movement----------------------
+
 USTRUCT(BlueprintType)
 struct BATTLEFRAME_API FProjectileMove_Static
 {
@@ -202,7 +125,8 @@ public:
 
 	FProjectileMove_Interped()
 	{
-		InitializeCurve(XYOffset, { {0.0f, 0.0f}, {1.0f, 0.0f} });
+		InitializeCurve(XOffset, { {0.0f, 0.0f}, {1.0f, 0.0f} });
+		InitializeCurve(YOffset, { {0.0f, 0.0f}, {1.0f, 0.0f} });
 		InitializeCurve(ZOffset, { {0.0f, 0.0f}, {1.0f, 0.0f} });
 	}
 
@@ -222,17 +146,26 @@ private:
 
 public:
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Curves, meta = (Tooltip = "XY平面位置偏移曲线"))
-	FRuntimeFloatCurve XYOffset;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "速度"))
+	float Speed = 2000;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Curves, meta = (Tooltip = "XY平面位置偏移乘数映射"))
-	FVector4 XYScaleRangeMap = FVector4(0, 1, 10000, 1);
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Curves, meta = (Tooltip = "前后偏移曲线"))
+	FRuntimeFloatCurve XOffset;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Curves, meta = (Tooltip = "Z轴向高度偏移曲线"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Curves, meta = (Tooltip = "前后偏移-距离映射乘数"))
+	FVector4 XOffsetRangeMap = FVector4(0, 1, 10000, 1);
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Curves, meta = (Tooltip = "左右偏移曲线"))
+	FRuntimeFloatCurve YOffset;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Curves, meta = (Tooltip = "左右偏移-距离映射乘数"))
+	FVector4 YOffsetRangeMap = FVector4(0, 1, 10000, 1);
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Curves, meta = (Tooltip = "上下偏移曲线"))
 	FRuntimeFloatCurve ZOffset;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Curves, meta = (Tooltip = "Z轴向高度偏移乘数映射"))
-	FVector4 ZScaleRangeMap = FVector4(0, 1, 10000, 1);
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Curves, meta = (Tooltip = "上下偏移-距离映射乘数"))
+	FVector4 ZOffsetRangeMap = FVector4(0, 1, 10000, 1);
 
 };
 
@@ -255,11 +188,11 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "生成时间"))
 	float BirthTime = 0;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "速度"))
-	float Speed = 2000;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
+	float XOffsetMult = 1;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	float XYOffsetMult = 1;
+	float YOffsetMult = 1;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
 	float ZOffsetMult = 1;
@@ -274,10 +207,25 @@ struct BATTLEFRAME_API FProjectileMove_Ballistic
 public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "最大速度"))
-	float MaxSpeed = 5000;
+	float MaxSpeed = 10000;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "重力"))
 	float Gravity = -980;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "预判精度"))
+	int32 Iterations = 3;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "弹道计算模式"))
+	EProjectileSolveMode SolveMode = EProjectileSolveMode::FromPitch;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "抛射仰角角度", EditCondition = "SolveMode == EProjectileSolveMode::FromPitch", EditConditionHides))
+	float Pitch = 35;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "初速度", EditCondition = "SolveMode == EProjectileSolveMode::FromSpeed", EditConditionHides))
+	float Speed = 3000;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "选择高抛弹道还是平抛弹道", EditCondition = "SolveMode == EProjectileSolveMode::FromSpeed", EditConditionHides))
+	bool bFavorHighArc = false;
 
 };
 
@@ -309,11 +257,14 @@ struct BATTLEFRAME_API FProjectileMove_Tracking
 
 public:
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "加速度"))
-	float Acceleration = 1000;
-
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "最大速度"))
 	float MaxSpeed = 5000;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "初速度"))
+	float Speed = 1000;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "加速度"))
+	float Acceleration = 1000;
 
 };
 
@@ -341,21 +292,226 @@ public:
 
 };
 
+
+//-------------------Multipliers----------------------
+
 USTRUCT(BlueprintType)
-struct BATTLEFRAME_API FIsAttachedFx
+struct BATTLEFRAME_API FProjectileMultipliers_Static
 {
 	GENERATED_BODY()
 
 public:
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "尺寸乘数"))
+	float ScaleMult = 1;
+
 };
 
 USTRUCT(BlueprintType)
-struct BATTLEFRAME_API FIsBurstFx
+struct BATTLEFRAME_API FProjectileMultipliers_Interped
 {
 	GENERATED_BODY()
 
 public:
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "尺寸乘数"))
+	float ScaleMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "速度乘数"))
+	float SpeedMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "前后偏移乘数"))
+	float XOffsetMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "左右偏移乘数"))
+	float YOffsetMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "上下偏移乘数"))
+	float ZOffsetMult = 1;
+
 };
 
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FProjectileMultipliers_Ballistic
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "尺寸乘数"))
+	float ScaleMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "重力乘数"))
+	float GravityMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "抛射仰角角度乘数"))
+	float PitchMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "抛射初速度乘数"))
+	float SpeedMult = 1;
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FProjectileMultipliers_Tracking
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "尺寸乘数"))
+	float ScaleMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "初速度乘数"))
+	float SpeedMult = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "加速度乘数"))
+	float AccelerationMult = 1;
+
+};
+
+
+//-------------------Spawn Config-------------------
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FProjectileMultipliers
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	FProjectileMultipliers_Static Static;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	FProjectileMultipliers_Interped Interped;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	FProjectileMultipliers_Ballistic Ballistic;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = ""))
+	FProjectileMultipliers_Tracking Tracking;
+
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FProjectileConfig
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "启用"))
+	bool bEnable = true;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "子弹数据资产"))
+	TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "子弹参数乘数"))
+	FProjectileMultipliers Multipliers;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "原点"))
+	ESpawnOrigin SpawnOrigin = ESpawnOrigin::AtSelf;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "偏移量"))
+	FTransform Transform = FTransform::Identity;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "数量"))
+	int32 Quantity = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "延时生成"))
+	float Delay = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "附着"))
+	bool bAttached = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "附着点失效后自毁"))
+	bool bDespawnWhenNoParent = true;
+
+};
+
+USTRUCT(BlueprintType)
+struct BATTLEFRAME_API FProjectileConfig_Final
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "启用"))
+	bool bEnable = true;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "子弹数据资产"))
+	TSoftObjectPtr<UProjectileConfigDataAsset> ProjectileConfigDataAsset;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Meta = (ToolTip = "子弹参数乘数"))
+	FProjectileMultipliers Multipliers;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Tooltip = "原点"))
+	ESpawnOrigin SpawnOrigin = ESpawnOrigin::AtSelf;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "偏移量"))
+	FTransform Transform = FTransform::Identity;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "数量"))
+	int32 Quantity = 1;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "延时生成"))
+	float Delay = 0;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "附着"))
+	bool bAttached = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "附着点失效后自毁"))
+	bool bDespawnWhenNoParent = true;
+
+	//-----------------------------------------------
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "生成者"))
+	FSubjectHandle OwnerSubject = FSubjectHandle();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "附着到"))
+	FSubjectHandle AttachToSubject = FSubjectHandle();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "目标"))
+	FSubjectHandle TargetSubject = FSubjectHandle();
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
+	FTransform SpawnTransform;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
+	FTransform InitialRelativeTransform;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
+	TArray<FSubjectHandle> SpawnedProjectiles;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
+	FVector FromPoint;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
+	FVector ToPoint;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
+	FVector TargetVelocity;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
+	UNeighborGridComponent* NeighborGrid;
+
+	bool bInitialized = false;
+	bool bSpawned = false;
+
+	//-----------------------------------------------
+
+	FProjectileConfig_Final(){};
+
+	FProjectileConfig_Final(const FProjectileConfig& Config)
+	{
+		bEnable = Config.bEnable;
+		ProjectileConfigDataAsset = Config.ProjectileConfigDataAsset;
+		Multipliers = Config.Multipliers;
+		SpawnOrigin = Config.SpawnOrigin;
+		Transform = Config.Transform;
+		Quantity = Config.Quantity;
+		Delay = Config.Delay;
+		bAttached = Config.bAttached;
+		bDespawnWhenNoParent = Config.bDespawnWhenNoParent;
+	}
+};

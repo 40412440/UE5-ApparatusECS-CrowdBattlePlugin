@@ -28,21 +28,14 @@ public:
 
     GENERATED_BODY()
 
-    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Type", meta = (ToolTip = "主类型"))
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Common", meta = (ToolTip = "主类型"))
     FProjectile Projectile;
 
-    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Type", meta = (ToolTip = "子类型"))
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Common", meta = (ToolTip = "子类型"))
     FSubType SubType;
 
-    // 无条件的通用参数
-    FLocated Located;
-    FDirected Directed;
-    FScaled Scaled;
-
-    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "SharedParams", meta = (ToolTip = "通用参数"))
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Common", meta = (ToolTip = "通用参数"))
     FProjectileParams ProjectileParams;
-
-    FProjectileParamsRT ProjectileParamsRT;
 
 
     // 投射物运动模式
@@ -50,22 +43,17 @@ public:
     EProjectileMoveMode MovementMode = EProjectileMoveMode::Ballistic;
 
     // 运动模式相关参数（根据MovementMode显示）
-    FProjectileMove_Static ProjectileMove_Static;
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement", meta = (DisplayName = "ProjectileMove", ToolTip = "抛物线运动参数", EditCondition = "MovementMode == EProjectileMoveMode::Ballistic", EditConditionHides))
+    FProjectileMove_Ballistic ProjectileMove_Ballistic;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement", meta = (DisplayName = "ProjectileMove", ToolTip = "插值运动参数", EditCondition = "MovementMode == EProjectileMoveMode::Interped", EditConditionHides))
     FProjectileMove_Interped ProjectileMove_Interped;
 
-    FProjectileMoving_Interped ProjectileMoving_Interped;
-
-    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement", meta = (DisplayName = "ProjectileMove", ToolTip = "抛物线运动参数", EditCondition = "MovementMode == EProjectileMoveMode::Ballistic", EditConditionHides))
-    FProjectileMove_Ballistic ProjectileMove_Ballistic;
-
-    FProjectileMoving_Ballistic ProjectileMoving_Ballistic;
-
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement", meta = (DisplayName = "ProjectileMove", ToolTip = "跟踪运动参数", EditCondition = "MovementMode == EProjectileMoveMode::Tracking", EditConditionHides))
     FProjectileMove_Tracking ProjectileMove_Tracking;
 
-    FProjectileMoving_Tracking ProjectileMoving_Tracking;
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Movement", meta = (DisplayName = "ProjectileMove", ToolTip = "静止运动参数", EditCondition = "MovementMode == EProjectileMoveMode::Static", EditConditionHides))
+    FProjectileMove_Static ProjectileMove_Static;
 
 
     // 投射物伤害模式
@@ -92,7 +80,15 @@ public:
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "DamageAndDebuff", meta = (DisplayName = "Debuff", ToolTip = "球扫Debuff参数", EditCondition = "DamageMode == EProjectileDamageMode::Beam", EditConditionHides))
     FDebuff_Beam Debuff_Beam;
 
+    // Runtime Params
+    FProjectileParamsRT ProjectileParamsRT;
+    FProjectileMoving_Interped ProjectileMoving_Interped;
+    FProjectileMoving_Ballistic ProjectileMoving_Ballistic;
+    FProjectileMoving_Tracking ProjectileMoving_Tracking;
 
+    FLocated Located;
+    FDirected Directed;
+    FScaled Scaled;
 
     UProjectileConfigDataAsset() {};
 };
