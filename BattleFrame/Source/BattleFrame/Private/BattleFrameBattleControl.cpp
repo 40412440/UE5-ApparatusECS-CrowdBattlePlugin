@@ -2534,33 +2534,20 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 						switch (DataAsset->MovementMode)
 						{
-							case EProjectileMoveMode::Ballistic:
-							{
-								if (DataAsset->ProjectileMove_Ballistic.SolveMode == EProjectileSolveMode::FromPitch)
-								{
-									UBattleFrameFunctionLibraryRT::SolveProjectileVelocityFromPitchWithPrediction(Succeed, LaunchVelocity, Config.FromPoint, Config.ToPoint, Config.TargetVelocity, DataAsset->ProjectileMove_Ballistic.Iterations, DataAsset->ProjectileMove_Ballistic.Gravity, DataAsset->ProjectileMove_Ballistic.Pitch);
-								}
-								else
-								{
-									UBattleFrameFunctionLibraryRT::SolveProjectileVelocityFromSpeedWithPrediction(Succeed, LaunchVelocity, Config.FromPoint, Config.ToPoint, Config.TargetVelocity, DataAsset->ProjectileMove_Ballistic.Iterations, DataAsset->ProjectileMove_Ballistic.Gravity, DataAsset->ProjectileMove_Ballistic.Speed, DataAsset->ProjectileMove_Ballistic.bFavorHighArc);
-								}
-								if (Succeed)
-								{
-									UBattleFrameFunctionLibraryRT::SpawnProjectile_Ballistic(Succeed, ProjectileHandle, Config.NeighborGrid, Config.ProjectileConfigDataAsset.LoadSynchronous(), SpawnWorldTransform.GetScale3D()* Config.Multipliers.Ballistic.ScaleMult, Config.FromPoint, Config.ToPoint, LaunchVelocity, FSubjectHandle(Subject), FSubjectArray());
-								}
+							case EProjectileMoveMode::Static:
+								UBattleFrameFunctionLibraryRT::SpawnProjectile_Static(Succeed, ProjectileHandle, Config.NeighborGrid, Config.ProjectileConfigDataAsset.LoadSynchronous(), SpawnWorldTransform.GetScale3D() * Config.Multipliers.Static.ScaleMult, Config.FromPoint, Config.OwnerSubject, FSubjectArray());
 								break;
-							}
 
 							case EProjectileMoveMode::Interped:
 								UBattleFrameFunctionLibraryRT::SpawnProjectile_Interped(Succeed, ProjectileHandle, Config.NeighborGrid, Config.ProjectileConfigDataAsset.LoadSynchronous(), SpawnWorldTransform.GetScale3D() * Config.Multipliers.Interped.ScaleMult, Config.FromPoint, Config.ToPoint, Config.TargetSubject, Config.Multipliers.Interped.XOffsetMult, Config.Multipliers.Interped.YOffsetMult, Config.Multipliers.Interped.ZOffsetMult, Config.OwnerSubject, FSubjectArray());
 								break;
 
-							case EProjectileMoveMode::Tracking:
-								UBattleFrameFunctionLibraryRT::SpawnProjectile_Tracking(Succeed, ProjectileHandle, Config.NeighborGrid, Config.ProjectileConfigDataAsset.LoadSynchronous(), SpawnWorldTransform.GetScale3D() * Config.Multipliers.Tracking.ScaleMult, Config.FromPoint, Config.ToPoint, Config.TargetSubject, (Config.ToPoint - Config.FromPoint).GetSafeNormal() * DataAsset->ProjectileMove_Tracking.Speed, Config.OwnerSubject, FSubjectArray());
+							case EProjectileMoveMode::Ballistic:
+								UBattleFrameFunctionLibraryRT::SpawnProjectile_Ballistic(Succeed, ProjectileHandle, Config.NeighborGrid, Config.ProjectileConfigDataAsset.LoadSynchronous(), SpawnWorldTransform.GetScale3D()* Config.Multipliers.Ballistic.ScaleMult, Config.FromPoint, Config.ToPoint, Config.TargetSubject, Config.TargetVelocity, FSubjectHandle(Subject), FSubjectArray());
 								break;
 
-							case EProjectileMoveMode::Static:
-								UBattleFrameFunctionLibraryRT::SpawnProjectile_Static(Succeed, ProjectileHandle, Config.NeighborGrid, Config.ProjectileConfigDataAsset.LoadSynchronous(), SpawnWorldTransform.GetScale3D() * Config.Multipliers.Static.ScaleMult, Config.FromPoint, Config.OwnerSubject, FSubjectArray());
+							case EProjectileMoveMode::Tracking:
+								UBattleFrameFunctionLibraryRT::SpawnProjectile_Tracking(Succeed, ProjectileHandle, Config.NeighborGrid, Config.ProjectileConfigDataAsset.LoadSynchronous(), SpawnWorldTransform.GetScale3D() * Config.Multipliers.Tracking.ScaleMult, Config.FromPoint, Config.ToPoint, Config.TargetSubject, (Config.ToPoint - Config.FromPoint).GetSafeNormal(), Config.OwnerSubject, FSubjectArray());
 								break;
 						}
 

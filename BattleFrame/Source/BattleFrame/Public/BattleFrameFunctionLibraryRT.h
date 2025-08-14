@@ -251,10 +251,10 @@ public:
     static void SpawnProjectile_Interped(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, float XOffsetMult, float YOffsetMult, float ZOffsetMult, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects);
 
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | Projectile", meta = (Keywords = "Set,Projectile,Movement,RuntimeData,Ballistic"))
-    static void SpawnProjectile_Ballistic(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects);
+    static void SpawnProjectile_Ballistic(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, FVector TargetVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects);
 
     UFUNCTION(BlueprintCallable, Category = "BattleFrame | Projectile", meta = (Keywords = "Set,Projectile,Movement,RuntimeData,Tracking"))
-    static void SpawnProjectile_Tracking(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects);
+    static void SpawnProjectile_Tracking(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, FVector Direction, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects);
 
     static void GetProjectilePositionAtTime_Interped(bool& bHasArrived, FVector& CurrentLocation, FVector FromPoint, FVector& ToPoint, FSubjectHandle ToTarget, FRuntimeFloatCurve XOffset, float XOffsetMult, FRuntimeFloatCurve YOffset, float YOffsetMult, FRuntimeFloatCurve ZOffset, float ZOffsetMult, float InitialTime, float CurrentTime, float Speed);
 

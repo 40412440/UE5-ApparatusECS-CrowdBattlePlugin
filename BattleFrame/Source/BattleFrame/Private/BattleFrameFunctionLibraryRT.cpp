@@ -570,7 +570,6 @@ void UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Interped
 	bHasArrived = (CurrentLocation - ToPoint).Size() <= KINDA_SMALL_NUMBER;
 }
 
-
 void UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Ballistic
 (
 	bool& bHasArrived,
@@ -659,7 +658,8 @@ void UBattleFrameFunctionLibraryRT::GetProjectilePositionAtTime_Tracking
 	FVector NewAcceleration = CorrectingAcceleration + DirectionToTarget * Acceleration;
 
 	// 确保加速度不超过设定的最大加速度
-	if (NewAcceleration.Size() > Acceleration) {
+	if (NewAcceleration.Size() > Acceleration) 
+	{
 		NewAcceleration = NewAcceleration.GetSafeNormal() * Acceleration;
 	}
 
@@ -783,7 +783,12 @@ void UBattleFrameFunctionLibraryRT::SpawnProjectile_Static(bool& Successful, FSu
 	if (!IsValid(Config))
 	{
 		Successful = false;
-		ProjectileHandle = FSubjectHandle();
+		return;
+	}
+
+	if (Config->MovementMode != EProjectileMoveMode::Static)
+	{
+		Successful = false;
 		return;
 	}
 
@@ -817,7 +822,12 @@ void UBattleFrameFunctionLibraryRT::SpawnProjectile_Interped(bool& Successful, F
 	if (!IsValid(Config))
 	{
 		Successful = false;
-		ProjectileHandle = FSubjectHandle();
+		return;
+	}
+
+	if (Config->MovementMode != EProjectileMoveMode::Interped)
+	{
+		Successful = false;
 		return;
 	}
 
@@ -871,16 +881,39 @@ void UBattleFrameFunctionLibraryRT::SpawnProjectile_Interped(bool& Successful, F
 }
 
 // Ballistic Movement
-void UBattleFrameFunctionLibraryRT::SpawnProjectile_Ballistic(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects)
+void UBattleFrameFunctionLibraryRT::SpawnProjectile_Ballistic(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, FVector TargetVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects)
 {
 	UProjectileConfigDataAsset* Config = ProjectileConfigDataAsset;
 
 	if (!IsValid(Config))
 	{
 		Successful = false;
-		ProjectileHandle = FSubjectHandle();
 		return;
 	}
+
+	if (Config->MovementMode != EProjectileMoveMode::Ballistic)
+	{
+		Successful = false;
+		return;
+	}
+
+	bool bHasValidTarget = ToTarget.IsValid() && ToTarget.HasTrait<FLocated>();
+	ToPoint = bHasValidTarget ? ToTarget.GetTrait<FLocated>().Location : ToPoint;
+
+	FVector InitialVelocity;
+
+	switch (Config->ProjectileMove_Ballistic.SolveMode)
+	{
+	case EProjectileSolveMode::FromSpeed:
+		SolveProjectileVelocityFromSpeedWithPrediction(Successful, InitialVelocity, FromPoint, ToPoint, TargetVelocity, Config->ProjectileMove_Ballistic.Iterations, Config->ProjectileMove_Ballistic.Gravity, Config->ProjectileMove_Ballistic.Speed, Config->ProjectileMove_Ballistic.bFavorHighArc);
+		break;
+
+	case EProjectileSolveMode::FromPitch:
+		SolveProjectileVelocityFromPitchWithPrediction(Successful, InitialVelocity, FromPoint, ToPoint, TargetVelocity, Config->ProjectileMove_Ballistic.Iterations, Config->ProjectileMove_Ballistic.Gravity, Config->ProjectileMove_Ballistic.Pitch);
+		break;
+	}
+
+	if (!Successful) return;
 
 	SpawnProjectileByConfig(Successful, ProjectileHandle, Config);
 
@@ -917,14 +950,19 @@ void UBattleFrameFunctionLibraryRT::SpawnProjectile_Ballistic(bool& Successful, 
 }
 
 // Tracking Movement
-void UBattleFrameFunctionLibraryRT::SpawnProjectile_Tracking(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, FVector InitialVelocity, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects)
+void UBattleFrameFunctionLibraryRT::SpawnProjectile_Tracking(bool& Successful, FSubjectHandle& ProjectileHandle, UNeighborGridComponent* NeighborGridComponent, UProjectileConfigDataAsset* ProjectileConfigDataAsset, FVector ScaleMult, FVector FromPoint, FVector ToPoint, FSubjectHandle ToTarget, FVector Direction, FSubjectHandle Instigator, FSubjectArray IgnoreSubjects)
 {
 	UProjectileConfigDataAsset* Config = ProjectileConfigDataAsset;
 
 	if (!IsValid(Config))
 	{
 		Successful = false;
-		ProjectileHandle = FSubjectHandle();
+		return;
+	}
+
+	if (Config->MovementMode != EProjectileMoveMode::Tracking)
+	{
+		Successful = false;
 		return;
 	}
 
@@ -947,15 +985,15 @@ void UBattleFrameFunctionLibraryRT::SpawnProjectile_Tracking(bool& Successful, F
 	ProjectileMoving.ToPoint = ToPoint;
 	ProjectileMoving.Target = ToTarget;
 	ProjectileMoving.TargetVelocity = TargetV;
-	ProjectileMoving.CurrentVelocity = InitialVelocity;
+	ProjectileMoving.CurrentVelocity = Direction * Config->ProjectileMove_Tracking.Speed;
 
 	FLocated Located;
 	Located.Location = FromPoint;
 	Located.PreLocation = FromPoint;
 
 	FDirected Directed;
-	Directed.Direction = InitialVelocity.GetSafeNormal();
-	Directed.DesiredDirection = Directed.Direction;
+	Directed.Direction = Direction;
+	Directed.DesiredDirection = Direction;
 
 	FScaled Scaled;
 	Scaled.RenderScale *= ScaleMult;
