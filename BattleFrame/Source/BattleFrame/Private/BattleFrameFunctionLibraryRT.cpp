@@ -1186,9 +1186,14 @@ void USphereSweepForSubjectsAsyncAction::Activate()
 					IgnoreSet.Add(Subject);
 				}
 
+				SubjectFilter.Include(Filter.IncludeTraits);
+				SubjectFilter.Exclude(Filter.ExcludeTraits);
+
 				// 检查每个单元中的subject
 				for (const auto& CageCell : ValidCells)
 				{
+					if (!CageCell.Fingerprint.TraitsMatch(SubjectFilter)) continue;
+
 					for (const FGridData& Data : CageCell.Subjects)
 					{
 						const FSubjectHandle Subject = Data.SubjectHandle;
@@ -1283,14 +1288,10 @@ void USphereSweepForSubjectsAsyncAction::Activate()
 						int32 ValidCount = 0;
 						const bool bRequireLimit = (KeepCount > 0);
 
-						FFilter SubjectFilter;
-						SubjectFilter.Include(Filter.IncludeTraits);
-						SubjectFilter.Exclude(Filter.ExcludeTraits);
-
 						// 按预排序顺序遍历，遇到有效项立即收集
 						for (const FTraceResult& TempResult : TempResults)
 						{
-							if (!TempResult.Subject.Matches(SubjectFilter)) continue;// this can only run on gamethread
+							if (!TempResult.Subject.GetFingerprint().TraitsMatch(SubjectFilter)) continue;// this can only run on gamethread
 
 							Results.Add(TempResult);
 							ValidCount++;

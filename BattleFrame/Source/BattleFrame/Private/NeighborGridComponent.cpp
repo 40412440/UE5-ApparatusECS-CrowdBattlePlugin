@@ -147,6 +147,10 @@ void UNeighborGridComponent::SphereTraceForSubjects
 	TArray<uint32> SeenHashes;
 	SeenHashes.Reserve(32);
 
+	FFilter SubjectFilter;
+	SubjectFilter.Include(Filter.IncludeTraits);
+	SubjectFilter.Exclude(Filter.ExcludeTraits);
+
 	for (const FIntVector& Coord : CandidateCells)
 	{
 		// 提前终止检查
@@ -158,21 +162,17 @@ void UNeighborGridComponent::SphereTraceForSubjects
 
 		const auto& CellData = GetCellAt(SubjectCells, Coord);
 
+		if (!CellData.Fingerprint.TraitsMatch(SubjectFilter)) continue;
+
 		for (const FGridData& SubjectData : CellData.Subjects)
 		{
 			const FSubjectHandle Subject = SubjectData.SubjectHandle;
 
 			// 有效性检查
-			if (!Subject.IsValid()) continue;
+			if (UNLIKELY(!Subject.IsValid())) continue;
 
 			// 忽略列表检查
-			if (IgnoreSet.Contains(Subject)) continue;
-
-			// 特征过滤
-			FFilter SubjectFilter;
-			SubjectFilter.Include(Filter.IncludeTraits);
-			SubjectFilter.Exclude(Filter.ExcludeTraits);
-			if (!Subject.Matches(SubjectFilter)) continue;
+			if (UNLIKELY(IgnoreSet.Contains(Subject))) continue;
 
 			// 距离检查
 			const FVector SubjectPos = FVector(SubjectData.Location);
@@ -183,8 +183,11 @@ void UNeighborGridComponent::SphereTraceForSubjects
 			if (DistSq > FMath::Square(CombinedRadius)) continue;
 
 			// 去重
-			if (LIKELY(SeenHashes.Contains(SubjectData.SubjectHash))) continue;
+			if (SeenHashes.Contains(SubjectData.SubjectHash)) continue;
 			SeenHashes.Add(SubjectData.SubjectHash);
+
+			// 特征过滤
+			if (!Subject.GetFingerprint().TraitsMatch(SubjectFilter)) continue;
 
 			// 障碍物检查
 			const FVector CheckOriginToSubjectDir = (SubjectPos - CheckOrigin).GetSafeNormal();
@@ -420,7 +423,6 @@ void UNeighborGridComponent::SphereSweepForSubjects(
 	TArray<FTraceResult>& Results
 ) const
 {
-	//TRACE_CPUPROFILER_EVENT_SCOPE_STR("GellCellIndexes");
 	Results.Reset();
 	Hit = false; // 确保初始值为false
 
@@ -442,7 +444,7 @@ void UNeighborGridComponent::SphereSweepForSubjects(
 
 	// 临时存储所有结果
 	TArray<FTraceResult> TempResults;
-	//TRACE_CPUPROFILER_EVENT_SCOPE_STR("SortCellIndexes");
+
 	// 根据SortMode对网格进行排序（新增）
 	if (SortMode != ESortMode::None)
 	{
@@ -463,11 +465,15 @@ void UNeighborGridComponent::SphereSweepForSubjects(
 		const float ThresholdDistance = FMath::Sqrt(BestDistSq) + 2.0f * MaxCellSize * FMath::Sqrt(2.0f);
 		ThresholdDistanceSq = FMath::Square(ThresholdDistance);
 	}
-	//TRACE_CPUPROFILER_EVENT_SCOPE_STR("LoopThroughCells");
+
 	// 遍历网格
 	TArray<FHitResult> VisibilityResults;
 	TArray<uint32> SeenHashes;
 	SeenHashes.Reserve(32);
+
+	FFilter SubjectFilter;
+	SubjectFilter.Include(Filter.IncludeTraits);
+	SubjectFilter.Exclude(Filter.ExcludeTraits);
 
 	for (const FIntVector& CellIndex : GridCells)
 	{
@@ -478,11 +484,10 @@ void UNeighborGridComponent::SphereSweepForSubjects(
 			if ((SortMode == ESortMode::NearToFar && CellDistSq > ThresholdDistanceSq) || (SortMode == ESortMode::FarToNear && CellDistSq < ThresholdDistanceSq)) break;
 		}
 
-		//if (!IsInside(CellIndex)) continue;
+		const auto& CellData = GetCellAt(SubjectCells, CellIndex);
+		if (!CellData.Fingerprint.TraitsMatch(SubjectFilter)) continue;
 
-		const auto& CageCell = GetCellAt(SubjectCells, CellIndex);
-		//TRACE_CPUPROFILER_EVENT_SCOPE_STR("LoopThroughSubjects");
-		for (const FGridData& Data : CageCell.Subjects)
+		for (const FGridData& Data : CellData.Subjects)
 		{
 			const FSubjectHandle Subject = Data.SubjectHandle;
 
@@ -493,29 +498,24 @@ void UNeighborGridComponent::SphereSweepForSubjects(
 			if (UNLIKELY(IgnoreSet.Contains(Subject))) continue;
 
 			// 距离检查
-			// 粗过滤
 			const FVector SubjectPos = FVector(Data.Location);
 			float SubjectRadius = Data.Radius;
 			const FVector ToSubject = SubjectPos - Start;
 			const float ProjOnTrace = FVector::DotProduct(ToSubject, TraceDir);
 			const float ProjThreshold = SubjectRadius + Radius;
-			if (LIKELY(ProjOnTrace < -ProjThreshold || ProjOnTrace > TraceLength + ProjThreshold)) continue;
-
-			// 精确过滤
+			if (LIKELY(ProjOnTrace < -ProjThreshold || ProjOnTrace > TraceLength + ProjThreshold)) continue; // 粗过滤
+		
 			const float ClampedProj = FMath::Clamp(ProjOnTrace, 0.0f, TraceLength);
 			const FVector NearestPoint = Start + ClampedProj * TraceDir;
 			const float CombinedRadSq = FMath::Square(Radius + SubjectRadius);
-			if (LIKELY(FVector::DistSquared(NearestPoint, SubjectPos) >= CombinedRadSq)) continue;
+			if (LIKELY(FVector::DistSquared(NearestPoint, SubjectPos) >= CombinedRadSq)) continue; // 精确过滤
 
 			// 去重
-			if (UNLIKELY(SeenHashes.Contains(Data.SubjectHash))) continue;
+			if (SeenHashes.Contains(Data.SubjectHash)) continue;
 			SeenHashes.Add(Data.SubjectHash);
 
 			// 特征检查
-			FFilter SubjectFilter;
-			SubjectFilter.Include(Filter.IncludeTraits);
-			SubjectFilter.Exclude(Filter.ExcludeTraits);
-			if (LIKELY(!Subject.Matches(SubjectFilter))) continue;
+			if (!Subject.GetFingerprint().TraitsMatch(SubjectFilter)) continue;
 
 			// 障碍物检查
 			const FVector CheckOriginToSubjectDir = (SubjectPos - CheckOrigin).GetSafeNormal();
@@ -789,7 +789,6 @@ void UNeighborGridComponent::SectorTraceForSubjects
 	TArray<FTraceResult>& Results
 ) const
 {
-	//TRACE_CPUPROFILER_EVENT_SCOPE_STR("SectorTraceForSubjects");
 	Results.Reset();
 
 	// 特殊处理标志
@@ -904,6 +903,10 @@ void UNeighborGridComponent::SectorTraceForSubjects
 	TArray<uint32> SeenHashes;
 	SeenHashes.Reserve(32);
 
+	FFilter SubjectFilter;
+	SubjectFilter.Include(Filter.IncludeTraits);
+	SubjectFilter.Exclude(Filter.ExcludeTraits);
+
 	for (const FIntVector& Coord : CandidateCells)
 	{
 		// 提前终止检查
@@ -914,6 +917,7 @@ void UNeighborGridComponent::SectorTraceForSubjects
 		}
 
 		const auto& CellData = GetCellAt(SubjectCells, Coord);
+		if (!CellData.Fingerprint.TraitsMatch(SubjectFilter)) continue;
 
 		for (const FGridData& SubjectData : CellData.Subjects)
 		{
@@ -923,7 +927,7 @@ void UNeighborGridComponent::SectorTraceForSubjects
 			if (UNLIKELY(!Subject.IsValid())) continue;
 
 			// 忽略列表检查
-			if (LIKELY(IgnoreSet.Contains(Subject))) continue;
+			if (UNLIKELY(IgnoreSet.Contains(Subject))) continue;
 
 			// 高度检查
 			const FVector SubjectPos = FVector(SubjectData.Location);
@@ -946,14 +950,11 @@ void UNeighborGridComponent::SectorTraceForSubjects
 			}
 
 			// 去重
-			if (LIKELY(SeenHashes.Contains(SubjectData.SubjectHash))) continue;
+			if (SeenHashes.Contains(SubjectData.SubjectHash)) continue;
 			SeenHashes.Add(SubjectData.SubjectHash);
 
 			// 特征检查
-			FFilter SubjectFilter;
-			SubjectFilter.Include(Filter.IncludeTraits);
-			SubjectFilter.Exclude(Filter.ExcludeTraits);
-			if (UNLIKELY(!Subject.Matches(SubjectFilter))) continue;
+			if (!Subject.GetFingerprint().TraitsMatch(SubjectFilter)) continue;
 
 			// 障碍物检查
 			const FVector CheckOriginToSubjectDir = (SubjectPos - CheckOrigin).GetSafeNormal();
@@ -1224,6 +1225,7 @@ void UNeighborGridComponent::Update()
 				bShouldRegister = true;
 				Cell.bRegistered = true;
 			}
+			Cell.Fingerprint.Add(GridData.SubjectHandle.GetFingerprint());
 			Cell.Subjects.Add(GridData);
 			Cell.Unlock();
 

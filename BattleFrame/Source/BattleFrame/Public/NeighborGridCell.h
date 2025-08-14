@@ -43,7 +43,8 @@ public:
 		LockFlag.store(false, std::memory_order_release);
 	}
 
-	TArray<FGridData, TInlineAllocator<8>> Subjects;
+	FFingerprint Fingerprint;
+	TArray<FGridData, TInlineAllocator<16>> Subjects;
 	bool bRegistered = false;
 
 	FORCEINLINE FNeighborGridCell(){}
@@ -51,12 +52,14 @@ public:
 	FORCEINLINE FNeighborGridCell(const FNeighborGridCell& Cell)
 	{
 		LockFlag.store(Cell.LockFlag.load());
+		Fingerprint = Cell.Fingerprint;
 		Subjects = Cell.Subjects;
 		bRegistered = Cell.bRegistered;
 	}
 
 	FNeighborGridCell& operator=(const FNeighborGridCell& Cell)
 	{
+		Fingerprint = Cell.Fingerprint;
 		Subjects = Cell.Subjects;
 		bRegistered = Cell.bRegistered;
 		return *this;
@@ -64,6 +67,7 @@ public:
 
 	FORCEINLINE void Empty()
 	{
+		Fingerprint.Reset();
 		Subjects.Empty();
 		bRegistered = false;
 	}

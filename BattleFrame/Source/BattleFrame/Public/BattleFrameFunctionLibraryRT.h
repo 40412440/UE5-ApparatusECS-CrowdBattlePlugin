@@ -733,6 +733,8 @@ public:
     TArray<FTraceResult> TempResults;
     TArray<FTraceResult> Results;
 
+    FFilter SubjectFilter;
+
     UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject", AutoCreateRefTerm = "TraceStart, TraceEnd, CheckOrigin, SortOrigin, CheckObjectTypes, IgnoreSubjects, Filter, DrawDebugConfig"))
     static USphereSweepForSubjectsAsyncAction* SphereSweepForSubjectsAsync
     (

@@ -377,9 +377,7 @@ public:
 		AnimIndex2 = FMath::Clamp(AnimIndex2, 0, 1023);
 
 		// 位组合：| 未使用 | AnimIndex2 | AnimIndex1 | AnimIndex0 |
-		uint32 packed = (static_cast<uint32>(AnimIndex2) << 20) |
-			(static_cast<uint32>(AnimIndex1) << 10) |
-			static_cast<uint32>(AnimIndex0);
+		uint32 packed = (static_cast<uint32>(AnimIndex2) << 20) | (static_cast<uint32>(AnimIndex1) << 10) | static_cast<uint32>(AnimIndex0);
 
 		return *reinterpret_cast<float*>(&packed);
 	}

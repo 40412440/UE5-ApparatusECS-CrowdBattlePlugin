@@ -945,6 +945,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							// 排除自身
 							if (UNLIKELY(Data.SubjectHash == SelfHash)) continue;
 
+							if (UNLIKELY(!Data.SubjectHandle.IsValid())) continue;
+
 							// 距离检查
 							const float DistSqr = FVector::DistSquared(SelfLocation, FVector(Data.Location));
 							if (DistSqr > CombinedRadiusSqr) continue;
@@ -954,7 +956,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							SeenHashes.Add(Data.SubjectHash);
 
 							// Filter By Traits
-							if (UNLIKELY(!Data.SubjectHandle.Matches(SubjectFilter))) continue;
+							if (UNLIKELY(!Data.SubjectHandle.GetFingerprint().TraitsMatch(SubjectFilter))) continue;
 
 							// we limit the amount of subjects. we keep the nearest MaxNeighbors amount of neighbors
 							// 动态维护堆
@@ -1060,7 +1062,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							}
 						};
 
-					auto ProcessObstacles = [&](const TArray<FGridData, TInlineAllocator<8>>& Obstacles)
+					auto ProcessObstacles = [&](const TArray<FGridData, TInlineAllocator<16>>& Obstacles)
 						{
 							for (const auto& Obstacle : Obstacles)
 							{
