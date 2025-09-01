@@ -2530,7 +2530,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					{
 						bool Succeed;
 						FSubjectHandle ProjectileHandle;
-						FVector LaunchVelocity;
+						FVector LaunchVelocity = FVector::ZeroVector;
 
 						switch (DataAsset->MovementMode)
 						{
