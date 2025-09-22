@@ -100,7 +100,7 @@ public:
 	FSubjectArray IgnoreSubjects = FSubjectArray();
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "在哪个邻居网格中检索目标, 不填会尝试自动获取关卡中第一个"))
-	UNeighborGridComponent* NeighborGridComponent;
+	UNeighborGridComponent* NeighborGridComponent = nullptr;
 
 };
 
@@ -475,25 +475,25 @@ public:
 	FSubjectHandle TargetSubject = FSubjectHandle();
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	FTransform SpawnTransform;
+	FTransform SpawnTransform = FTransform::Identity;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	FTransform InitialRelativeTransform;
+	FTransform InitialRelativeTransform = FTransform::Identity;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
 	TArray<FSubjectHandle> SpawnedProjectiles;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	FVector FromPoint;
+	FVector FromPoint = FVector::ZeroVector;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	FVector ToPoint;
+	FVector ToPoint = FVector::ZeroVector;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	FVector TargetVelocity;
+	FVector TargetVelocity = FVector::ZeroVector;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	UNeighborGridComponent* NeighborGrid;
+	UNeighborGridComponent* NeighborGrid = nullptr;
 
 	bool bInitialized = false;
 	bool bSpawned = false;
