@@ -192,10 +192,10 @@ public:
 	FTransform InitialRelativeTransform;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	TArray<UNiagaraComponent*> SpawnedNiagaraSystems;
+	TArray<TObjectPtr<UNiagaraComponent>> SpawnedNiagaraSystems;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	TArray<UParticleSystemComponent*> SpawnedCascadeSystems;
+	TArray<TObjectPtr<UParticleSystemComponent>> SpawnedCascadeSystems;
 
 	bool bInitialized = false;
 	bool bSpawned = false;

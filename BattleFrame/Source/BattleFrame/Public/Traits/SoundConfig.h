@@ -175,7 +175,7 @@ public:
 	FTransform InitialRelativeTransform;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-	TArray<UAudioComponent*> SpawnedSounds;
+	TArray<TObjectPtr<UAudioComponent>> SpawnedSounds;
 
 	bool bInitialized = false;
 	bool bSpawned = false;

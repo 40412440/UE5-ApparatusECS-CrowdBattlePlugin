@@ -158,7 +158,7 @@ public:
     FTransform InitialRelativeTransform;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
-    TArray<AActor*> SpawnedActors;
+    TArray<TObjectPtr<AActor>> SpawnedActors;
 
     bool bInitialized = false;
     bool bSpawned = false;

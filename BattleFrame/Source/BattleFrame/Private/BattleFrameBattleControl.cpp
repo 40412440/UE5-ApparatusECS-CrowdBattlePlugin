@@ -3743,7 +3743,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 							for (int32 i = 0; i < Config.Quantity; ++i)
 							{
-								AActor* Actor = CurrentWorld->SpawnActor<AActor>(Config.ActorClass, SpawnWorldTransform, SpawnParams);
+								TObjectPtr<AActor> Actor = CurrentWorld->SpawnActor<AActor>(Config.ActorClass, SpawnWorldTransform, SpawnParams);
 
 								if (IsValid(Actor))
 								{
@@ -3786,7 +3786,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						// 更新所有生成的Actor
 						if (Config.bSpawned)
 						{
-							for (AActor* Actor : Config.SpawnedActors)
+							for (auto& Actor : Config.SpawnedActors)
 							{
 								if (IsValid(Actor))
 								{
@@ -3801,7 +3801,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				if (Config.bSpawned)
 				{
 					bool bHasValidChild = false;
-					for (AActor* Actor : Config.SpawnedActors)
+					for (const auto& Actor : Config.SpawnedActors)
 					{
 						if (IsValid(Actor))
 						{
@@ -3819,7 +3819,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 						if (!bHasValidChild || bLifeExpired || bInvalidAttachment)
 						{
-							for (AActor* Actor : Config.SpawnedActors)
+							for (auto& Actor : Config.SpawnedActors)
 							{
 								if (IsValid(Actor)) Actor->Destroy();
 							}
@@ -3936,7 +3936,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						// 更新所有生成的粒子系统
 						if (Config.bSpawned)
 						{
-							for (auto Fx : Config.SpawnedNiagaraSystems)
+							for (auto& Fx : Config.SpawnedNiagaraSystems)
 							{
 								if (IsValid(Fx))
 								{
@@ -3944,7 +3944,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								}
 							}
 
-							for (auto Fx : Config.SpawnedCascadeSystems)
+							for (auto& Fx : Config.SpawnedCascadeSystems)
 							{
 								if (IsValid(Fx))
 								{
@@ -3959,7 +3959,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				if (Config.bSpawned)
 				{
 					bool bHasValidChild = false;
-					for (auto Fx : Config.SpawnedNiagaraSystems)
+					for (auto& Fx : Config.SpawnedNiagaraSystems)
 					{
 						if (IsValid(Fx))
 						{
@@ -3970,7 +3970,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 					if (!bHasValidChild)
 					{
-						for (auto Fx : Config.SpawnedCascadeSystems)
+						for (auto& Fx : Config.SpawnedCascadeSystems)
 						{
 							if (IsValid(Fx))
 							{
@@ -3989,11 +3989,11 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 						if (!bHasValidChild || bLifeExpired || bInvalidAttachment)
 						{
-							for (auto Fx : Config.SpawnedNiagaraSystems)
+							for (auto& Fx : Config.SpawnedNiagaraSystems)
 							{
 								if (IsValid(Fx)) Fx->DestroyComponent();
 							}
-							for (auto Fx : Config.SpawnedCascadeSystems)
+							for (auto& Fx : Config.SpawnedCascadeSystems)
 							{
 								if (IsValid(Fx)) Fx->DestroyComponent();
 							}
@@ -4038,7 +4038,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 								if (Config.SpawnOrigin == EPlaySoundOrigin::PlaySound2D)
 								{
 									// 2D音效直接播放，不处理附着
-									UAudioComponent* AudioComp = UGameplayStatics::CreateSound2D(
+									auto AudioComp = UGameplayStatics::CreateSound2D(
 										GetWorld(),
 										Config.Sound.Get(),
 										Config.Volume);
@@ -4055,7 +4055,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 										PlayTransform = Config.InitialRelativeTransform * CurrentAttachTransform;
 									}
 
-									UAudioComponent* AudioComp = UGameplayStatics::SpawnSoundAtLocation(
+									auto AudioComp = UGameplayStatics::SpawnSoundAtLocation(
 										GetWorld(),
 										Config.Sound.Get(),
 										PlayTransform.GetLocation(),
@@ -4086,7 +4086,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						// 更新所有生成的音效位置
 						if (Config.bSpawned)
 						{
-							for (UAudioComponent* AudioComp : Config.SpawnedSounds)
+							for (auto& AudioComp : Config.SpawnedSounds)
 							{
 								if (IsValid(AudioComp))
 								{
@@ -4102,7 +4102,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				{
 					bool bHasValidChild = false;
 
-					for (UAudioComponent* AudioComp : Config.SpawnedSounds)
+					for (auto& AudioComp : Config.SpawnedSounds)
 					{
 						if (IsValid(AudioComp) && AudioComp->IsPlaying())
 						{
@@ -4120,7 +4120,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 						if (!bHasValidChild || bLifeExpired || bInvalidAttachment)
 						{
-							for (UAudioComponent* AudioComp : Config.SpawnedSounds)
+							for (auto& AudioComp : Config.SpawnedSounds)
 							{
 								if (IsValid(AudioComp))
 								{
@@ -4158,7 +4158,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 			if (Data.SelfSubject.IsValid())
 			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+				TObjectPtr<AActor> DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
 
 				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
 				{
@@ -4174,7 +4174,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 			if (Data.SelfSubject.IsValid())
 			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+				TObjectPtr<AActor> DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
 
 				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
 				{
@@ -4190,7 +4190,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 			if (Data.SelfSubject.IsValid())
 			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+				TObjectPtr<AActor> DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
 
 				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
 				{
@@ -4206,7 +4206,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 			if (Data.SelfSubject.IsValid())
 			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+				TObjectPtr<AActor> DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
 
 				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
 				{
@@ -4222,7 +4222,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 			if (Data.SelfSubject.IsValid())
 			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+				TObjectPtr<AActor> DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
 
 				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
 				{
@@ -4238,7 +4238,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 			if (Data.SelfSubject.IsValid())
 			{
-				AActor* DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
+				TObjectPtr<AActor> DmgActor = Data.SelfSubject.GetSubjective()->GetActor();
 
 				if (DmgActor && DmgActor->GetClass()->ImplementsInterface(UBattleFrameInterface::StaticClass()))
 				{
