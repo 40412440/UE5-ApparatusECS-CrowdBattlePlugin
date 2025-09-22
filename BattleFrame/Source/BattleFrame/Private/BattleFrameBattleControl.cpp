@@ -82,6 +82,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 
 		Chain->OperateConcurrently([&](FSolidSubjectHandle Subject, FStatistics& Stats)
 		{
+			const bool bHasIsSubjective = Subject.HasTrait<FIsSubjective>();
+
 			if (Stats.bEnable)
 			{
 				Stats.TotalTime += DeltaTime;
@@ -100,7 +102,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					Subject.SetTraitDeferred(FDying());
 
 					// Death Event OutOfLifeSpan
-					if (Subject.HasTrait<FIsSubjective>())
+					if (bHasIsSubjective)
 					{
 						FDeathData DeathData;
 						DeathData.SelfSubject = FSubjectHandle(Subject);
@@ -133,6 +135,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FAnimating& Animating,
 				FCurves& Curves)
 			{
+				const bool bHasIsSubjective = Subject.HasTrait<FIsSubjective>();
+
 				// Initial execute
 				if (Appearing.Time == 0 && !Appearing.bInitialized)
 				{
@@ -175,7 +179,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 
 					// Appear Event
-					if (Subject.HasTrait<FIsSubjective>())
+					if (bHasIsSubjective)
 					{
 						FAppearData AppearData;
 						AppearData.SelfSubject = FSubjectHandle(Subject);
@@ -470,13 +474,15 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				const FVector SelfLocation = Located.Location;
 				const float SelfRadius = Collider.Radius * Scaled.Scale;
 
+				const bool bHasIsSubjective = Subject.HasTrait<FIsSubjective>();
+
 				// 死亡区域检测			
 				if (SelfLocation.Z - SelfRadius < Fall.KillZ)
 				{
 					Subject.DespawnDeferred();
 
 					// Death Event KillZ
-					if (Subject.HasTrait<FIsSubjective>())
+					if (bHasIsSubjective)
 					{
 						FDeathData DeathData;
 						DeathData.SelfSubject = FSubjectHandle(Subject);
@@ -534,7 +540,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						Tracing.TimeLeft = 0;
 
 						// Move Event Sleeping
-						if (Subject.HasTrait<FIsSubjective>())
+						if (bHasIsSubjective)
 						{
 							FMoveData MoveData;
 							MoveData.SelfSubject = FSubjectHandle(Subject);
@@ -561,7 +567,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						if (!bIsPreviouslyPatrolling) Tracing.TimeLeft = 0;
 
 						// Move Event Patrol
-						if (Subject.HasTrait<FIsSubjective>())
+						if (bHasIsSubjective)
 						{
 							FMoveData MoveData;
 							MoveData.SelfSubject = FSubjectHandle(Subject);
@@ -589,7 +595,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						if (!bIsPreviouslyChasing) Tracing.TimeLeft = 0;
 
 						// Move Event Chasing
-						if (Subject.HasTrait<FIsSubjective>())
+						if (bHasIsSubjective)
 						{
 							FMoveData MoveData;
 							MoveData.SelfSubject = FSubjectHandle(Subject);
@@ -616,7 +622,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						if (!bIsPreviouslyApproaching) Tracing.TimeLeft = 0;
 
 						// Move Event
-						if (Subject.HasTrait<FIsSubjective>())
+						if (bHasIsSubjective)
 						{
 							FMoveData MoveData;
 							MoveData.SelfSubject = FSubjectHandle(Subject);
@@ -1509,6 +1515,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 			{
 				bool bShouldTrace = false;
 				const bool bHasAttacking = Subject.HasTrait<FAttacking>();// we don't trace in the middle of an attack
+				const bool bHasIsSubjective = Subject.HasTrait<FIsSubjective>();
 
 				if (Trace.bEnable && !bHasAttacking)
 				{
@@ -1574,7 +1581,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						}
 
 						// Trace Event Begin
-						if (Subject.HasTrait<FIsSubjective>())
+						if (bHasIsSubjective)
 						{
 							FTraceData TraceData;
 							TraceData.SelfSubject = FSubjectHandle(Subject);
@@ -1636,6 +1643,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 			FMoving& Moving = Subject.GetTraitRef<FMoving>();
 			FNavigating& Navigating = Subject.GetTraitRef<FNavigating>();
 
+			const bool bHasIsSubjective = Subject.HasTrait<FIsSubjective>();
 			bool bHasValidTraceResult = false;
 			bool bFinalCheckVisibility = false;
 			bool bFinalDrawDebugShape = Trace.bDrawDebugShape;
@@ -1973,8 +1981,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				}
 
 				// Trace Event, Succeed or Fail
-				const bool bHasIsSubjective = Subject.HasTrait<FIsSubjective>();
-
 				if (bHasIsSubjective)
 				{
 					FTraceData TraceData;
@@ -2023,6 +2029,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				if (!Attack.bEnable) return;
 
 				if (Subject.HasFlag(HitAnimFlag)) return;
+				const bool bHasIsSubjective = Subject.HasTrait<FIsSubjective>();
 
 				// Debug Draw Attack Range
 				if (Attack.bDrawDebugShape)
@@ -2057,7 +2064,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							Subject.SetTraitDeferred(FAttacking());
 
 							// Attack Aim(Begin) Event
-							if (Subject.HasTrait<FIsSubjective>())
+							if (bHasIsSubjective)
 							{
 								FAttackData AttackData;
 								AttackData.SelfSubject = FSubjectHandle(Subject);
@@ -2099,6 +2106,8 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FDefence& Defence,
 				FSlowing& Slowing)
 			{
+				const bool bHasIsSubjective = Subject.HasTrait<FIsSubjective>();
+
 				// 瞄准
 				if (Attacking.State == EAttackState::Aim)
 				{
@@ -2112,7 +2121,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						Tracing.TimeLeft = 0; // 可立即重新索敌
 
 						// Attack End Event
-						if (Subject.HasTrait<FIsSubjective>())
+						if (bHasIsSubjective)
 						{
 							FAttackData AttackData;
 							AttackData.SelfSubject = FSubjectHandle(Subject);
@@ -2159,7 +2168,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						Subject.RemoveTraitDeferred<FAttacking>(); // 不再攻击
 
 						// Attack End Event
-						if (Subject.HasTrait<FIsSubjective>())
+						if (bHasIsSubjective)
 						{
 							FAttackData AttackData;
 							AttackData.SelfSubject = FSubjectHandle(Subject);
@@ -2331,7 +2340,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 
 					// Attack Begin Event
-					if (Subject.HasTrait<FIsSubjective>())
+					if (bHasIsSubjective)
 					{
 						FAttackData AttackData;
 						AttackData.SelfSubject = FSubjectHandle(Subject);
@@ -2408,7 +2417,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 
 					// Attack Hit Event
-					if (Subject.HasTrait<FIsSubjective>())
+					if (bHasIsSubjective)
 					{
 						FAttackData AttackData;
 						AttackData.SelfSubject = FSubjectHandle(Subject);
@@ -2423,7 +2432,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					{
 						Subject.DespawnDeferred();
 
-						if (Subject.HasTrait<FIsSubjective>())
+						if (bHasIsSubjective)
 						{
 							// Death Event SuicideAttack
 							FDeathData DeathData;
@@ -2450,7 +2459,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					Subject.SetFlag(AttackAnimFlag,false);
 
 					// Attack Event Cooling 
-					if (Subject.HasTrait<FIsSubjective>())
+					if (bHasIsSubjective)
 					{
 						FAttackData AttackData;
 						AttackData.SelfSubject = FSubjectHandle(Subject);
@@ -2471,7 +2480,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					if (!bIsTargetValid) Tracing.TimeLeft = 0;
 
 					// Attack Event Complete
-					if (Subject.HasTrait<FIsSubjective>())
+					if (bHasIsSubjective)
 					{
 						FAttackData AttackData;
 						AttackData.SelfSubject = FSubjectHandle(Subject);
@@ -3593,6 +3602,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 				FCurves& Curves)
 			{
 				if (!Death.bEnable) return;
+				const bool bHasIsSubjective = Subject.HasTrait<FIsSubjective>();
 
 				// Init, do once
 				if (Dying.Time == 0 && !Dying.bInitialized)
@@ -3637,7 +3647,7 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					}
 
 					// Death Begin Event
-					if (Subject.HasTrait<FIsSubjective>())
+					if (bHasIsSubjective)
 					{
 						FDeathData DeathData;
 						DeathData.SelfSubject = FSubjectHandle(Subject);
