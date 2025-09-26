@@ -1230,7 +1230,7 @@ void USphereSweepForSubjectsAsyncAction::Activate()
 				// 检查每个单元中的subject
 				for (const auto& CageCell : ValidCells)
 				{
-					if (!CageCell.Fingerprint.TraitsMatch(SubjectFilter)) continue;
+					if (!CageCell.Fingerprint.Matches(Filter.IncludeTraits)) continue;
 
 					for (const FGridData& Data : CageCell.Subjects)
 					{
@@ -1329,7 +1329,7 @@ void USphereSweepForSubjectsAsyncAction::Activate()
 						// 按预排序顺序遍历，遇到有效项立即收集
 						for (const FTraceResult& TempResult : TempResults)
 						{
-							if (!TempResult.Subject.GetFingerprint().TraitsMatch(SubjectFilter)) continue;// this can only run on gamethread
+							if (!TempResult.Subject.Matches(SubjectFilter)) continue;// this can only run on gamethread
 
 							Results.Add(TempResult);
 							ValidCount++;

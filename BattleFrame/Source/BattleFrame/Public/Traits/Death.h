@@ -35,8 +35,8 @@ public:
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "寿命，负值为无限长"))
     float LifeSpan = -1.f;
 
-    UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "死亡后的尸体是否关闭碰撞"))
-    bool bDisableCollision = true;
+    //UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = "死亡后的尸体是否关闭碰撞"))
+    //bool bDisableCollision = true;
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere, meta = (Tooltip = ""))
     TArray<FActorSpawnConfig> SpawnActor;

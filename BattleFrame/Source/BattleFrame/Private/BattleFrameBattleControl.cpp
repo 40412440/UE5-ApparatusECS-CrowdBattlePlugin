@@ -934,11 +934,6 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 						}
 					}
 
-					if (UNLIKELY(Subject.HasTrait<FDying>()))
-					{
-						SubjectFilter.Include<FDying>();// dying subject only collide with dying subjects
-					}
-
 					// this for loop is the most expensive code of all
 					for (const auto& Coord : NeighbourCellCoords)
 					{
@@ -961,8 +956,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 							if (UNLIKELY(SeenHashes.Contains(Data.SubjectHash))) continue;
 							SeenHashes.Add(Data.SubjectHash);
 
+							if (UNLIKELY(Data.SubjectHandle.HasTrait<FDying>())) continue;
+
 							// Filter By Traits
-							if (UNLIKELY(!Data.SubjectHandle.GetFingerprint().TraitsMatch(SubjectFilter))) continue;
+							if (UNLIKELY(!Data.SubjectHandle.Matches(SubjectFilter))) continue;
 
 							// we limit the amount of subjects. we keep the nearest MaxNeighbors amount of neighbors
 							// 动态维护堆
@@ -3678,10 +3675,10 @@ void ABattleFrameBattleControl::Tick(float DeltaTime)
 					Dying.Time += SafeDeltaTime; // 计时
 
 					// 关闭碰撞
-					if (Death.bDisableCollision && !Subject.HasFlag(DeathDisableCollisionFlag) && Moving.CurrentVelocity.Size2D() < 0)
-					{
-						Subject.SetFlag(DeathDisableCollisionFlag);
-					}
+					//if (Death.bDisableCollision && !Subject.HasFlag(DeathDisableCollisionFlag) && Moving.CurrentVelocity.Size2D() < 0)
+					//{
+					//	Subject.SetFlag(DeathDisableCollisionFlag);
+					//}
 
 					// 死亡消融					
 					if (Subject.HasFlag(DeathDissolveFlag))
@@ -4835,7 +4832,7 @@ void ABattleFrameBattleControl::DefineFilters()
 	AgentSleepFilter = FFilter::Make<FAgent, FLocated, FDirected, FScaled, FCollider, FSleep, FSleeping, FTrace, FTracing, FMove, FMoving, FRendering, FActivated>().Exclude<FAppearing, FDying>();
 	AgentPatrolFilter = FFilter::Make<FAgent, FLocated, FDirected, FScaled, FCollider, FPatrol, FPatrolling, FTrace, FTracing, FMove, FMoving, FRendering, FActivated>().Exclude<FAppearing, FSleeping, FDying>();
 	AgentMoveFilter = FFilter::Make<FAgent, FRendering, FAnimation, FMove, FMoving, FChase, FLocated, FDirected, FScaled, FCollider, FAttack, FTrace, FTracing, FNavigation, FNavigating, FAvoidance, FAvoiding, FDefence, FPatrol, FGridData, FSlowing, FActivated>();
-	SubjectFilterBase = FFilter::Make<FLocated, FDirected, FScaled, FCollider, FAvoidance, FAvoiding, FGridData, FActivated>().Exclude<FSphereObstacle, FBoxObstacle>().ExcludeFlag(DeathDisableCollisionFlag);
+	SubjectFilterBase = FFilter::Make<FLocated, FDirected, FScaled, FCollider, FAvoidance, FAvoiding, FGridData, FActivated>().Exclude<FSphereObstacle, FBoxObstacle>();
 
 	AgentTraceFilter = FFilter::Make<FAgent, FLocated, FDirected, FScaled, FCollider, FSleep, FPatrol, FTrace, FTracing, FMoving, FRendering, FActivated>().Exclude<FAppearing, FDying>();
 	AgentAttackFilter = FFilter::Make<FAgent, FAttack, FRendering, FLocated, FDirected, FCollider, FScaled, FTrace, FActivated>().Exclude<FAppearing, FSleeping, FPatrolling, FDying>();

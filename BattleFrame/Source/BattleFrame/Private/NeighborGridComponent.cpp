@@ -161,8 +161,7 @@ void UNeighborGridComponent::SphereTraceForSubjects
 		}
 
 		const auto& CellData = GetCellAt(SubjectCells, Coord);
-
-		if (!CellData.Fingerprint.TraitsMatch(SubjectFilter)) continue;
+		if (!CellData.Fingerprint.Matches(Filter.IncludeTraits)) continue;
 
 		for (const FGridData& SubjectData : CellData.Subjects)
 		{
@@ -187,7 +186,7 @@ void UNeighborGridComponent::SphereTraceForSubjects
 			SeenHashes.Add(SubjectData.SubjectHash);
 
 			// 特征过滤
-			if (!Subject.GetFingerprint().TraitsMatch(SubjectFilter)) continue;
+			if (!Subject.Matches(SubjectFilter)) continue;
 
 			// 障碍物检查
 			const FVector CheckOriginToSubjectDir = (SubjectPos - CheckOrigin).GetSafeNormal();
@@ -485,7 +484,8 @@ void UNeighborGridComponent::SphereSweepForSubjects(
 		}
 
 		const auto& CellData = GetCellAt(SubjectCells, CellIndex);
-		if (!CellData.Fingerprint.TraitsMatch(SubjectFilter)) continue;
+
+		if (!CellData.Fingerprint.Matches(Filter.IncludeTraits)) continue;
 
 		for (const FGridData& Data : CellData.Subjects)
 		{
@@ -515,7 +515,7 @@ void UNeighborGridComponent::SphereSweepForSubjects(
 			SeenHashes.Add(Data.SubjectHash);
 
 			// 特征检查
-			if (!Subject.GetFingerprint().TraitsMatch(SubjectFilter)) continue;
+			if (!Subject.Matches(SubjectFilter)) continue;
 
 			// 障碍物检查
 			const FVector CheckOriginToSubjectDir = (SubjectPos - CheckOrigin).GetSafeNormal();
@@ -917,7 +917,7 @@ void UNeighborGridComponent::SectorTraceForSubjects
 		}
 
 		const auto& CellData = GetCellAt(SubjectCells, Coord);
-		if (!CellData.Fingerprint.TraitsMatch(SubjectFilter)) continue;
+		if (!CellData.Fingerprint.Matches(Filter.IncludeTraits)) continue;
 
 		for (const FGridData& SubjectData : CellData.Subjects)
 		{
@@ -954,7 +954,7 @@ void UNeighborGridComponent::SectorTraceForSubjects
 			SeenHashes.Add(SubjectData.SubjectHash);
 
 			// 特征检查
-			if (!Subject.GetFingerprint().TraitsMatch(SubjectFilter)) continue;
+			if (!Subject.Matches(SubjectFilter)) continue;
 
 			// 障碍物检查
 			const FVector CheckOriginToSubjectDir = (SubjectPos - CheckOrigin).GetSafeNormal();
